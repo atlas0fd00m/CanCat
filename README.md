@@ -26,6 +26,12 @@ the goals of CanCat are multiple:
 
 github collab/pull requests should make this a good point of collaboration.
 
+
+REQUIRED SOFTWARE:
+* Currently, CANBUS_Shield from SeeedStudio  
+    http://www.seeedstudio.com/wiki/CAN-BUS_Shield
+    https://github.com/Seeed-Studio/CAN_BUS_Shield
+
 hack fun!
 @
 
