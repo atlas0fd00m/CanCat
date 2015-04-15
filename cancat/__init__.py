@@ -821,7 +821,7 @@ class CanInterface:
                     )
 
         last_msg = None
-        last_bkmk = 0
+        next_bkmk = 0
         next_bkmk_idx = 0
 
         msg_count = 0
@@ -832,12 +832,15 @@ class CanInterface:
         data_delta = None
 
 
+        data_repeat = 0
+        data_similar = 0
+
         for idx, ts, arbid, msg in self.filterCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids=arbids, ignore=ignore):
             diff = []
 
-            while idx > last_bkmk and next_bkmk_idx < len(self.bookmarks):
+            # insert bookmark names/comments in appropriate places
+            while next_bkmk_idx < len(self.bookmarks) and idx >= self.bookmarks[next_bkmk_idx]:
                 out.append(self.reprBookmark(next_bkmk_idx))
-                last_bkmk = self.bookmarks[next_bkmk_idx]
                 next_bkmk_idx += 1
 
             msg_count += 1
@@ -852,8 +855,10 @@ class CanInterface:
 
                     if byte_cnt_diff == 0:
                         diff.append("REPEAT")
+                        data_repeat += 1
                     elif byte_cnt_diff <=4:
                         diff.append("Similar")
+                        data_similar += 1
                     # FIXME: make some better heuristic to identify "out of norm"
 
             # look for ASCII data (4+ consecutive bytes)
@@ -881,7 +886,7 @@ class CanInterface:
             last_ts = ts
             last_msg = msg
 
-        out.append("Total Messages: %d" % msg_count)
+        out.append("Total Messages: %d  (repeat: %d / similar: %d)" % (msg_count, data_repeat, data_similar))
 
         return "\n".join(out)
 
