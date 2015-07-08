@@ -105,18 +105,17 @@ In [5]: help(cancat)
 
 or tab-completion
 In [6]: c.<PRESS_TAB_KEY>
-c.CANrecv                          c.filterCanMsgsByBookmark          c.messages                         c.queuelock                        c.saveSessionToFile
-c.CANreplay                        c.genCanMsgs                       c.name                             c.reconnect                        c.send
-c.CANsniff                         c.getArbitrationIds                c.ping                             c.recv                             c.setCanBaud
-c.CANxmit                          c.getBookmarkFromMsgIndex          c.placeCanBookmark                 c.recvall                          c.setCanBookmarkComment
-c.baud                             c.getCanMsgCount                   c.port                             c.register_handler                 c.setCanBookmarkCommentByMsgIndex
-c.bookmark_info                    c.getMsgIndexFromBookmark          c.printAsciiStrings                c.remove_handler                   c.setCanBookmarkName
-c.bookmarks                        c.getSessionStats                  c.printBookmarks                   c.reprBookmark                     c.setCanBookmarkNameByMsgIndex
-c.clearCanMsgs                     c.getSessionStatsByBookmark        c.printCanMsgs                     c.reprBookmarks                    c.snapshotCanMessages
-c.cmdhandlers                      c.inWaiting                        c.printCanMsgsByBookmark           c.reprCanMsgs                      c.splitCanMsg
-c.comments                         c.io                               c.printCanSessions                 c.reprCanMsgsByBookmark            c.startRxThread
-c.commsthread                      c.loadFromFile                     c.printSessionStats                c.restoreSession                   c.trash
-c.filterCanMsgs                    c.log                              c.printSessionStatsByBookmark      c.saveSession                      c.verbose
+c.CANrecv                          c.genCanMsgs                       c.ping                             c.recv                             c.saveSessionToFile
+c.CANreplay                        c.getArbitrationIds                c.placeCanBookmark                 c.recvall                          c.setCanBaud
+c.CANsniff                         c.getBookmarkFromMsgIndex          c.port                             c.register_handler                 c.setCanBookmarkComment
+c.CANxmit                          c.getCanMsgCount                   c.printAsciiStrings                c.remove_handler                   c.setCanBookmarkCommentByMsgIndex
+c.bookmark_info                    c.getMsgIndexFromBookmark          c.printBookmarks                   c.reprBookmark                     c.setCanBookmarkName
+c.bookmarks                        c.getSessionStats                  c.printCanMsgs                     c.reprBookmarks                    c.setCanBookmarkNameByMsgIndex
+c.clearCanMsgs                     c.getSessionStatsByBookmark        c.printCanMsgsByBookmark           c.reprCanMsgs                      c.snapshotCanMessages
+c.comments                         c.loadFromFile                     c.printCanSessions                 c.reprCanMsgsByBookmark            c.verbose
+c.filterCanMsgs                    c.log                              c.printSessionStats                c.restoreSession                   
+c.filterCanMsgsByBookmark          c.name                             c.printSessionStatsByBookmark      c.saveSession                      
+
 
 (start with the functions that start with "print" to get familiar with the toolset.
 
