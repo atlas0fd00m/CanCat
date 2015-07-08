@@ -94,11 +94,10 @@ void loop()
     // handle CAN-incoming data
     if(CAN_MSGAVAIL == CAN.checkReceive())            // check if data coming
     {
-        CAN.readMsgBuf(&len, buf+4);    // read data,  len: data length, buf: data buf
+        CAN.readMsgBufID(&canId, &len, buf+4);    // read data,  len: data length, buf: data buf
 
         // requires a binary client on the other end.  this should be python
         
-        canId = CAN.getCanId();
         buf[0] = (canId >> 24) & 0xff;
         buf[1] = (canId >> 16) & 0xff;
         buf[2] = (canId >> 8) & 0xff;
