@@ -7,7 +7,7 @@ import threading
 import cPickle as pickle
 
 # defaults for Linux:
-serialdev = '/dev/ttyACM0'
+serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
 baud = 115200
 
 
@@ -150,7 +150,7 @@ class CanInterface:
             self.loadFromFile(load_filename)
             return
 
-        self.reconnect()
+        self._reconnect()
         self._startRxThread()
 
     def _startRxThread(self):
