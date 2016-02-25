@@ -43,29 +43,41 @@ once you have the required software installed, your CanCat device flashed, the i
 CanCat is currently centered around the class CanInterface (or some subclass of it, like FordInterface, GMInterface, etc...)
 
 connect to the device (old way):
+
 >>> import cancat
+
 >>> CANalysis = cancat.CanInterface('/dev/ttyACM0', 115200) # your device may vary
+
 >>> CANalysis.ping()
 
+
 set the can bus interface baud rate (500kbps is most common, others are often slower, depending on your car):
+
 >>> CANalysis.setCanBaud(cancat.CAN_125KBPS)    # medium speed CAN baudrate for Fords
 
 once you connect to the device and set the device, you will automatically capture any messages the CanCat device sees on the CAN bus it is attached to.  it will store these messages for analysis
 
 save your analysis/capture session periodically (only when you say save will it save)
+
 >>> CANalysis.saveSessionToFile('filename_for_this_session')
 
 once you save it once, the name will be cached so you can simply save it again to the same file by typing:
+
 >>> CANalysis.saveSessionToFile()
 
 other than that, "help" is your friend :)
+
 >>> help(cancat)
 
 
 connect to the device(new way - Linux):
+
 $ ./CanCat -h
+
 $ ./CanCat -p /dev/ttyACM0                  # if CanCat device is /dev/ttyACM0
+
 $ ./CanCat -f filename_of_previous_capture  # no CanCat device required
+
 'CanCat, the greatest thing since J2534!'                                                                                                                                                              
                                                                                                                                                                                                        
                                                                                                                                                                                                        Research Mode: enjoy the raw power of cancat                                                                                                                                                           
@@ -83,27 +95,42 @@ $ ./CanCat -f filename_of_previous_capture  # no CanCat device required
    >>> c.saveSessionToFile('file_to_save_session_to')
    >>> help(c)
 
+(Note: The following two are used interchangeably in our notes:)
+(">>>" is the default interactive python prompt.)
+("In [#]:" is the IPython prompt)
 
-In [1]: 
 
 see if the CanCat is communicating correctly with your computer (only if you have a device connected)
+
 In [1]: c.ping()
 
+
+
+
 set the can bus interface baud rate (500kbps is most common, others are often slower, depending on your car):
+
 In [2]: c.setCanBaud(cancat.CAN_125KBPS)    # medium speed CAN baudrate for Fords
 
 once you connect to the device and set the device, you will automatically capture any messages the CanCat device sees on the CAN bus it is attached to.  it will store these messages for analysis
 
+
 save your analysis/capture session periodically (only saves when when you tell it to)
+
 In [3]: c.saveSessionToFile('filename_for_this_session')
 
+
 once you save it once, the name will be cached so you can simply save it again to the same file by typing:
+
 In [4]: c.saveSessionToFile()
 
+
 other than that, "help" is your friend :)
+
 In [5]: help(cancat)
 
+
 or tab-completion
+
 In [6]: c.<PRESS_TAB_KEY>
 c.CANrecv                          c.genCanMsgs                       c.ping                             c.recv                             c.saveSessionToFile
 c.CANreplay                        c.getArbitrationIds                c.placeCanBookmark                 c.recvall                          c.setCanBaud

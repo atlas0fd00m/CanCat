@@ -117,12 +117,17 @@ def loadCanBuffer(filename):
     return pickle.load(file(filename))
 
 class CanInterface:
-    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None):
+    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         '''
         CAN Analysis Workspace
         This can be subclassed by vendor to allow more vendor-specific code 
         based on the way each vendor uses the varios Buses
         '''
+        if orig_iface != None:
+            self._consumeInterface(orig_iface)
+            return
+
+        self._go = False
         self._inbuf = ''
         self._trash = []
         self._messages = {}
@@ -154,6 +159,7 @@ class CanInterface:
         self._startRxThread()
 
     def _startRxThread(self):
+        self._go = True
         self._commsthread = threading.Thread(target=self._rxtx)
         self._commsthread.setDaemon(True)
         self._commsthread.start()
@@ -163,6 +169,14 @@ class CanInterface:
 
     def remove_handler(self, cmd):
         self._cmdhandlers[cmd] = None
+
+    def _consumeInterface(self, other):
+        other._go = False
+
+        for k,v in vars(other).items():
+            setattr(self, k, v)
+
+        self._startRxThread()
 
     def _reconnect(self, port=None, baud=None):
         '''
@@ -225,6 +239,10 @@ class CanInterface:
 
         while not self._shutdown:
             try:    
+                if not self._go:
+                    time.sleep(.04)
+                    continue
+
                 if self.verbose > 4:
                     if self.verbose > 5: 
                         print "STATE: %s" % self._rxtx_state
