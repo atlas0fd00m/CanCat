@@ -33,6 +33,7 @@ INT32U canId;
 INT8U results;
 INT8U  extflag;
 INT8U baud = CAN_500KBPS;
+int failCnt = 0;
 
 
 
@@ -168,8 +169,20 @@ KEEP_TRYING:
                         (inbuf[2] << 24);
                 extflag = inbuf[6];
                 len = inbuf[0] - 7;
-                results = CAN.sendMsgBuf(canId, extflag, len, inbuf+7);
+                failCnt = 0;
+                do
+                {
+                  results = CAN.sendMsgBuf(canId, extflag, len, inbuf+7);
+                  if(results != CAN_OK)
+                  {
+                    failCnt++;
+                  }
+                } while (results != CAN_OK && failCnt < 10);
                 send(&results, CMD_CAN_SEND_RESULT, 1);
+                if(failCnt >= 10)
+                {
+                    //logHexStr(results, "Send failed. Error: ", 20);
+                }
                 
                 break;
                 
