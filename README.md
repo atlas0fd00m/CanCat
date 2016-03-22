@@ -72,11 +72,11 @@ other than that, "help" is your friend :)
 
 connect to the device(new way - Linux):
 
-$ ./CanCat -h
+$ ./CanCat.py -h
 
-$ ./CanCat -p /dev/ttyACM0                  # if CanCat device is /dev/ttyACM0
+$ ./CanCat.py -p /dev/ttyACM0                  # if CanCat device is /dev/ttyACM0
 
-$ ./CanCat -f filename_of_previous_capture  # no CanCat device required
+$ ./CanCat.py -f filename_of_previous_capture  # no CanCat device required
 
 'CanCat, the greatest thing since J2534!'                                                                                                                                                              
                                                                                                                                                                                                        
