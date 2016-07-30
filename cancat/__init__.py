@@ -583,7 +583,7 @@ class CanInterface:
     def getSessionStats(self, start=0, stop=None):
         out = []
         
-        arbid_list = self.getArbitrationIds(reverse=True)
+        arbid_list = self.getArbitrationIds(start=start, stop=stop, reverse=True)
 
         for datalen, arbid, msgs in arbid_list:
             last = 0
