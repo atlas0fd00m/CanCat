@@ -177,7 +177,7 @@ the following commands:
 
 `$ import cancat`
 
-`$ citm = cancat.CanInTheMiddle("/dev/ttyACM0") # replace /dev/ttyACM0 with whatever the arduino serial is called on your system
+`$ citm = cancat.CanInTheMiddle("/dev/ttyACM0") # replace /dev/ttyACM0 with whatever the arduino serial is called on your system`
 
 Most of the commands for CanInTheMiddle are the same as the normal CanCat interface. 
 Functions that report only what has been received on the Isolation side have Iso appended 
