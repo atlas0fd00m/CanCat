@@ -25,6 +25,7 @@
 #define CMD_CHANGE_BAUD_RESULT   0x32
 #define CMD_CAN_BAUD_RESULT      0x33
 #define CMD_CAN_SEND_RESULT      0x34
+#define CMD_ISO_RECV             0x35
 
 #define CMD_PING                 0x41
 #define CMD_CHANGE_BAUD          0x42
@@ -125,7 +126,7 @@ void loop()
             results = ISO_CAN.sendMsgBuf(canId, 0, len, buf+4);     // Re-send this data on the isolation side
             failcnt++;
         }
-        if(failcnt >= 10) logHexStr(results, "ISO SEND FAIL", 13);
+        //if(failcnt >= 10) logHexStr(results, "ISO SEND FAIL", 13);
         // requires a binary client on the other end.  this should be python
         
         buf[0] = (canId >> 24) & 0xff;
@@ -149,7 +150,7 @@ void loop()
             results = VEH_CAN.sendMsgBuf(canId, 0, len, buf+4);     // Re-send this data on the Vehicle side
             failcnt++;
         }
-        if(failcnt >= 10) logHexStr(results, "VEH SEND FAIL", 13);
+        //if(failcnt >= 10) logHexStr(results, "VEH SEND FAIL", 13);
         
 
         // requires a binary client on the other end.  this should be python
@@ -161,7 +162,7 @@ void loop()
         // FIXME: grab extflags and put in here.
         
         send(buf, CMD_CAN_RECV, len + 4);
-        log((char *)buf, (char)len+4);
+        send(buf, CMD_ISO_RECV, len+4);
     }
 
 
