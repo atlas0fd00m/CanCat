@@ -21,6 +21,7 @@ CMD_PING_RESPONSE           = 0x31
 CMD_CHANGE_BAUD_RESULT      = 0x32
 CMD_CAN_BAUD_RESULT         = 0x33
 CMD_CAN_SEND_RESULT         = 0x34
+CMD_ISO_RECV                = 0x35
 
 CMD_PING                    = 0x41
 CMD_CHANGE_BAUD             = 0x42
@@ -583,7 +584,7 @@ class CanInterface:
     def getSessionStats(self, start=0, stop=None):
         out = []
         
-        arbid_list = self.getArbitrationIds(reverse=True)
+        arbid_list = self.getArbitrationIds(start=start, stop=stop, reverse=True)
 
         for datalen, arbid, msgs in arbid_list:
             last = 0
@@ -1017,6 +1018,469 @@ class GMInterface(CanInterface):
 
     def setCanBaudLSCAN(self):
         self.setCanBaud(CAN_33KBPS)
+
+class CanInTheMiddle(CanInterface):
+    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
+        '''
+        CAN in the middle. Allows the user to determine what CAN messages are being
+        sent by a device by isolating a device from the CAN network and using two
+        Can shields on one Arduino to relay the CAN messages to each other.
+
+        Device<----->Isolation CanCat<----->Arduino<----->Vehicle CanCat<----->Vehicle
+                CAN                    SPI     |     SPI                  CAN
+                                               |
+                                               | < Serial
+                                               PC
+
+        This solves the problem of not being able to determine which device is sending
+        which CAN message, since CAN messages have no source information and all messages
+        are broadcast.
+
+        The Can shield connected to the device is referred to as the isolation CanCat. 
+        This CanCat should be modified so that the CS SPI pin is connected to D10, rather 
+        than the default of D9. This is accomplished by cutting a trace on the circuit 
+        board and bridging the CS pad to the D10 pad. Seeedstudio has instructions
+        on their Wiki, but there shield differed slightly from my board. The CanCat
+        connected to the vehicle is referred to as the vehicle CanCat and should be unmodified.
+        '''
+        self.bookmarks_iso = []
+        self.bookmark_info_iso = {}
+        CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface);
+        
+
+    def genCanMsgsIso(self, start=0, stop=None, arbids=None):
+        '''
+        CAN message generator.  takes in start/stop indexes as well as a list
+        of desired arbids (list). Uses the isolation messages.
+        '''
+        messages = self._messages.get(CMD_ISO_RECV, [])
+        if stop == None:
+            stop = len(messages)
+
+        for idx in xrange(start, stop):
+            ts, msg = messages[idx]
+
+            arbid, data = self._splitCanMsg(msg)
+
+            if arbids != None and arbid not in arbids:
+                # allow filtering of arbids
+                continue
+
+            yield((idx, ts, arbid, data))
+
+    def getCanMsgCountIso(self):
+        '''
+        the number of CAN messages we've received on the isolation side session
+        '''
+        canmsgs = self._messages.get(CMD_ISO_RECV, [])
+        return len(canmsgs)
+
+    def printSessionStatsByBookmarkIso(self, start=None, stop=None):
+        '''
+        Prints session stats only for messages between two bookmarks
+        '''
+        print self.getSessionStatsByBookmarkIso(start, stop)
+
+    def printSessionStatsIso(self, start=0, stop=None):
+        '''
+        Print session stats by Arbitration ID (aka WID/PID/CANID/etc...)
+        between two message indexes (where they sit in the CMD_CAN_RECV
+        mailbox)
+        '''
+        print self.getSessionStatsIso(start, stop)
+
+    def getSessionStatsByBookmarkIso(self, start=None, stop=None):
+        '''
+        returns session stats by bookmarks
+        '''
+        if start != None:
+            start_msg = self.getMsgIndexFromBookmarkIso(start)
+        else:
+            start_msg = 0
+
+        if stop != None:
+            stop_msg = self.getMsgIndexFromBookmarkIso(stop)
+        else:
+            stop_msg = self.getCanMsgCountIso()
+
+        return self.getSessionStatsIso(start=start_msg, stop=stop_msg)
+
+    def getArbitrationIdsIso(self, start=0, stop=None, reverse=False):
+        '''
+        return a list of Arbitration IDs
+        '''
+        arbids = {}
+        msg_count = 0
+        for idx,ts,arbid,data in self.genCanMsgsIso(start, stop):
+            arbmsgs = arbids.get(arbid)
+            if arbmsgs == None:
+                arbmsgs = []
+                arbids[arbid] = arbmsgs
+            arbmsgs.append((ts, data))
+            msg_count += 1
+
+        arbid_list = [(len(msgs), arbid, msgs) for arbid,msgs in arbids.items()]
+        arbid_list.sort(reverse=reverse)
+
+        return arbid_list
+
+    def getSessionStatsIso(self, start=0, stop=None):
+        out = []
+        
+        arbid_list = self.getArbitrationIdsIso(start=start, stop=stop, reverse=True)
+
+        for datalen, arbid, msgs in arbid_list:
+            last = 0
+            high = 0
+            low = 0xffffffff
+            for ts, data in msgs:
+                if last == 0:
+                    last = ts
+                    continue
+
+                # calculate the high and low
+                delta = ts - last
+                if delta > high:
+                    high = delta
+                if delta < low:
+                    low = delta
+
+                # track repeated values (rounded to nearest .001 sec)
+                last = ts
+
+            if datalen > 1:
+                mean = (msgs[-1][0] - msgs[0][0]) / (datalen-1)
+                median = low + (high-low) / 2
+            else:
+                low = 0
+                mean = 0
+                median = mean
+            out.append("id: 0x%x\tcount: %d\ttiming::  mean: %.3f\tmedian: %.3f\thigh: %.3f\tlow: %.3f" % \
+                    (arbid, datalen, mean, median, high, low))
+
+        msg_count = self.getCanMsgCountIso()
+        out.append("Total Uniq IDs: %d\nTotal Messages: %d" % (len(arbid_list), msg_count))
+        return '\n'.join(out)
+
+    # bookmark subsystem
+    def placeCanBookmark(self, name=None, comment=None):
+        '''
+        Save a named bookmark (with optional comment).
+        This stores the message index number from the 
+        CMD_ISO_RECV mailbox.
+
+        This also places a bookmark in the normal CAN message
+        stream.
+
+        DON'T USE CANrecv or recv(CMD_CAN_RECV) with Bookmarks or Snapshots!!
+        '''
+        mbox = self._messages.get(CMD_ISO_RECV)
+        if mbox == None:
+            msg_index = 0
+        else:
+            msg_index = len(mbox)
+
+        bkmk_index = len(self.bookmarks_iso)
+        self.bookmarks_iso.append(msg_index)
+        
+        info = { 'name' : name,
+                'comment' : comment }
+
+        self.bookmark_info_iso[bkmk_index] = info #should this be msg_index? benefit either way?
+        CanInterface.placeCanBookmark(self, name=name, comment=comment)
+        return bkmk_index
+
+    def getMsgIndexFromBookmarkIso(self, bkmk_index):
+        return self.bookmarks_iso[bkmk_index]
+
+    def getBookmarkFromMsgIndexIso(self, msg_index):
+        bkmk_index = self.bookmarks_iso.index(msg_index)
+        return bkmk_index
+
+    def setCanBookmarkNameIso(self, bkmk_index, name):
+        info = self.bookmark_info_iso[bkmk_index]
+        info[name] = name
+
+    def setCanBookmarkCommentIso(self, bkmk_index, comment):
+        info = self.bookmark_info_iso[bkmk_index]
+        info[name] = name
+
+    def setCanBookmarkNameByMsgIndexIso(self, msg_index, name):
+        bkmk_index = self.bookmarks_iso.index(msg_index)
+        info = self.bookmark_info_iso[bkmk_index]
+        info[name] = name
+
+    def setCanBookmarkCommentByMsgIndexIso(self, msg_index, comment):
+        bkmk_index = self.bookmarks_iso.index(msg_index)
+        info = self.bookmark_info_iso[bkmk_index]
+        info[name] = name
+
+    def snapshotCanMessagesIso(self, name=None, comment=None):
+        '''
+        Save bookmarks at the start and end of some event you are about to do
+        Bookmarks are named "Start_" + name and "Stop_" + name
+
+        DON'T USE CANrecv or recv(CMD_CAN_RECV) with Bookmarks or Snapshots!!
+        '''
+        start_bkmk = self.placeCanBookmarkIso("Start_" + name, comment)
+        raw_input("Press Enter When Done...")
+        stop_bkmk = self.placeCanBookmarkIso("Stop_" + name, comment)
+
+    def filterCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, 
+                    arbids=None, ignore=[]):
+
+        if start_bkmk != None:
+            start_msg = self.getMsgIndexFromBookmarkIso(start_bkmk)
+        else:
+            start_msg = 0
+
+        if stop_bkmk != None:
+            stop_msg = self.getMsgIndexFromBookmarkIso(stop_bkmk)
+        else:
+            stop_bkmk = -1
+
+        if start_baseline_bkmk != None:
+            start_baseline_msg = self.getMsgIndexFromBookmarkIso(start_baseline_bkmk)
+        else:
+            start_baseline_msg = None
+        
+        if stop_baseline_bkmk != None:
+            stop_baseline_msg = self.getMsgIndexFromBookmarkIso(stop_baseline_bkmk)
+        else:
+            stop_baseline_msg = None
+
+        return self.filterCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore)
+
+    def filterCanMsgsIso(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[]):
+        '''
+        returns the received CAN messages between indexes "start_msg" and "stop_msg"
+        but only messages to ID's that *do not* appear in the the baseline indicated 
+        by "start_baseline_msg" and "stop_baseline_msg".
+
+        for message indexes, you *will* want to look into the bookmarking subsystem!
+        '''
+        self.log("starting filtering messages...")
+        if stop_baseline_msg != None:
+            self.log("ignoring arbids from baseline...")
+            # get a list of baseline arbids
+            filter_ids = { arbid:1 for ts,arbid,data in self.genCanMsgs(start_baseline_msg, stop_baseline_msg) 
+                }.keys()
+        else:
+            filter_ids = None
+        self.log("filtering messages...")
+        filteredMsgs = [(idx, ts,arbid,msg) for idx,ts,arbid,msg in self.genCanMsgsIso(start_msg, stop_msg, arbids=arbids) \
+                if (type(arbids) == list and arbid in arbids) or arbid not in ignore and (filter_ids==None or arbid not in filter_ids)]
+
+        return filteredMsgs
+        
+    def printCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, 
+                    arbids=None, ignore=[]):
+        print self.reprCanMsgsByBookmarkIso(start_bkmk, stop_bkmk, start_baseline_bkmk, stop_baseline_bkmk, arbids, ignore)
+
+    def reprCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, arbids=None, ignore=[]):
+        out = []
+
+        if start_bkmk != None:
+            start_msg = self.getMsgIndexFromBookmarkIso(start_bkmk)
+        else:
+            start_msg = 0
+
+        if stop_bkmk != None:
+            stop_msg = self.getMsgIndexFromBookmarkIso(stop_bkmk)
+        else:
+            stop_bkmk = -1
+
+        if start_baseline_bkmk != None:
+            start_baseline_msg = self.getMsgIndexFromBookmarkIso(start_baseline_bkmk)
+        else:
+            start_baseline_msg = None
+        
+        if stop_baseline_bkmk != None:
+            stop_baseline_msg = self.getMsgIndexFromBookmarkIso(stop_baseline_bkmk)
+        else:
+            stop_baseline_msg = None
+
+        return self.reprCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore)
+
+    def printCanMsgsIso(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[]):
+        print self.reprCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore)
+
+    def reprCanMsgsIso(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[]):
+        '''
+        String representation of a set of CAN Messages.
+        These can be filtered by start and stop message indexes, as well as
+        use a baseline (defined by start/stop message indexes), 
+        by a list of "desired" arbids as well as a list of 
+        ignored arbids
+
+        Many functions wrap this one.
+        '''
+        out = []
+
+        if start_msg in self.bookmarks_iso:
+            bkmk = self.bookmarks_iso.index(start_msg)
+            out.append("starting from bookmark %d: '%s'" % 
+                    (bkmk,
+                    self.bookmark_info_iso[bkmk].get('name'))
+                    )
+
+        if stop_msg in self.bookmarks_iso:
+            bkmk = self.bookmarks_iso.index(stop_msg)
+            out.append("stoppng at bookmark %d: '%s'" % 
+                    (bkmk,
+                    self.bookmark_info_iso[bkmk].get('name'))
+                    )
+
+        last_msg = None
+        next_bkmk = 0
+        next_bkmk_idx = 0
+
+        msg_count = 0
+        last_ts = None
+        tot_delta_ts = 0
+        counted_msgs = 0    # used for calculating averages, excluding outliers
+        
+        data_delta = None
+
+
+        data_repeat = 0
+        data_similar = 0
+
+        for idx, ts, arbid, msg in self.filterCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids=arbids, ignore=ignore):
+            diff = []
+
+            # insert bookmark names/comments in appropriate places
+            while next_bkmk_idx < len(self.bookmarks_iso) and idx >= self.bookmarks_iso[next_bkmk_idx]:
+                out.append(self.reprBookmarkIso(next_bkmk_idx))
+                next_bkmk_idx += 1
+
+            msg_count += 1
+
+            # check data
+            byte_cnt_diff = 0
+            if last_msg != None:
+                if len(last_msg) == len(msg):
+                    for bidx in range(len(msg)):
+                        if last_msg[bidx] != msg[bidx]:
+                            byte_cnt_diff += 1
+
+                    if byte_cnt_diff == 0:
+                        diff.append("REPEAT")
+                        data_repeat += 1
+                    elif byte_cnt_diff <=4:
+                        diff.append("Similar")
+                        data_similar += 1
+                    # FIXME: make some better heuristic to identify "out of norm"
+
+            # look for ASCII data (4+ consecutive bytes)
+            if hasAscii(msg):
+                diff.append("ASCII: %s" % repr(msg))
+
+            # calculate timestamp delta and comment if out of whack
+            if last_ts == None:
+                last_ts = ts
+
+            delta_ts = ts - last_ts
+            if counted_msgs:
+                avg_delta_ts = tot_delta_ts / counted_msgs
+            else:
+                avg_delta_ts = delta_ts
+
+
+            if abs(delta_ts - avg_delta_ts) <= delta_ts:
+                tot_delta_ts += delta_ts
+                counted_msgs += 1
+            else:
+                diff.append("TS_delta: %.3f" % delta_ts)
+
+            out.append(reprCanMsg(idx, ts, arbid, msg, comment='\t'.join(diff)))
+            last_ts = ts
+            last_msg = msg
+
+        out.append("Total Messages: %d  (repeat: %d / similar: %d)" % (msg_count, data_repeat, data_similar))
+
+        return "\n".join(out)
+
+    def printCanSessionsIso(self, arbid_list=None):
+        '''
+        Split CAN messages into Arbitration ID's and prints entire
+        sessions for each CAN id.
+        Defaults to printing by least number of messages, including all IDs
+        Or... provide your own list of ArbIDs in whatever order you like
+        '''
+        if arbid_list == None:
+            arbids = self.getArbitrationIdsIso()
+        else:
+            arbids = [arbdata for arbdata in self.getArbitrationIdsIso() if arbdata[1] in arbid_list]
+        for datalen,arbid,msgs in arbids:
+            print self.reprCanMsgsIso(arbids=[arbid])
+            raw_input("\nPress Enter to review the next Session...")
+            print 
+
+    def printBookmarksIso(self):
+        '''
+        Print out the list of current Bookmarks and where they sit
+        '''
+        print(self.reprBookmarksIso())
+
+    def printAsciiStringsIso(self, minbytes=4):
+        '''
+        Search through messages looking for ASCII strings
+        '''
+        for idx, ts, arbid, msg in self.genCanMsgsIso():
+            if hasAscii(msg, minbytes=minbytes):
+                print reprCanMsgIso(idx, ts, arbid, msg, repr(msg))
+
+    def reprBookmarksIso(self):
+        '''
+        get a string representation of the bookmarks
+        '''
+        out = []
+        for bid in range(len(self.bookmarks_iso)):
+            out.append(self.reprBookmarkIso(bid))
+        return '\n'.join(out)
+
+    def reprBookmarkIso(self, bid):
+        '''
+        get a string representation of one bookmark
+        '''
+        msgidx = self.bookmarks_iso[bid]
+        info = self.bookmark_info_iso.get(bid)
+        comment = info.get('comment')
+        if comment == None:
+            return "bkmkidx: %d\tmsgidx: %d\tbkmk: %s" % (bid, msgidx, info.get('name'))
+
+    def restoreSession(self, me, force=False):
+        '''
+        Load a previous analysis session from a python dictionary object
+        see: saveSession()
+        '''
+        if isinstance(self._io, serial.Serial) and force==False:
+            print("Refusing to reload a session while active session!  use 'force=True' option")
+            return
+
+        self._messages = me.get('messages')
+        self.bookmarks = me.get('bookmarks')
+        self.bookmark_info = me.get('bookmark_info')
+        self.comments = me.get('comments')
+        self.bookmarks_iso = me.get('bookmarks_iso')
+        self.bookmark_info_iso = me.get('bookmark_info_iso')
+
+    def saveSession(self):
+        '''
+        Save the current analysis session to a python dictionary object
+        What you do with it form there is your own business.
+        This function is called by saveSessionToFile() to get the data
+        to save to the file.
+        '''
+        savegame = { 'messages' : self._messages,
+                'bookmarks' : self.bookmarks,
+                'bookmark_info' : self.bookmark_info,
+                'bookmarks_iso' : self.bookmarks_iso,
+                'bookmark_info_iso' : self.bookmark_info_iso,
+                'comments' : self.comments,
+                }
+        return savegame
 
 
 
