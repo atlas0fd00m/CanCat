@@ -72,11 +72,11 @@ other than that, "help" is your friend :)
 
 connect to the device(new way - Linux):
 
-$ ./CanCat -h
+$ ./CanCat.py -h
 
-$ ./CanCat -p /dev/ttyACM0                  # if CanCat device is /dev/ttyACM0
+$ ./CanCat.py -p /dev/ttyACM0                  # if CanCat device is /dev/ttyACM0
 
-$ ./CanCat -f filename_of_previous_capture  # no CanCat device required
+$ ./CanCat.py -f filename_of_previous_capture  # no CanCat device required
 
 'CanCat, the greatest thing since J2534!'                                                                                                                                                              
                                                                                                                                                                                                        
@@ -150,3 +150,48 @@ c.filterCanMsgsByBookmark          c.name                             c.printSes
 hack fun!
 @
 
+CAN-In-The-Middle
+=======
+
+CAN-In-The-Middle is another way to utilize your CanCat. It requires two CAN shields 
+on one arduino. One of the CAN shields needs to be modified so that the CS pin of the 
+MCP2515 CAN controller is on D10, rather than D9. This is accomplished by cutting a 
+trace on the CAN shield PCB and bridging (solder bridge or 0-ohm resistor) the pads
+for CS and D10. Instructions are also on the seeedstudio Wiki, although their board 
+differed slightly from mine, mostly in that the pads are on the bottom of the board 
+on mine and on the top of the board in their example.
+
+Once you have a properly modified CAN Bus shield, you'll be able to isolate components
+connected to the CAN bus to see which messages a specific device is sending, without
+changing the conditions by fully removing it from the CAN Bus. This can be very helpful for 
+certain reverse engineering tasks.
+
+Flash the CAN_in_the_middle firmware to the Arduino. Hook the CAN wires up so that the 
+device you are trying to isolate is connected to the modified CAN shield that uses D10
+for CS, and the vehicle CAN bus (with the rest of the devices) is connected to the 
+unmodified CAN shield. These are referred to as the Isolation network (ISO)
+and the Vehicle network (VEH) respectively.
+
+Fire up python (ipython is phenomenal here). Import cancat and start sniffing by running
+the following commands:
+
+`$ import cancat`
+
+`$ citm = cancat.CanInTheMiddle("/dev/ttyACM0") # replace /dev/ttyACM0 with whatever the arduino serial is called on your system`
+
+Most of the commands for CanInTheMiddle are the same as the normal CanCat interface. 
+Functions that report only what has been received on the Isolation side have Iso appended 
+to the end of the function name. For example:
+
+`$ citm.getCanMsgCount() # The number of CAN packets seen in aggregate`
+
+`$ citm.getCanMsgCountIso() # The number of CAN packets received on the Isolation network`
+
+`$ citm.printCanMsgs() # Prints all CAN messages`
+
+`$ citm.printCanMsgsIso() # prints all CAN messages received on the Isolation network`
+
+Placing a bookmark places a bookmark simultaneously on both the Isolation information and the aggregate information.
+
+Happy Hacking!
+@
