@@ -11,10 +11,10 @@ from cancat import *
 
 intro = """'CanCat, the greatest thing since J2534!'
 
-Research Mode: enjoy the raw power of cancat
+Research Mode: enjoy the raw power of CanCat
 
 currently your environment has an object called "c" for CanCat.  this is how 
-you interact with the CanCat dongle:
+you interact with the CanCat tool:
     >>> c.ping()
     >>> c.placeBookmark('')
     >>> c.snapshotCanMsgs()
