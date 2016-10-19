@@ -22,6 +22,7 @@ CMD_CHANGE_BAUD_RESULT      = 0x32
 CMD_CAN_BAUD_RESULT         = 0x33
 CMD_CAN_SEND_RESULT         = 0x34
 CMD_ISO_RECV                = 0x35
+CMD_SET_FILT_MASK           = 0x36
 
 CMD_PING                    = 0x41
 CMD_CHANGE_BAUD             = 0x42
@@ -985,6 +986,42 @@ class CanInterface:
             return "bkmkidx: %d\tmsgidx: %d\tbkmk: %s" % (bid, msgidx, info.get('name'))
 
         return "bkmkidx: %d\tmsgidx: %d\tbkmk: %s \tcomment: %s" % (bid, msgidx, info.get('name'), info.get('comment'))
+
+    def setMaskAndFilter(self, 
+                         mask0=0, 
+                         mask1=0, 
+                         filter0=0, 
+                         filter1=0,
+                         filter2=0,
+                         filter3=0,
+                         filter4=0,
+                         filter5=0):
+        '''
+        Set the filters and masks. The mask determines which bits matter for the filter following the
+        below truth table:
+
+        _____________________________________________________________________________
+        | Mask Bit n    | Filter Bit n  | Arbitration ID bit n  | Accept or Reject  |
+        | 0             | X             | X                     | Accept            |
+        | 1             | 0             | 0                     | Accept            |
+        | 1             | 0             | 1                     | Reject            |
+        | 1             | 1             | 0                     | Reject            |
+        | 1             | 1             | 1                     | Accept            |
+        -----------------------------------------------------------------------------
+
+        There are two RX buffers. mask0 and filters 0 and 1 apply to buffer 0. mask1 and the other four filters
+        apply to buffer 1.
+        '''
+        msg = struct.pack('>IIIIIIII', mask0, mask1, filter0, filter1, filter2, filter3, filter4, filter5)
+        return self._send(CMD_SET_FILT_MASK, msg)
+    
+    def clearMaskAndFilter(self):
+        '''
+        Clears all masks and filters
+        '''
+        msg = struct.pack('>IIIIIIII', 0, 0, 0, 0, 0, 0, 0, 0)
+        return self._send(CMD_SET_FILT_MASK, msg)
+
 
 class CanControl(cmd.Cmd):
     '''
