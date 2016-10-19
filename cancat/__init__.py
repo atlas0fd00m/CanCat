@@ -933,12 +933,12 @@ class CanInterface:
         '''
         print(self.reprBookmarks())
 
-    def printAsciiStrings(self, minbytes=4):
+    def printAsciiStrings(self, minbytes=4, strict=True):
         '''
         Search through messages looking for ASCII strings
         '''
         for idx, ts, arbid, msg in self.genCanMsgs():
-            if hasAscii(msg, minbytes=minbytes):
+            if hasAscii(msg, minbytes=minbytes, strict=strict):
                 print reprCanMsg(idx, ts, arbid, msg, repr(msg))
 
     def reprBookmarks(self):
@@ -972,7 +972,11 @@ class CanControl(cmd.Cmd):
         self.canbuf = CanBuffer(self.serialdev, self._baud)
 
 
-def hasAscii(msg, minbytes=4):
+def hasAscii(msg, minbytes=4, strict=True):
+    '''
+    if minbytes == -1, every character has to be clean ASCII
+    otherwise, look for strings of at least minbytes in length
+    '''
     ascii_match = 0
     ascii_count = 0
     for byte in msg:
@@ -981,6 +985,9 @@ def hasAscii(msg, minbytes=4):
             if ascii_count >= minbytes:
                 ascii_match = 1
         else:
+            if strict:
+                return 0
+
             ascii_count = 0
     return ascii_match
 
@@ -988,7 +995,7 @@ def reprCanMsg(idx, ts, arbid, data, comment=None):
     #TODO: make some repr magic that spits out known ARBID's and other subdata
     if comment == None:
         comment = ''
-    return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %s\t%s" % (idx, ts, arbid, len(data), data.encode('hex'), comment)
+    return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, arbid, len(data), data.encode('hex'), comment)
 
 
 class FordInterface(CanInterface):
@@ -1423,12 +1430,12 @@ class CanInTheMiddle(CanInterface):
         '''
         print(self.reprBookmarksIso())
 
-    def printAsciiStringsIso(self, minbytes=4):
+    def printAsciiStringsIso(self, minbytes=4, strict=True):
         '''
         Search through messages looking for ASCII strings
         '''
         for idx, ts, arbid, msg in self.genCanMsgsIso():
-            if hasAscii(msg, minbytes=minbytes):
+            if hasAscii(msg, minbytes=minbytes, strict=strict):
                 print reprCanMsgIso(idx, ts, arbid, msg, repr(msg))
 
     def reprBookmarksIso(self):
