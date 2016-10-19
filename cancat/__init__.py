@@ -931,9 +931,24 @@ class CanInterface:
             arbids = self.getArbitrationIds()
         else:
             arbids = [arbdata for arbdata in self.getArbitrationIds() if arbdata[1] in arbid_list]
+
         for datalen,arbid,msgs in arbids:
             print self.reprCanMsgs(arbids=[arbid])
-            raw_input("\nPress Enter to review the next Session...")
+            cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, Q)uit: ").upper()
+            while len(cmd) and cmd != 'N':
+                if cmd == 'R':
+                    self.CANreplay(arbids=[arbid], timing=TIMING_REAL)
+
+                elif cmd == 'F':
+                    self.CANreplay(arbids=[arbid], timing=TIMING_FAST)
+
+                elif cmd == 'I':
+                    self.CANreplay(arbids=[arbid], timing=TIMING_INTERACTIVE)
+
+                elif cmd == 'Q':
+                    return
+
+                cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, Q)uit: ").upper()
             print 
 
     def printBookmarks(self):
