@@ -254,7 +254,7 @@ class CanInterface:
                 if self._rxtx_state == RXTX_DISCONN:
                     print "FIXME: reconnect disconnected serial port..."
                     time.sleep(1)
-                    self.reconnect()
+                    self._reconnect()
                     self._rxtx_state = RXTX_SYNC
                     continue
 
@@ -449,7 +449,7 @@ class CanInterface:
         raw_input("Press Enter to stop sniffing")
         self.remove_handler(CMD_CAN_RECV)
 
-    def CANreplay(self, bkmk_start=None, bkmk_stop=None, start_msg=0, stop_msg=None, arbids=None, timing=TIMING_FAST):
+    def CANreplay(self, start_bkmk=None, stop_bkmk=None, start_msg=0, stop_msg=None, arbids=None, timing=TIMING_FAST):
         '''
         Replay packets between two bookmarks.
         timing = TIMING_FAST: just slam them down the CAN bus as fast as possible
@@ -467,7 +467,7 @@ class CanInterface:
         last_time = -1
         for idx,ts,arbid,data in self.genCanMsgs(start_msg, stop_msg, arbids=arbids):
             if timing == TIMING_INTERACTIVE:
-                raw_input("%s\nPress Enter to Transmit" % self.reprCanMsg(idx, ts, arbid, data))
+                raw_input("%s\nPress Enter to Transmit" % reprCanMsg(idx, ts, arbid, data))
 
             elif timing == TIMING_REAL:
                 if last_time != -1:
@@ -619,13 +619,13 @@ class CanInterface:
         out.append("Total Uniq IDs: %d\nTotal Messages: %d" % (len(arbid_list), msg_count))
         return '\n'.join(out)
 
-    def loadFromFile(self, filename):
+    def loadFromFile(self, filename, force=False):
         '''
         Load a previous analysis session from a saved file
         see: saveSessionToFile()
         '''
         me = pickle.load(file(filename))
-        self.restoreSession(me)
+        self.restoreSession(me, force=force)
         self._filename = filename
 
     def restoreSession(self, me, force=False):
@@ -933,12 +933,12 @@ class CanInterface:
         '''
         print(self.reprBookmarks())
 
-    def printAsciiStrings(self, minbytes=4):
+    def printAsciiStrings(self, minbytes=4, strict=True):
         '''
         Search through messages looking for ASCII strings
         '''
         for idx, ts, arbid, msg in self.genCanMsgs():
-            if hasAscii(msg, minbytes=minbytes):
+            if hasAscii(msg, minbytes=minbytes, strict=strict):
                 print reprCanMsg(idx, ts, arbid, msg, repr(msg))
 
     def reprBookmarks(self):
@@ -972,7 +972,11 @@ class CanControl(cmd.Cmd):
         self.canbuf = CanBuffer(self.serialdev, self._baud)
 
 
-def hasAscii(msg, minbytes=4):
+def hasAscii(msg, minbytes=4, strict=True):
+    '''
+    if minbytes == -1, every character has to be clean ASCII
+    otherwise, look for strings of at least minbytes in length
+    '''
     ascii_match = 0
     ascii_count = 0
     for byte in msg:
@@ -981,6 +985,9 @@ def hasAscii(msg, minbytes=4):
             if ascii_count >= minbytes:
                 ascii_match = 1
         else:
+            if strict:
+                return 0
+
             ascii_count = 0
     return ascii_match
 
@@ -988,7 +995,7 @@ def reprCanMsg(idx, ts, arbid, data, comment=None):
     #TODO: make some repr magic that spits out known ARBID's and other subdata
     if comment == None:
         comment = ''
-    return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %s\t%s" % (idx, ts, arbid, len(data), data.encode('hex'), comment)
+    return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, arbid, len(data), data.encode('hex'), comment)
 
 
 class FordInterface(CanInterface):
@@ -1423,12 +1430,12 @@ class CanInTheMiddle(CanInterface):
         '''
         print(self.reprBookmarksIso())
 
-    def printAsciiStringsIso(self, minbytes=4):
+    def printAsciiStringsIso(self, minbytes=4, strict=True):
         '''
         Search through messages looking for ASCII strings
         '''
         for idx, ts, arbid, msg in self.genCanMsgsIso():
-            if hasAscii(msg, minbytes=minbytes):
+            if hasAscii(msg, minbytes=minbytes, strict=strict):
                 print reprCanMsgIso(idx, ts, arbid, msg, repr(msg))
 
     def reprBookmarksIso(self):
