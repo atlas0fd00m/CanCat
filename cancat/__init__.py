@@ -254,7 +254,7 @@ class CanInterface:
                 if self._rxtx_state == RXTX_DISCONN:
                     print "FIXME: reconnect disconnected serial port..."
                     time.sleep(1)
-                    self.reconnect()
+                    self._reconnect()
                     self._rxtx_state = RXTX_SYNC
                     continue
 
@@ -449,7 +449,7 @@ class CanInterface:
         raw_input("Press Enter to stop sniffing")
         self.remove_handler(CMD_CAN_RECV)
 
-    def CANreplay(self, bkmk_start=None, bkmk_stop=None, start_msg=0, stop_msg=None, arbids=None, timing=TIMING_FAST):
+    def CANreplay(self, start_bkmk=None, stop_bkmk=None, start_msg=0, stop_msg=None, arbids=None, timing=TIMING_FAST):
         '''
         Replay packets between two bookmarks.
         timing = TIMING_FAST: just slam them down the CAN bus as fast as possible
@@ -467,7 +467,7 @@ class CanInterface:
         last_time = -1
         for idx,ts,arbid,data in self.genCanMsgs(start_msg, stop_msg, arbids=arbids):
             if timing == TIMING_INTERACTIVE:
-                raw_input("%s\nPress Enter to Transmit" % self.reprCanMsg(idx, ts, arbid, data))
+                raw_input("%s\nPress Enter to Transmit" % reprCanMsg(idx, ts, arbid, data))
 
             elif timing == TIMING_REAL:
                 if last_time != -1:
@@ -619,13 +619,13 @@ class CanInterface:
         out.append("Total Uniq IDs: %d\nTotal Messages: %d" % (len(arbid_list), msg_count))
         return '\n'.join(out)
 
-    def loadFromFile(self, filename):
+    def loadFromFile(self, filename, force=False):
         '''
         Load a previous analysis session from a saved file
         see: saveSessionToFile()
         '''
         me = pickle.load(file(filename))
-        self.restoreSession(me)
+        self.restoreSession(me, force=force)
         self._filename = filename
 
     def restoreSession(self, me, force=False):
