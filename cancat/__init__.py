@@ -436,7 +436,8 @@ class CanInterface:
         Transmit a CAN message on the attached CAN bus
         '''
         msg = struct.pack('>I', arbid) + chr(extflag) + message
-        return self._send(CMD_CAN_SEND, msg)
+        results = self._send(CMD_CAN_SEND, msg)
+        return self.recv(CMD_CAN_SEND_RESULTS)
 
     def CANsniff(self):
         '''
@@ -812,10 +813,10 @@ class CanInterface:
 
         return self.reprCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore)
 
-    def printCanMsgs(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[]):
-        print self.reprCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore)
+    def printCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[]):
+        print self.reprCanMsgs(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore)
 
-    def reprCanMsgs(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[]):
+    def reprCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[]):
         '''
         String representation of a set of CAN Messages.
         These can be filtered by start and stop message indexes, as well as
@@ -826,6 +827,14 @@ class CanInterface:
         Many functions wrap this one.
         '''
         out = []
+
+        if start_bkmk != None:
+            start_msg = self.getMsgIndexFromBookmark(start_bkmk)
+
+        if stop_bkmk != None:
+            stop_msg = self.getMsgIndexFromBookmark(stop_bkmk)
+
+
 
         if start_msg in self.bookmarks:
             bkmk = self.bookmarks.index(start_msg)
@@ -1502,12 +1511,15 @@ def cleanupInteractiveAtExit():
         except:
             pass
 
-def interactive(port='/dev/ttyACM0', InterfaceClass=CanInterface, intro='', load_filename=None):
+def interactive(port='/dev/ttyACM0', InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
     global c
     import atexit
 
     c = InterfaceClass(port=port, load_filename=load_filename)
     atexit.register(cleanupInteractiveAtExit)
+
+    if can_baud != None:
+        c.setCanBaud(can_baud)
 
     gbls = globals()
     lcls = locals()
