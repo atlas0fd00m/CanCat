@@ -16,6 +16,7 @@
 #define CMD_CHANGE_BAUD_RESULT   0x32
 #define CMD_CAN_BAUD_RESULT      0x33
 #define CMD_CAN_SEND_RESULT      0x34
+#define CMD_SET_FILT_MASK        0x36 // 0x35 is used by CAN in the middle
 
 #define CMD_PING                 0x41
 #define CMD_CHANGE_BAUD          0x42
@@ -33,7 +34,7 @@ INT32U canId;
 INT8U results;
 INT8U  extflag;
 INT8U baud = CAN_500KBPS;
-int failCnt = 0;
+uint16_t failCnt = 0;
 
 
 
@@ -177,14 +178,33 @@ KEEP_TRYING:
                   {
                     failCnt++;
                   }
-                } while (results != CAN_OK && failCnt < 10);
+                } while (results != CAN_OK && failCnt < 100);
                 send(&results, CMD_CAN_SEND_RESULT, 1);
-                if(failCnt >= 10)
+                if(failCnt >= 100)
                 {
-                    //logHexStr(results, "Send failed. Error: ", 20);
+                    logHexStr(results, "Send failed. Error: ", 20);
                 }
                 
                 break;
+
+            case CMD_SET_FILT_MASK:
+                // Loop through all 8 values (2 masks, 6 filters) and set them
+                for(uint8_t i = 5; i <=33; i += 4)
+                {
+                    uint32_t val = inbuf[i] | 
+                                   (inbuf[i - 1] << 8) |
+                                   (inbuf[i - 2] << 16) |
+                                   (inbuf[i - 3] << 24);
+                    if(i <= 9) // First two are masks
+                    {
+                        CAN.init_Mask((i / 4) - 1, 0, val);
+                    }
+                    else // Rest are filters
+                    {
+                        CAN.init_Filt((i / 4) - 3, 0, val);
+                    }
+                }
+                
                 
             default:
                 Serial.write("@\x15\x03BAD COMMAND: ");
