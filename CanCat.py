@@ -38,7 +38,7 @@ if __name__ == "__main__":
     baud_nums = ', '.join(bauds)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p', '--port', default='/dev/ttyACM0') 
+    parser.add_argument('-p', '--port', help='eg: /dev/ttyACM0') 
     parser.add_argument('-f', '--filename', help='Load file (does not require CanCat device)') 
     parser.add_argument('-I', '--interface', help='Use a predefined Interface (%s)' % interface_names) 
     parser.add_argument('-S', '--baud', help='Set the CAN Bus Speed (%s)' % (baud_nums)) 
@@ -58,4 +58,6 @@ if __name__ == "__main__":
         if baud_val == None:
             raise Exception("Invalid baud: %s.  Must use one of the following: %s" % (ifo.baud, baud_nums))
 
-    interactive(ifo.port, intro=intro, InterfaceClass=interface, load_filename=ifo.filename)
+    results = interactive(ifo.port, intro=intro, InterfaceClass=interface, load_filename=ifo.filename)
+    if results == -1:
+        print "Error.  Try '-h' from CLI for help."

@@ -1,3 +1,4 @@
+import os
 import sys
 import cmd
 import time
@@ -435,6 +436,7 @@ class CanInterface:
     def CANxmit(self, arbid, message, extflag=0, timeout=3, count=1):
         '''
         Transmit a CAN message on the attached CAN bus
+        Currently returns the *last* result
         '''
         msg = struct.pack('>I', arbid) + chr(extflag) + message
 
@@ -1567,9 +1569,29 @@ def cleanupInteractiveAtExit():
         except:
             pass
 
-def interactive(port='/dev/ttyACM0', InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
+devlocs = [
+        '/dev/ttyACM0',
+        '/dev/ttyACM1',
+        '/dev/ttyACM2',
+        '/dev/tty.usbmodem1411',
+        '/dev/ttyACM0',
+        ]
+
+def getDeviceFile():
+    for devloc in devlocs:
+        if os.path.exists(devloc):
+            return devloc
+
+def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
     global c
     import atexit
+
+    if port == None:
+        port = getDeviceFile()
+
+    if port == None and load_filename == None:
+        print "Cannot find device, and no filename specified.  Please try again."
+        return -1
 
     c = InterfaceClass(port=port, load_filename=load_filename)
     atexit.register(cleanupInteractiveAtExit)
