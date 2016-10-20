@@ -9,7 +9,7 @@ import cPickle as pickle
 
 # defaults for Linux:
 serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
-baud = 115200
+baud = 350000
 
 
 # command constants (used to identify messages between 
@@ -30,6 +30,17 @@ CMD_CHANGE_BAUD             = 0x42
 CMD_CAN_BAUD                = 0x43
 CMD_CAN_SEND                = 0x44
 
+CAN_RESP_OK                 = (0)
+CAN_RESP_FAILINIT           = (1)
+CAN_RESP_FAILTX             = (2)
+CAN_RESP_MSGAVAIL           = (3)
+CAN_RESP_NOMSG              = (4)
+CAN_RESP_CTRLERROR          = (5)
+CAN_RESP_GETTXBFTIMEOUT     = (6)
+CAN_RESP_SENDMSGTIMEOUT     = (7)
+CAN_RESP_FAIL               = (0xff)
+
+CAN_RESPS = { v: k for k,v in globals().items() if k.startswith('CAN_RESP') }
 
 # constants for setting baudrate for the CAN bus
 CAN_5KBPS       = 1
@@ -442,9 +453,13 @@ class CanInterface:
 
         for i in range(count):
             self._send(CMD_CAN_SEND, msg)
-            result = self.recv(CMD_CAN_SEND_RESULT, timeout)
+            ts, result = self.recv(CMD_CAN_SEND_RESULT, timeout)
 
-        return result
+        resval = ord(result)
+        if resval != 0:
+            print "CANxmit() failed: %s" % CAN_RESPS.get(resval)
+
+        return resval
 
     def CANsniff(self):
         '''
@@ -473,14 +488,20 @@ class CanInterface:
             stop_msg = self.getMsgIndexFromBookmark(stop_bkmk)
 
         last_time = -1
+        newstamp = time.time()
         for idx,ts,arbid,data in self.genCanMsgs(start_msg, stop_msg, arbids=arbids):
+            laststamp = newstamp
+            newstamp = time.time()
+            delta_correction = newstamp - laststamp
+
             if timing == TIMING_INTERACTIVE:
                 raw_input("%s\nPress Enter to Transmit" % reprCanMsg(idx, ts, arbid, data))
 
             elif timing == TIMING_REAL:
                 if last_time != -1:
-                    delta = ts - last_time
-                    time.sleep(delta)
+                    delta = ts - last_time - delta_correction
+                    if delta >= 0:
+                        time.sleep(delta)
                 last_time = ts
 
             self.CANxmit(arbid, data)
@@ -1574,6 +1595,8 @@ devlocs = [
         '/dev/ttyACM1',
         '/dev/ttyACM2',
         '/dev/tty.usbmodem1411',
+        '/dev/tty.usbmodem1421',
+        '/dev/tty.usbmodem1431',
         '/dev/ttyACM0',
         ]
 
