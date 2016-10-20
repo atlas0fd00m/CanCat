@@ -431,13 +431,17 @@ class CanInterface:
         for x in range(count):
             yield self.recv(CMD_CAN_RECV)
 
-    def CANxmit(self, arbid, message, extflag=0, timeout=3):
+    def CANxmit(self, arbid, message, extflag=0, timeout=3, count=1):
         '''
         Transmit a CAN message on the attached CAN bus
         '''
         msg = struct.pack('>I', arbid) + chr(extflag) + message
-        results = self._send(CMD_CAN_SEND, msg)
-        return self.recv(CMD_CAN_SEND_RESULT, timeout)
+
+        for i in range(count):
+            self._send(CMD_CAN_SEND, msg)
+            result = self.recv(CMD_CAN_SEND_RESULT, timeout)
+
+        return result
 
     def CANsniff(self):
         '''
