@@ -53,9 +53,10 @@ if __name__ == "__main__":
         if interface == None:
             raise Exception("Invalid interface: %s.  Must use one of the following: %s" % (ifo.interface, interface_names))
 
+    baud_val = CAN_500KBPS
     if ifo.baud:
         baud_val = globals().get("CAN_%sBPS" % ifo.baud)
         if baud_val == None:
             raise Exception("Invalid baud: %s.  Must use one of the following: %s" % (ifo.baud, baud_nums))
 
-    interactive(ifo.port, intro=intro, InterfaceClass=interface, load_filename=ifo.filename)
+    interactive(ifo.port, intro=intro, InterfaceClass=interface, load_filename=ifo.filename, can_baud=baud_val)

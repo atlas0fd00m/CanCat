@@ -485,6 +485,11 @@ class CanInterface:
         connection from the computer to the tool
         '''
         self._send(CMD_CAN_BAUD, chr(baud_const))
+        response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
+
+        while(response[1] != '\x01'):
+            print "CAN INIT FAILED: Retrying"
+            response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
 
     def ping(self, buf='ABCDEFGHIJKL'):
         '''
@@ -1572,6 +1577,8 @@ def interactive(port='/dev/ttyACM0', InterfaceClass=CanInterface, intro='', load
 
     if can_baud != None:
         c.setCanBaud(can_baud)
+    else:
+        c.setCanBaud(CAN_500KBPS)
 
     gbls = globals()
     lcls = locals()
