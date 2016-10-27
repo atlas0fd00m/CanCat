@@ -1,3 +1,4 @@
+import os
 import sys
 import cmd
 import time
@@ -8,7 +9,7 @@ import cPickle as pickle
 
 # defaults for Linux:
 serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
-baud = 115200
+baud = 350000
 
 
 # command constants (used to identify messages between 
@@ -29,6 +30,17 @@ CMD_CHANGE_BAUD             = 0x42
 CMD_CAN_BAUD                = 0x43
 CMD_CAN_SEND                = 0x44
 
+CAN_RESP_OK                 = (0)
+CAN_RESP_FAILINIT           = (1)
+CAN_RESP_FAILTX             = (2)
+CAN_RESP_MSGAVAIL           = (3)
+CAN_RESP_NOMSG              = (4)
+CAN_RESP_CTRLERROR          = (5)
+CAN_RESP_GETTXBFTIMEOUT     = (6)
+CAN_RESP_SENDMSGTIMEOUT     = (7)
+CAN_RESP_FAIL               = (0xff)
+
+CAN_RESPS = { v: k for k,v in globals().items() if k.startswith('CAN_RESP') }
 
 # constants for setting baudrate for the CAN bus
 CAN_5KBPS       = 1
@@ -432,13 +444,22 @@ class CanInterface:
         for x in range(count):
             yield self.recv(CMD_CAN_RECV)
 
-    def CANxmit(self, arbid, message, extflag=0, timeout=3):
+    def CANxmit(self, arbid, message, extflag=0, timeout=3, count=1):
         '''
         Transmit a CAN message on the attached CAN bus
+        Currently returns the *last* result
         '''
         msg = struct.pack('>I', arbid) + chr(extflag) + message
-        results = self._send(CMD_CAN_SEND, msg)
-        return self.recv(CMD_CAN_SEND_RESULT, timeout)
+
+        for i in range(count):
+            self._send(CMD_CAN_SEND, msg)
+            ts, result = self.recv(CMD_CAN_SEND_RESULT, timeout)
+
+        resval = ord(result)
+        if resval != 0:
+            print "CANxmit() failed: %s" % CAN_RESPS.get(resval)
+
+        return resval
 
     def CANsniff(self):
         '''
@@ -467,14 +488,20 @@ class CanInterface:
             stop_msg = self.getMsgIndexFromBookmark(stop_bkmk)
 
         last_time = -1
+        newstamp = time.time()
         for idx,ts,arbid,data in self.genCanMsgs(start_msg, stop_msg, arbids=arbids):
+            laststamp = newstamp
+            newstamp = time.time()
+            delta_correction = newstamp - laststamp
+
             if timing == TIMING_INTERACTIVE:
                 raw_input("%s\nPress Enter to Transmit" % reprCanMsg(idx, ts, arbid, data))
 
             elif timing == TIMING_REAL:
                 if last_time != -1:
-                    delta = ts - last_time
-                    time.sleep(delta)
+                    delta = ts - last_time - delta_correction
+                    if delta >= 0:
+                        time.sleep(delta)
                 last_time = ts
 
             self.CANxmit(arbid, data)
@@ -1568,9 +1595,31 @@ def cleanupInteractiveAtExit():
         except:
             pass
 
-def interactive(port='/dev/ttyACM0', InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
+devlocs = [
+        '/dev/ttyACM0',
+        '/dev/ttyACM1',
+        '/dev/ttyACM2',
+        '/dev/tty.usbmodem1411',
+        '/dev/tty.usbmodem1421',
+        '/dev/tty.usbmodem1431',
+        '/dev/ttyACM0',
+        ]
+
+def getDeviceFile():
+    for devloc in devlocs:
+        if os.path.exists(devloc):
+            return devloc
+
+def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
     global c
     import atexit
+
+    if port == None:
+        port = getDeviceFile()
+
+    if port == None and load_filename == None:
+        print "Cannot find device, and no filename specified.  Please try again."
+        return -1
 
     c = InterfaceClass(port=port, load_filename=load_filename)
     atexit.register(cleanupInteractiveAtExit)
