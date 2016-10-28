@@ -71,7 +71,7 @@ void logHexStr(INT32U num, char* prefix, int len)
 void setup()
 {
     //MCP_CAN CAN(9); // Set CS to pin 9﻿
-    Serial.begin(350000);
+    Serial.begin(500000);
 
 START_INIT:
 
