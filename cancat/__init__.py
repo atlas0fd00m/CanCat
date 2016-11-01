@@ -9,7 +9,6 @@ import cPickle as pickle
 
 # defaults for Linux:
 serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
-baud = 350000
 baud = 500000
 
 
@@ -1132,7 +1131,7 @@ class GMInterface(CanInterface):
     def setCanBaudLSCAN(self):
         self.setCanBaud(CAN_33KBPS)
 
-class CanInTheMiddle(CanInterface):
+class CanInTheMiddleInterface(CanInterface):
     def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         '''
         CAN in the middle. Allows the user to determine what CAN messages are being

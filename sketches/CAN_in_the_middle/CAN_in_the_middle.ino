@@ -26,6 +26,7 @@
 #define CMD_CAN_BAUD_RESULT      0x33
 #define CMD_CAN_SEND_RESULT      0x34
 #define CMD_ISO_RECV             0x35
+#define CMD_SET_FILT_MASK        0x36
 
 #define CMD_PING                 0x41
 #define CMD_CHANGE_BAUD          0x42
@@ -43,6 +44,7 @@ INT32U canId;
 INT8U results;
 INT8U  extflag;
 INT8U baud = CAN_500KBPS;
+uint8_t initialized = 0;
 
 
 
@@ -79,35 +81,7 @@ void logHexStr(INT32U num, char* prefix, int len)
 
 void setup()
 {
-    Serial.begin(115200);//345600);
-
-START_ISO_INIT:
-
-    if(CAN_OK == ISO_CAN.begin(baud))                   // init can bus : baudrate = 500k
-    {
-        Serial.write("@\x05\x01INIT", 7);
-    }
-    else
-    {
-        Serial.write("@\x05\x02""FAIL", 7);
-        delay(100);
-        goto START_ISO_INIT;
-    }
-
-START_VEH_INIT:
-
-    if(CAN_OK == VEH_CAN.begin(baud))                   // init can bus : baudrate = 500k
-    {
-        Serial.write("@\x05\x01INIT", 7);
-    }
-    else
-    {
-        Serial.write("@\x05\x02""FAIL", 7);
-        delay(100);
-        goto START_VEH_INIT;
-    }
-   
-    
+    Serial.begin(500000);
     while (!Serial);
 }
 
@@ -115,7 +89,7 @@ START_VEH_INIT:
 void loop()
 {
     // handle CAN-incoming data on Vehicle side
-    if(CAN_MSGAVAIL == VEH_CAN.checkReceive()) // check if data coming on vehicle side
+    if(initialized == 1 && CAN_MSGAVAIL == VEH_CAN.checkReceive()) // check if data coming on vehicle side
     {
         int results = CAN_FAIL;
         int failcnt = 0;
@@ -126,8 +100,8 @@ void loop()
             results = ISO_CAN.sendMsgBuf(canId, 0, len, buf+4);     // Re-send this data on the isolation side
             failcnt++;
         }
-        //if(failcnt >= 10) logHexStr(results, "ISO SEND FAIL", 13);
-        // requires a binary client on the other end.  this should be python
+        if(failcnt >= 10) 
+            logHexStr(results, "ISO SEND FAIL", 13);
         
         buf[0] = (canId >> 24) & 0xff;
         buf[1] = (canId >> 16) & 0xff;
@@ -139,7 +113,7 @@ void loop()
     }
 
     // handle CAN-incoming data on Isolation side
-    if(CAN_MSGAVAIL == ISO_CAN.checkReceive()) // check if data coming on isolation side
+    if(initialized == 1 && CAN_MSGAVAIL == ISO_CAN.checkReceive()) // check if data coming on isolation side
     {
         int results = CAN_FAIL;
         int failcnt = 0;
@@ -150,11 +124,9 @@ void loop()
             results = VEH_CAN.sendMsgBuf(canId, 0, len, buf+4);     // Re-send this data on the Vehicle side
             failcnt++;
         }
-        //if(failcnt >= 10) logHexStr(results, "VEH SEND FAIL", 13);
-        
+        if(failcnt >= 10) 
+            logHexStr(results, "VEH SEND FAIL", 13);
 
-        // requires a binary client on the other end.  this should be python
-        
         buf[0] = (canId >> 24) & 0xff;
         buf[1] = (canId >> 16) & 0xff;
         buf[2] = (canId >> 8) & 0xff;
@@ -192,6 +164,13 @@ void loop()
         INT8U results_veh = CAN_FAIL;
         INT8U results_iso = CAN_FAIL;
 
+        // Check if we've been initialized and we're not trying to initialize
+        if(initialized == 0 && inbuf[1] != CMD_CAN_BAUD)
+        {
+            log("CAN Not Initialized", 19);
+            goto NOT_INITIALIZED;
+        }
+
         switch (inbuf[1])  // cmd byte
         {
             case CMD_CHANGE_BAUD:
@@ -209,11 +188,13 @@ void loop()
 KEEP_TRYING_ISO:
                 if(CAN_OK == ISO_CAN.begin(baud))                   // init can bus : baudrate = 500k
                 {
-                    Serial.write("@\x05\x01INIT", 7);
+                    results_iso = 1;
+                    send(&results_iso, CMD_CAN_BAUD_RESULT, 1);
                 }
                 else
                 {
-                    Serial.write("@\x05\x02""FAIL", 7);
+                    results_iso = 0;
+                    send(&results_iso, CMD_CAN_BAUD_RESULT, 1);
                     delay(100);
                     goto KEEP_TRYING_ISO;
                 }
@@ -221,19 +202,20 @@ KEEP_TRYING_ISO:
 KEEP_TRYING_VEH:
                 if(CAN_OK == VEH_CAN.begin(baud))                   // init can bus : baudrate = 500k
                 {
-                    Serial.write("@\x05\x01INIT", 7);
+                    results_veh = 1;
+                    send(&results_veh, CMD_CAN_BAUD_RESULT, 1);
+                    initialized = 1;
                 }
                 else
                 {
-                    Serial.write("@\x05\x02""FAIL", 7);
+                    results_veh = 0;
+                    send(&results_veh, CMD_CAN_BAUD_RESULT, 1);
                     delay(100);
                     goto KEEP_TRYING_VEH;
                 }
-                while (!Serial);
                 break;
                 
             case CMD_CAN_SEND:
-                //log("sending", 7);
                 // len, cmd, canid, canid2, extflag
                 canId = (INT32U)inbuf[5] | 
                         ((INT32U)inbuf[4] << 8) |
@@ -257,16 +239,43 @@ KEEP_TRYING_VEH:
                         fail_iso++;
                     }                    
                 }
+                if(fail_veh >= 10 || fail_iso >= 10)
+                {
+                    logHexStr(results, "Send failed. Error: ", 20);
+                }
+
                 //TODO: Only sending vehicle results back
                 send(&results_veh, CMD_CAN_SEND_RESULT, 1);
                 
                 break;
+
+            case CMD_SET_FILT_MASK:
+                // Loop through all 8 values (2 masks, 6 filters) and set them
+                for(uint8_t i = 5; i <=33; i += 4)
+                {
+                    uint32_t val = inbuf[i] | 
+                                   (inbuf[i - 1] << 8) |
+                                   (inbuf[i - 2] << 16) |
+                                   (inbuf[i - 3] << 24);
+                    if(i <= 9) // First two are masks
+                    {
+                        VEH_CAN.init_Mask((i / 4) - 1, 0, val);
+                        ISO_CAN.init_Mask((i / 4) - 1, 0, val);
+                    }
+                    else // Rest are filters
+                    {
+                        VEH_CAN.init_Filt((i / 4) - 3, 0, val);
+                        ISO_CAN.init_Filt((i / 4) - 3, 0, val);
+                    }
+                }
+
                 
             default:
                 Serial.write("@\x15\x03""BAD COMMAND: ");
                 Serial.print(inbuf[1]);
                 
         }
+NOT_INITIALIZED:
         // clear counters for next message
         inbufidx = 0;
         inbufcount = 0;
