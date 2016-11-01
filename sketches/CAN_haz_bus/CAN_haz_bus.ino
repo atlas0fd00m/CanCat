@@ -71,7 +71,7 @@ void logHexStr(INT32U num, char* prefix, int len)
 
 void setup()
 {
-    Serial.begin(350000);
+    Serial.begin(500000);
     while (!Serial);
 }
 
@@ -79,7 +79,7 @@ void setup()
 void loop()
 {
     // handle CAN-incoming data
-    if(CAN_MSGAVAIL == CAN.checkReceive())            // check if data coming
+    if(initialized == 1 && CAN_MSGAVAIL == CAN.checkReceive())            // check if data coming
     {
         CAN.readMsgBufID(&canId, &len, buf+4);    // read data,  len: data length, buf: data buf
 
@@ -215,3 +215,4 @@ NOT_INITIALIZED:
 /*********************************************************************************************************
   END FILE
 *********************************************************************************************************/
+

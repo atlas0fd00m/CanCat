@@ -10,6 +10,7 @@ import cPickle as pickle
 # defaults for Linux:
 serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
 baud = 350000
+baud = 500000
 
 
 # command constants (used to identify messages between 
@@ -171,6 +172,13 @@ class CanInterface:
         if load_filename != None:
             self.loadFromFile(load_filename)
             return
+
+        if self.port == None:
+            self.port = getDeviceFile()
+
+        if self.port == None:    # we're already past the "load_filename" section, must have a port.
+            raise Exception("Cannot find device, and no filename specified.  Please try again.")
+
 
         self._reconnect()
         self._startRxThread()
@@ -458,6 +466,8 @@ class CanInterface:
             self._send(CMD_CAN_SEND, msg)
             ts, result = self.recv(CMD_CAN_SEND_RESULT, timeout)
 
+        if result == None:
+            print "CANxmit:  Return is None!?"
         resval = ord(result)
         if resval != 0:
             print "CANxmit() failed: %s" % CAN_RESPS.get(resval)
@@ -1616,13 +1626,6 @@ def getDeviceFile():
 def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
     global c
     import atexit
-
-    if port == None:
-        port = getDeviceFile()
-
-    if port == None and load_filename == None:
-        print "Cannot find device, and no filename specified.  Please try again."
-        return -1
 
     c = InterfaceClass(port=port, load_filename=load_filename)
     atexit.register(cleanupInteractiveAtExit)
