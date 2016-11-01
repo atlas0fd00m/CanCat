@@ -43,21 +43,24 @@ CAN_RESP_FAIL               = (0xff)
 CAN_RESPS = { v: k for k,v in globals().items() if k.startswith('CAN_RESP') }
 
 # constants for setting baudrate for the CAN bus
-CAN_5KBPS       = 1
-CAN_10KBPS      = 2
-CAN_20KBPS      = 3
-CAN_31K25BPS    = 4
-CAN_33KBPS      = 5
-CAN_40KBPS      = 6
-CAN_50KBPS      = 7
-CAN_80KBPS      = 8
-CAN_95KBPS      = 9
-CAN_100KBPS     = 10
-CAN_125KBPS     = 11
-CAN_200KBPS     = 12
-CAN_250KBPS     = 13
-CAN_500KBPS     = 14
-CAN_1000KBPS    = 15
+CAN_5KBPS    = 1
+CAN_10KBPS   = 2
+CAN_20KBPS   = 3
+CAN_25KBPS   = 4 
+CAN_31K25BPS = 5
+CAN_33KBPS   = 6
+CAN_40KBPS   = 7
+CAN_50KBPS   = 8
+CAN_80KBPS   = 9
+CAN_83K3BPS  = 10
+CAN_95KBPS   = 11
+CAN_100KBPS  = 12
+CAN_125KBPS  = 13
+CAN_200KBPS  = 14
+CAN_250KBPS  = 15
+CAN_500KBPS  = 16
+CAN_666KBPS  = 17
+CAN_1000KBPS = 18
 
 # state constants for the Receiver thread
 RXTX_DISCONN    = -1

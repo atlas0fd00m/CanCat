@@ -71,30 +71,13 @@ void logHexStr(INT32U num, char* prefix, int len)
 
 void setup()
 {
-    //MCP_CAN CAN(9); // Set CS to pin 9﻿
     Serial.begin(350000);
-
-START_INIT:
-
-    if(CAN_OK == CAN.begin(baud))                   // init can bus : baudrate = 500k
-    {
-        Serial.write("@\x05\x01INIT", 7);
-    }
-    else
-    {
-        Serial.write("@\x05\x02FAIL", 7);
-        delay(100);
-        goto START_INIT;
-    }
-    
->>>>>>> 9fca291c50de3874df0c81d86e61e62f911e7152
     while (!Serial);
 }
 
 
 void loop()
 {
-  
     // handle CAN-incoming data
     if(CAN_MSGAVAIL == CAN.checkReceive())            // check if data coming
     {
@@ -110,8 +93,6 @@ void loop()
         
         send(buf, CMD_CAN_RECV, len + 4);
     }
-
-
 
     // handle Serial-incoming data    
     for (count=Serial.available(); count>0; count--)
