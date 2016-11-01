@@ -172,12 +172,11 @@ for CS, and the vehicle CAN bus (with the rest of the devices) is connected to t
 unmodified CAN shield. These are referred to as the Isolation network (ISO)
 and the Vehicle network (VEH) respectively.
 
-Fire up python (ipython is phenomenal here). Import cancat and start sniffing by running
-the following commands:
+Start CAN_in_the_middle with the following command:
 
-`$ import cancat`
+`./CanCat.py -I CanInTheMiddle -p /dev/tty.usbmodem1411 -S 500K`
 
-`$ citm = cancat.CanInTheMiddle("/dev/ttyACM0") # replace /dev/ttyACM0 with whatever the arduino serial is called on your system`
+where the -p option is your port and -S is the CAN Baud rate
 
 Most of the commands for CanInTheMiddle are the same as the normal CanCat interface. 
 Functions that report only what has been received on the Isolation side have Iso appended 
