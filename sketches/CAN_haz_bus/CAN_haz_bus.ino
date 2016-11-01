@@ -35,6 +35,7 @@ INT8U results;
 INT8U  extflag;
 INT8U baud = CAN_500KBPS;
 uint16_t failCnt = 0;
+uint8_t initialized = 0;
 
 
 
@@ -70,31 +71,15 @@ void logHexStr(INT32U num, char* prefix, int len)
 
 void setup()
 {
-    //MCP_CAN CAN(9); // Set CS to pin 9﻿
     Serial.begin(500000);
-
-START_INIT:
-
-    if(CAN_OK == CAN.begin(baud))                   // init can bus : baudrate = 500k
-    {
-        Serial.write("@\x05\x01INIT", 7);
-    }
-    else
-    {
-        Serial.write("@\x05\x02FAIL", 7);
-        delay(100);
-        goto START_INIT;
-    }
-    
     while (!Serial);
 }
 
 
 void loop()
 {
-  
     // handle CAN-incoming data
-    if(CAN_MSGAVAIL == CAN.checkReceive())            // check if data coming
+    if(initialized == 1 && CAN_MSGAVAIL == CAN.checkReceive())            // check if data coming
     {
         CAN.readMsgBufID(&canId, &len, buf+4);    // read data,  len: data length, buf: data buf
 
@@ -108,8 +93,6 @@ void loop()
         
         send(buf, CMD_CAN_RECV, len + 4);
     }
-
-
 
     // handle Serial-incoming data    
     for (count=Serial.available(); count>0; count--)
@@ -128,10 +111,17 @@ void loop()
             count = 1;  // exit the loop
         }        
     }
-        
+
     // if we've received an entire message, process it here
     if (inbufidx && inbufidx == inbufcount)
     {
+        // Check if we've been initialized and we're not trying to initialize
+        if(initialized == 0 && inbuf[1] != CMD_CAN_BAUD)
+        {
+            log("CAN Not Initialized", 19);
+            goto NOT_INITIALIZED;
+        }
+            
         switch (inbuf[1])  // cmd byte
         {
             case CMD_CHANGE_BAUD:
@@ -149,11 +139,14 @@ void loop()
 KEEP_TRYING:
                 if(CAN_OK == CAN.begin(baud))                   // init can bus : baudrate = 500k
                 {
-                    Serial.write("@\x05\x01INIT", 7);
+                    results = 1;
+                    send(&results, CMD_CAN_BAUD_RESULT, 1);
+                    initialized = 1;
                 }
                 else
                 {
-                    Serial.write("@\x05\x02FAIL", 7);
+                    results = 0;
+                    send(&results, CMD_CAN_BAUD_RESULT, 1);
                     delay(100);
                     goto KEEP_TRYING;
                 }
@@ -211,6 +204,7 @@ KEEP_TRYING:
                 Serial.print(inbuf[1]);
                 
         }
+NOT_INITIALIZED:
         // clear counters for next message
         inbufidx = 0;
         inbufcount = 0;
@@ -221,3 +215,4 @@ KEEP_TRYING:
 /*********************************************************************************************************
   END FILE
 *********************************************************************************************************/
+
