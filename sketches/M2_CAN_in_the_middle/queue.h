@@ -16,7 +16,7 @@ class Queue {
       bool isEmpty() { return head == tail; }
 
       Queue(uint32_t num);
-      void enqueue(T const*);
+      bool enqueue(T const*);
       T dequeue();
 }; 
 
@@ -31,7 +31,9 @@ Queue<T>::Queue(uint32_t num)
 }
  
 template <class T>
-void Queue<T>::enqueue (T const* item) {
+bool Queue<T>::enqueue (T const* item) {
+    if((tail + 1) % num_items == head) // Buffer is full
+        return false;
     items[tail] = *item;
     tail++;
 
@@ -39,6 +41,7 @@ void Queue<T>::enqueue (T const* item) {
     {
         tail = 0;
     }
+    return true;
 } 
 
 template <class T>

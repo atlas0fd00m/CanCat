@@ -47,14 +47,18 @@ void logHexStr(uint32_t num, char* prefix, uint32_t len)
 /* CAN Callbacks */
 void Can0_cb(CAN_FRAME *frame)
 {
-    can_rx_frames0.enqueue(frame);
-    can_tx_frames1.enqueue(frame);
+    if(!can_rx_frames0.enqueue(frame))
+        log("RX ENQ Err CAN0", 15);
+    if(!can_tx_frames1.enqueue(frame))
+        log("TX ENQ Err CAN1", 15);
 }
 
 void Can1_cb(CAN_FRAME *frame)
 {
-    can_rx_frames1.enqueue(frame);
-    can_tx_frames0.enqueue(frame);
+    if(!can_rx_frames1.enqueue(frame))
+        log("RX ENQ Err CAN1", 15);
+    if(!can_tx_frames0.enqueue(frame))
+        log("TX ENQ Err CAN0", 15);
 }
 
 void setup()
