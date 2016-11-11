@@ -7,8 +7,8 @@ template <class T>
 class Queue { 
    private: 
       T* items;
-      uint32_t head;
-      uint32_t tail;
+      volatile uint32_t head;
+      volatile uint32_t tail;
       uint32_t num_items; 
 
    public:
