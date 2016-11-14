@@ -79,7 +79,7 @@ void loop()
         frame = can_tx_frames0.dequeue();
         if(!Can0.sendFrame(frame))
         {
-            Serial.write("Error Sending on CAN0");
+            log("Error Sending on CAN0", 21);
         }
     }
     if(!can_tx_frames1.isEmpty())
@@ -87,7 +87,7 @@ void loop()
         frame = can_tx_frames1.dequeue();
         if(!Can1.sendFrame(frame))
         {
-            Serial.write("Error Sending on CAN1");
+            log("Error Sending on CAN1", 21);
         }
     }
 
