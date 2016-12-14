@@ -24,11 +24,16 @@ CMD_CAN_BAUD_RESULT         = 0x33
 CMD_CAN_SEND_RESULT         = 0x34
 CMD_ISO_RECV                = 0x35
 CMD_SET_FILT_MASK           = 0x36
+CMD_CAN_MODE_RESULT         = 0x37
 
 CMD_PING                    = 0x41
 CMD_CHANGE_BAUD             = 0x42
 CMD_CAN_BAUD                = 0x43
 CMD_CAN_SEND                = 0x44
+CMD_CAN_MODE                = 0x45
+CMD_CAN_MODE_SNIFF_CAN0     = 0x00 # Start sniffing on can 0
+CMD_CAN_MODE_SNIFF_CAN1     = 0x01 # Start sniffing on can 1
+CMD_CAN_MODE_CITM           = 0x02 # Start CITM between can1 and can2
 
 CAN_RESP_OK                 = (0)
 CAN_RESP_FAILINIT           = (1)
@@ -529,6 +534,25 @@ class CanInterface:
         while(response[1] != '\x01'):
             print "CAN INIT FAILED: Retrying"
             response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
+
+    def setCanMode(self, mode):
+        '''
+        Sets the desired operation mode. Note that just setting the operational mode
+        does not change anything on the hardware, after changing the mode you must change
+        the baud rate in order to properly configure the hardware
+        '''
+        CAN_MODES = { v: k for k,v in globals().items() if k.startswith('CMD_CAN_MODE_') and k is not 'CMD_CAN_MODE_RESULT' }
+        if mode not in CAN_MODES:
+            print "{} is not a valid can mode. Valid modes are:".format(mode)
+            for k in CAN_MODES:
+                print "{} ({})".format(CAN_MODES[k], k)
+        else:
+            self._send(CMD_CAN_MODE, chr(mode))
+            response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
+
+            while(response[1] != '\x01'):
+                print "CAN INIT FAILED: Retrying"
+                response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
 
     def ping(self, buf='ABCDEFGHIJKL'):
         '''
@@ -1157,7 +1181,8 @@ class CanInTheMiddleInterface(CanInterface):
         '''
         self.bookmarks_iso = []
         self.bookmark_info_iso = {}
-        CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface);
+        CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
+        setCanMode(CMD_CAN_MODE_CITM)
         
 
     def genCanMsgsIso(self, start=0, stop=None, arbids=None):
