@@ -668,6 +668,8 @@ uint8_t SendIsoTPFrame(uint8_t serial_buffer[])
         CreateCanFrame(isotp_tx_arbid, isotp_tx_extended, 8, &serial_buffer[10], false, 0x00, &frame);
         results = SendFrame(frame);
     }
+
+    return results;
 }
  
 uint8_t RecvIsoTPFrame(uint8_t serial_buffer[])

@@ -25,6 +25,9 @@ CMD_CAN_SEND_RESULT         = 0x34
 CMD_ISO_RECV                = 0x35
 CMD_SET_FILT_MASK           = 0x36
 CMD_CAN_MODE_RESULT         = 0x37
+CMD_CAN_SEND_ISOTP_RESULT   = 0x38
+CMD_CAN_RECV_ISOTP_RESULT   = 0x39
+CMD_CAN_SENDRECV_ISOTP_RESULT = 0x3A
 
 CMD_PING                    = 0x41
 CMD_CHANGE_BAUD             = 0x42
@@ -34,6 +37,10 @@ CMD_CAN_MODE                = 0x45
 CMD_CAN_MODE_SNIFF_CAN0     = 0x00 # Start sniffing on can 0
 CMD_CAN_MODE_SNIFF_CAN1     = 0x01 # Start sniffing on can 1
 CMD_CAN_MODE_CITM           = 0x02 # Start CITM between can1 and can2
+CMD_CAN_SEND_ISOTP          = 0x46
+CMD_CAN_RECV_ISOTP          = 0x47
+CMD_CAN_SENDRECV_ISOTP      = 0x48
+
 
 CAN_RESP_OK                 = (0)
 CAN_RESP_FAILINIT           = (1)
@@ -436,7 +443,7 @@ class CanInterface:
         '''
         Send a message to the CanCat transceiver (not the CAN bus)
         '''
-        msgchar = chr(len(message) + 2)
+        msgchar = struct.pack(">H", len(message) + 3) # 2 byte Big Endian
         msg = msgchar + chr(cmd) + message
         self.log("XMIT: %s" % repr(msg))
 
@@ -475,6 +482,64 @@ class CanInterface:
         resval = ord(result)
         if resval != 0:
             print "CANxmit() failed: %s" % CAN_RESPS.get(resval)
+
+        return resval
+
+    def ISOTPxmit(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1):
+        '''
+        Transmit an ISOTP can message. tx_arbid is the arbid we're transmitting,
+        and rx_arbid is the arbid we're listening for
+        '''
+        msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag) + message
+        for i in range(count):
+            self._send(CMD_CAN_SEND_ISOTP, msg)
+            ts, result = self.recv(CMD_CAN_SEND_ISOTP_RESULT, timeout)
+
+        if result == None:
+            print "ISOTPxmit: Return is None!?"
+        resval = ord(result)
+        if resval != 0:
+            print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
+
+        return resval
+
+    def ISOTPrecv(self, tx_arbid, rx_arbid, extflag=0, timeout=3, count=1):
+        '''
+        Receives an ISOTP can message. This function just causes
+        the hardware to send the appropriate flow control command
+        when an ISOTP frame is received freom rx_arbid, using
+        tx_arbid for the flow control frame. The ISOTP frame
+        itself needs to be extracted from the received can messages
+        '''
+        msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag)
+        for i in range(count):
+            self._send(CMD_CAN_RECV_ISOTP, msg)
+            ts, result = self.recv(CMD_CAN_RECV_ISOTP_RESULT, timeout)
+
+        if result == None:
+            print "ISOTPrecv: Return is None!?"
+        resval = ord(result)
+        if resval != 0:
+            print "ISOTPrecv() failed: %s" % CAN_RESPS.get(resval)
+
+        return resval
+
+    def ISOTPxmit_recv(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1):
+        '''
+        Transmit an ISOTP can message, then wait for a response.
+        tx_arbid is the arbid we're transmitting, and rx_arbid 
+        is the arbid we're listening for
+        '''
+        msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag) + message
+        for i in range(count):
+            self._send(CMD_CAN_SENDRECV_ISOTP, msg)
+            ts, result = self.recv(CMD_CAN_SENDRECV_ISOTP_RESULT, timeout)
+
+        if result == None:
+            print "ISOTPxmit: Return is None!?"
+        resval = ord(result)
+        if resval != 0:
+            print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
 
         return resval
 
