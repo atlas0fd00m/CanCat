@@ -1629,10 +1629,11 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     c = InterfaceClass(port=port, load_filename=load_filename)
     atexit.register(cleanupInteractiveAtExit)
 
-    if can_baud != None:
-        c.setCanBaud(can_baud)
-    else:
-        c.setCanBaud(CAN_500KBPS)
+    if load_filename is None:
+        if can_baud != None:
+            c.setCanBaud(can_baud)
+        else:
+            c.setCanBaud(CAN_500KBPS)
 
     gbls = globals()
     lcls = locals()
