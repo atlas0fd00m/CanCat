@@ -24,11 +24,23 @@ CMD_CAN_BAUD_RESULT         = 0x33
 CMD_CAN_SEND_RESULT         = 0x34
 CMD_ISO_RECV                = 0x35
 CMD_SET_FILT_MASK           = 0x36
+CMD_CAN_MODE_RESULT         = 0x37
+CMD_CAN_SEND_ISOTP_RESULT   = 0x38
+CMD_CAN_RECV_ISOTP_RESULT   = 0x39
+CMD_CAN_SENDRECV_ISOTP_RESULT = 0x3A
 
 CMD_PING                    = 0x41
 CMD_CHANGE_BAUD             = 0x42
 CMD_CAN_BAUD                = 0x43
 CMD_CAN_SEND                = 0x44
+CMD_CAN_MODE                = 0x45
+CMD_CAN_MODE_SNIFF_CAN0     = 0x00 # Start sniffing on can 0
+CMD_CAN_MODE_SNIFF_CAN1     = 0x01 # Start sniffing on can 1
+CMD_CAN_MODE_CITM           = 0x02 # Start CITM between can1 and can2
+CMD_CAN_SEND_ISOTP          = 0x46
+CMD_CAN_RECV_ISOTP          = 0x47
+CMD_CAN_SENDRECV_ISOTP      = 0x48
+
 
 CAN_RESP_OK                 = (0)
 CAN_RESP_FAILINIT           = (1)
@@ -431,7 +443,7 @@ class CanInterface:
         '''
         Send a message to the CanCat transceiver (not the CAN bus)
         '''
-        msgchar = chr(len(message) + 2)
+        msgchar = struct.pack(">H", len(message) + 3) # 2 byte Big Endian
         msg = msgchar + chr(cmd) + message
         self.log("XMIT: %s" % repr(msg))
 
@@ -470,6 +482,64 @@ class CanInterface:
         resval = ord(result)
         if resval != 0:
             print "CANxmit() failed: %s" % CAN_RESPS.get(resval)
+
+        return resval
+
+    def ISOTPxmit(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1):
+        '''
+        Transmit an ISOTP can message. tx_arbid is the arbid we're transmitting,
+        and rx_arbid is the arbid we're listening for
+        '''
+        msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag) + message
+        for i in range(count):
+            self._send(CMD_CAN_SEND_ISOTP, msg)
+            ts, result = self.recv(CMD_CAN_SEND_ISOTP_RESULT, timeout)
+
+        if result == None:
+            print "ISOTPxmit: Return is None!?"
+        resval = ord(result)
+        if resval != 0:
+            print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
+
+        return resval
+
+    def ISOTPrecv(self, tx_arbid, rx_arbid, extflag=0, timeout=3, count=1):
+        '''
+        Receives an ISOTP can message. This function just causes
+        the hardware to send the appropriate flow control command
+        when an ISOTP frame is received freom rx_arbid, using
+        tx_arbid for the flow control frame. The ISOTP frame
+        itself needs to be extracted from the received can messages
+        '''
+        msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag)
+        for i in range(count):
+            self._send(CMD_CAN_RECV_ISOTP, msg)
+            ts, result = self.recv(CMD_CAN_RECV_ISOTP_RESULT, timeout)
+
+        if result == None:
+            print "ISOTPrecv: Return is None!?"
+        resval = ord(result)
+        if resval != 0:
+            print "ISOTPrecv() failed: %s" % CAN_RESPS.get(resval)
+
+        return resval
+
+    def ISOTPxmit_recv(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1):
+        '''
+        Transmit an ISOTP can message, then wait for a response.
+        tx_arbid is the arbid we're transmitting, and rx_arbid 
+        is the arbid we're listening for
+        '''
+        msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag) + message
+        for i in range(count):
+            self._send(CMD_CAN_SENDRECV_ISOTP, msg)
+            ts, result = self.recv(CMD_CAN_SENDRECV_ISOTP_RESULT, timeout)
+
+        if result == None:
+            print "ISOTPxmit: Return is None!?"
+        resval = ord(result)
+        if resval != 0:
+            print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
 
         return resval
 
@@ -529,6 +599,25 @@ class CanInterface:
         while(response[1] != '\x01'):
             print "CAN INIT FAILED: Retrying"
             response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
+
+    def setCanMode(self, mode):
+        '''
+        Sets the desired operation mode. Note that just setting the operational mode
+        does not change anything on the hardware, after changing the mode you must change
+        the baud rate in order to properly configure the hardware
+        '''
+        CAN_MODES = { v: k for k,v in globals().items() if k.startswith('CMD_CAN_MODE_') and k is not 'CMD_CAN_MODE_RESULT' }
+        if mode not in CAN_MODES:
+            print "{} is not a valid can mode. Valid modes are:".format(mode)
+            for k in CAN_MODES:
+                print "{} ({})".format(CAN_MODES[k], k)
+        else:
+            self._send(CMD_CAN_MODE, chr(mode))
+            response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
+
+            while(response[1] != '\x01'):
+                print "CAN INIT FAILED: Retrying"
+                response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
 
     def ping(self, buf='ABCDEFGHIJKL'):
         '''
@@ -1157,7 +1246,8 @@ class CanInTheMiddleInterface(CanInterface):
         '''
         self.bookmarks_iso = []
         self.bookmark_info_iso = {}
-        CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface);
+        CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
+        setCanMode(CMD_CAN_MODE_CITM)
         
 
     def genCanMsgsIso(self, start=0, stop=None, arbids=None):
@@ -1629,10 +1719,11 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     c = InterfaceClass(port=port, load_filename=load_filename)
     atexit.register(cleanupInteractiveAtExit)
 
-    if can_baud != None:
-        c.setCanBaud(can_baud)
-    else:
-        c.setCanBaud(CAN_500KBPS)
+    if load_filename is None:
+        if can_baud != None:
+            c.setCanBaud(can_baud)
+        else:
+            c.setCanBaud(CAN_500KBPS)
 
     gbls = globals()
     lcls = locals()

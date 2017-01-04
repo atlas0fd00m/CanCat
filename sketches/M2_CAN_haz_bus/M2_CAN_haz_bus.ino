@@ -1,206 +1,385 @@
-// Protocol:
-// PC->Duino:  <size><cmd><data>  where size includes cmd and data but not the size byte itself
-// Duino->PC:  @<size><cmd><data> where size includes cmd and data
-
-/*
-  http://ww1.microchip.com/downloads/en/DeviceDoc/21801e.pdf
-  http://en.wikipedia.org/wiki/CAN_bus
-  http://en.wikipedia.org/wiki/OBD-II_PIDs
-
-  The due_can library files also contain important information.
-  
-  This sketch is configured to work with the 'Macchina' Automotive Interface board 
-  manufactured by RechargeCar Inc. CS_PIN and INT_PIN are specific to this board.
-  
-*/
-// Arduino Due - CAN Sample 1
-// Brief CAN example for Arduino Due
-// Test the transmission from CAN0 Mailbox 0 to CAN1 Mailbox 0
-// By Thibaut Viard/Wilfredo Molina/Collin Kidder 2013
-
-// Required libraries
-#include "variant.h"
 #include <due_can.h>
+#include "queue.h"
+#include "defines.h"
 
-#define MAX_BUF_SIZE  207
+#define Serial SerialUSB
 
-#define CMD_LOG                  0x2f
-#define CMD_LOG_HEX              0x2e
+/* Function headers */
+void CreateCanFrame(uint32_t arbid, uint8_t extended, uint8_t len, uint8_t data[], bool padding, uint8_t padding_byte, CAN_FRAME *frame);
+uint8_t SendFrame(CAN_FRAME frame);
+uint8_t SendIsoTPFrame(uint8_t serial_buffer[]);
+uint8_t RecvIsoTPFrame(uint8_t serial_buffer[]);
 
-#define CMD_CAN_RECV             0x30
-#define CMD_PING_RESPONSE        0x31
-#define CMD_CHANGE_BAUD_RESULT   0x32
-#define CMD_CAN_BAUD_RESULT      0x33
-#define CMD_CAN_SEND_RESULT      0x34
+/* circular buffers for receiving and sending CAN frames */
+Queue<CAN_FRAME> can_rx_frames0(32);
+Queue<CAN_FRAME> can_rx_frames1(32);
+Queue<CAN_FRAME> can_tx_frames0(16);
+Queue<CAN_FRAME> can_tx_frames1(16);
 
-#define CMD_PING                 0x41
-#define CMD_CHANGE_BAUD          0x42
-#define CMD_CAN_BAUD             0x43
-#define CMD_CAN_SEND             0x44
+/* Buffer for receiving serial commands */
+uint8_t serial_buffer[SERIAL_BUF_SIZE];
+uint16_t serial_buf_index = 0;
+uint16_t serial_buf_count = 0;
+uint8_t initialized = 0;
+uint8_t mode = CMD_CAN_MODE_SNIFF_CAN0;
 
-#define CC_STATE_BRIDGE   0
-#define CC_STATE_DUAL     1
+/* The current can device if sniffing */
+CANRaw *device = NULL;
 
-uint8_t CCstate = CC_STATE_BRIDGE;
-uint8_t len = 0;
-uint8_t buf[MAX_BUF_SIZE];
+/* IsoTP related globals */
+uint32_t isotp_rx_arbid;
+uint32_t isotp_tx_arbid;
+uint8_t isotp_tx_extended;
+uint8_t isotp_tx_buffer[ISOTP_BUF_SIZE];
+volatile uint16_t isotp_tx_index = 0;
+volatile uint16_t isotp_tx_length = 0;
+volatile uint8_t isotp_tx_go = 0;
+uint8_t isotp_tx_PCIIndex = 0;
 
-uint32_t count = 0;
-uint8_t  inbuf[MAX_BUF_SIZE];
-uint8_t  inbufcount = 0;
-uint8_t  inbufidx = 0;
-uint32_t canId;
-uint8_t  results;
-uint8_t  extflag;
-uint32_t sbaud = 115200;
-uint32_t baud0 = CAN_BPS_250K;
-uint32_t baud1 = CAN_BPS_250K;
-
-//Frame CanMsg;
-CAN_FRAME frame0, frame1, incoming;
-
-uint8_t BAUD_LIST[] =
+/* Functions for serial communication */
+void send(unsigned char *data, unsigned char cmd, unsigned char len)
 {
-    CAN_BPS_1000K,
-    CAN_BPS_800K,
-    CAN_BPS_500K,
-    CAN_BPS_250K,
-    CAN_BPS_125K,
-    CAN_BPS_50K,
-    CAN_BPS_33333,
-    CAN_BPS_25K,
-    CAN_BPS_10K,
-    CAN_BPS_5K,
-};
-
-// Pin definitions specific to how the MCP2515 is wired up.
-#define CS_PIN    85
-#define RESET_PIN  7
-#define INT_PIN    84
-
-// Create CAN object with pins as defined
-//MCP2515 CAN(CS_PIN, RESET_PIN, INT_PIN);
-
-//byte intFlag;
-
-//void CANHandler() {
-//	CAN.intHandler();
-//        intFlag = 1;
-//}
-
-void send(uint8_t *data, uint8_t cmd, uint8_t len)
-{
-    SerialUSB.write("@");
-    SerialUSB.write(len + 1);    // 1 for cmd
-    SerialUSB.write(cmd);
-    SerialUSB.write(data, len);
+    Serial.write("@");
+    Serial.write(len + 1);    // 1 for @
+    Serial.write(cmd);
+    Serial.write(data, len);
 }
 
-void log(char* msg, uint8_t len)
+void log(const char* msg, uint8_t len)
 {
-    send((uint8_t*)msg, CMD_LOG, len);
+    send((unsigned char*)msg, CMD_LOG, len);
 }
 
 void logHex(uint32_t num)
 {
     uint32_t temp = num;
-    send((uint8_t*)&temp, CMD_LOG_HEX, 4);
+    send((unsigned char*)&temp, CMD_LOG_HEX, 4);
 }
 
-void logHexStr(uint32_t num, char* prefix, int len)
+void logHexStr(uint32_t num, const char* prefix, uint32_t len)
 {
     log(prefix, len);
     logHex(num);
 }
 
+/* CAN interrupt Callbacks */
 
-void setup() {
-    // put your setup code here, to run once:  
-    SerialUSB.begin(sbaud);
-	
+/* CITM callback for Can 0 */
+void CITM_Can0_cb(CAN_FRAME *frame)
+{
+    if(!can_rx_frames0.enqueue(frame))
+        log("RX ENQ Err CAN0", 15);
+    if(!can_tx_frames1.enqueue(frame))
+        log("TX ENQ Err CAN1", 15);
+}
 
-START_INIT:
-    // NOTE! This speed might need to change. Usually 250 or 500
-    if(//CAN.Init(baud,16))
-          Can0.begin(baud0) && Can1.begin(baud1))   //FIXME: HANDLE CAN BUS SPEEDS SEPARATELY
-   
+/* CITM callback for Can 1 */
+void CITM_Can1_cb(CAN_FRAME *frame)
+{
+    if(!can_rx_frames1.enqueue(frame))
+        log("RX ENQ Err CAN1", 15);
+    if(!can_tx_frames0.enqueue(frame))
+        log("TX ENQ Err CAN0", 15);
+}
+
+/* Sniffing callback for Can 0 */
+void Sniff_Can0_cb(CAN_FRAME *frame)
+{
+    if(!can_rx_frames0.enqueue(frame))
+        log("RX ENQ Err CAN0", 15);
+}
+
+/* Sniffing callback for Can 1 */
+void Sniff_Can1_cb(CAN_FRAME *frame)
+{
+    if(!can_rx_frames1.enqueue(frame))
+        log("RX ENQ Err CAN1", 15);
+}
+
+/* IsoTP callback.
+ * 
+ * Receives packets for IsoTP. Responds with flow control message
+ * as required. Otherwise sends the CAN frame up the serial link like
+ * all the other messages. Upon receipt of a flow control message
+ * starts ISOTP transmission if one is pending
+ */
+void IsoTP_cb(CAN_FRAME *frame, CANRaw *device)
+{
+    if ((frame->data.bytes[0] & 0xF0) == 0x10) /* First message */
     {
-        SerialUSB.write("@\x05\x01INIT", 7);
+        CAN_FRAME tx_frame;
+        tx_frame.data.byte[0] = 0x30;
+
+        //TODO: Support for configurable padding
+        CreateCanFrame(isotp_tx_arbid, isotp_tx_extended, 1, tx_frame.data.byte, true, 0x00, &tx_frame);
+
+        if(mode == CMD_CAN_MODE_SNIFF_CAN0 && !can_tx_frames0.enqueue(&tx_frame))
+            log("TX ENQ Err CAN0", 15);
+        else if(mode == CMD_CAN_MODE_SNIFF_CAN1 && !can_tx_frames1.enqueue(&tx_frame))
+            log("TX ENQ Err CAN1", 15);
+        else if(mode == CMD_CAN_MODE_CITM)
+        {
+            if(device == &Can0 && !can_tx_frames0.enqueue(&tx_frame))
+                log("TX ENQ Err CAN0", 15);
+            else if(device == &Can1 && !can_tx_frames1.enqueue(&tx_frame))
+                log("TX ENQ Err CAN1", 15);
+        }
+    }
+    else if ((frame->data.bytes[0] & 0xF0) == 0x30) /* Flow control message */
+    {
+        /* Check for an abort message */
+        if((frame->data.bytes[0] & 0x0F) == 0x02)
+        {
+            log("Received ABORT from ISOTP TX", 28);
+            if (mode != CMD_CAN_MODE_CITM)
+            {
+                device->setRXFilter(0, 0, 0x7FF, false);
+                device->detachCANInterrupt(0);
+            }
+            else
+            {
+                Can0.setRXFilter(0, 0, 0x7FF, false);
+                Can0.detachCANInterrupt(0);
+                Can1.setRXFilter(0, 0, 0x7FF, false);
+                Can1.detachCANInterrupt(0);
+            }
+            isotp_tx_index = 0;
+            isotp_tx_length = 0;
+        }
+
+        /* Check for a wait message, frame limit or separation time which are
+           currently unimplemented. */
+        else if((frame->data.bytes[0] & 0x0F) == 0x01 || frame->data.bytes[1] != 0 || frame->data.bytes[2] != 0)
+        {
+            log("Flow Control specifies frame or time limits, which is unimplemented", 67);
+            if (mode != CMD_CAN_MODE_CITM)
+            {
+                device->setRXFilter(0, 0, 0x7FF, false);
+                device->detachCANInterrupt(0);
+            }
+            else
+            {
+                Can0.setRXFilter(0, 0, 0x7FF, false);
+                Can0.detachCANInterrupt(0);
+                Can1.setRXFilter(0, 0, 0x7FF, false);
+                Can1.detachCANInterrupt(0);
+            }
+            isotp_tx_index = 0;
+            isotp_tx_length = 0;
+        }
+        else
+        {
+            /* No flow control, we can just finish sending the message */
+            isotp_tx_go = 1;
+        }
+    }
+    if(mode == CMD_CAN_MODE_SNIFF_CAN0 && !can_rx_frames0.enqueue(frame))
+        log("RX ENQ Err CAN0", 15);
+    else if(mode == CMD_CAN_MODE_SNIFF_CAN1 && !can_rx_frames1.enqueue(frame))
+        log("RX ENQ Err CAN1", 15);
+    else if(mode == CMD_CAN_MODE_CITM)
+    {
+        if(device == &Can0)
+        {
+            if(!can_rx_frames0.enqueue(frame))
+                log("RX ENQ Err CAN0", 15);
+            if(!can_tx_frames1.enqueue(frame))
+                log("TX ENQ Err CAN1", 15);
+        }
+        else if(device == &Can1)
+        {
+            if(!can_rx_frames0.enqueue(frame))
+                log("RX ENQ Err CAN0", 15);
+            if(!can_tx_frames1.enqueue(frame))
+                log("TX ENQ Err CAN1", 15);
+        }
+    }
+}
+
+/* Just calls IsoTP_cb with the right interface number */
+void IsoTP_Can0_cb(CAN_FRAME *frame)
+{
+    IsoTP_cb(frame, &Can0);
+}
+
+/* Just calls IsoTP_cb with the right interface number */
+void IsoTP_Can1_cb(CAN_FRAME *frame)
+{
+    IsoTP_cb(frame, &Can1);
+}
+
+/* Initialization functions for different modes */
+/* Initialization for sniffing
+ * 
+ * Sets mailboxes as follows:
+ * 0 - Used for ISOTP, initialized when ISOTP is requested
+ * 1 - unused
+ * 2 - unused
+ * 3 - unused
+ * 4 - unused 
+ * 5 - Default RX - accepts all standard messages
+ * 6 - Default RX - accepts all extended
+ * 7 - Default TX - automatically set by init function
+ */
+uint8_t Init_Sniff(uint8_t baud)
+{
+    device->init(baud_rates_table[baud]);
+    
+    device->setRXFilter(5, 0, 0, false);
+    device->setRXFilter(6, 0, 0, true);
+    
+    if(device == &Can0)
+    {
+        device->setCallback(5, Sniff_Can0_cb);
+        device->setCallback(6, Sniff_Can0_cb);
     }
     else
     {
-        log("FAIL on INIT", 12);
-        delay(100);
-        goto START_INIT;
+        device->setCallback(5, Sniff_Can1_cb);
+        device->setCallback(6, Sniff_Can1_cb);
     }
-    
-    while (!SerialUSB);
-
-    //attachInterrupt(6, CANHandler, FALLING); // ????
-    
-	  //CAN.InitFilters(false);
-	  //CAN.SetRXMask(MASK0, 0x7F8, 0); //match all but bottom four bits
-        //CAN.SetRXFilter(FILTER0, 0x7E8, 0); // Allows 0x7E8 through 0x7EF, 
-                                      // to allow responses from up to 8 ECUs,
-                                      // per the 2008 OBD requirements
-    //SerialUSB.println("MCP2515 Ready ...");
+    initialized = 1;
+    return 1; //TODO: Error Checking
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-  
-    // handle CAN-incoming data
-    if (Can0.available() > 0)
-    {
-        Can0.read(frame0);
-        // copy along to other side
-        Can1.sendFrame(frame0);
-        
-        canId = frame0.id;
-        buf[0] = (canId >> 24) & 0xff;
-        buf[1] = (canId >> 16) & 0xff;
-        buf[2] = (canId >> 8) & 0xff;
-        buf[3] = canId & 0xff;
-        // FIXME: grab extflags and put in here.
-        buf[4] = (frame0.fid | (frame0.rtr<<1) | (frame0.extended << 2));
-        len = frame0.length;
-        memcpy(&buf[5], frame0.data.bytes, len);
-        
-        send(buf, CMD_CAN_RECV, len + 5);
-    }
+/* Initialization for CITM 
+ * 
+ * Sets mailboxes as follows:
+ * 0 - Used for ISOTP, initialized when ISOTP requested
+ * 1 - unused
+ * 2 - unused
+ * 3 - unused
+ * 4 - Default RX - accepts all standard messages
+ * 5 - Default RX - accepts all extended messages
+ * 6 - Default TX
+ * 7 - Default TX (two TX mailboxes since there can be a lot of TX traffic)
+ */
+uint8_t Init_CITM(uint8_t baud)
+{
+    Can0.init(baud_rates_table[baud]);
+    Can1.init(baud_rates_table[baud]);
+    Can0.setNumTXBoxes(2);
+    Can1.setNumTXBoxes(2);
+    Can0.setRXFilter(4, 0, 0, false);
+    Can0.setRXFilter(5, 0, 0, true);
+    Can1.setRXFilter(4, 0, 0, false);
+    Can1.setRXFilter(5, 0, 0, true);
+    Can0.setCallback(4, CITM_Can0_cb);
+    Can0.setCallback(5, CITM_Can0_cb);
+    Can1.setCallback(4, CITM_Can1_cb);
+    Can1.setCallback(5, CITM_Can1_cb);
+    initialized = 1;
+    return 1; //TODO: Error Checking
+}
 
-    // handle CAN-incoming data
-    if (Can1.available() > 0)
-    {
-        Can1.read(frame0);
-        // copy along to other side
-        Can0.sendFrame(frame0);
 
-        canId = frame0.id;
-        buf[0] = (canId >> 24) & 0xff;
-        buf[1] = (canId >> 16) & 0xff;
-        buf[2] = (canId >> 8) & 0xff;
-        buf[3] = canId & 0xff;
-        // FIXME: grab extflags and put in here.
-        buf[4] = (frame0.fid | (frame0.rtr<<1) | (frame0.extended << 2));
-        len = frame0.length;
-        memcpy(&buf[5], frame0.data.bytes, len);
-        
-        send(buf, CMD_CAN_RECV, len + 5);
-    }
+void setup()
+{
+  //start serial port
+  Serial.begin(250000);
+  while(!Serial);
+}
 
-    // handle SerialUSB-incoming data    
-    for (count=SerialUSB.available(); count>0; count--)
+void loop()
+{
+    uint8_t results = 0;
+    CAN_FRAME frame = {0};
+    /* Send enqueued frames */
+    if(!can_tx_frames0.isEmpty())
     {
-        //logHexStr((uint32_t)count, "readloopcount", 13);
-        inbuf[inbufidx++] = SerialUSB.read();
-        if (inbufidx==1)
+        frame = can_tx_frames0.dequeue();
+        if(!Can0.sendFrame(frame))
         {
-            inbufcount = inbuf[0];
-            //logHexStr(inbufcount, "Setting inbufcount", 17);
+            log("Error Sending on CAN0", 21);
+        }
+    }
+    if(!can_tx_frames1.isEmpty())
+    {
+        frame = can_tx_frames1.dequeue();
+        if(!Can1.sendFrame(frame))
+        {
+            log("Error Sending on CAN1", 21);
+        }
+    }
+
+    /* Push received frames back up */
+    if(!can_rx_frames0.isEmpty())
+    {
+        uint8_t buf[12];
+        frame = can_rx_frames0.dequeue();
+        buf[0] = (frame.id >> 24) & 0xff;
+        buf[1] = (frame.id >> 16) & 0xff;
+        buf[2] = (frame.id >> 8) & 0xff;
+        buf[3] = frame.id & 0xff;
+        // FIXME: grab extflags and put in here.
+        for(uint8_t i = 0; i < frame.length; i++)
+            buf[i+4] = frame.data.bytes[i];
+        
+        send(buf, CMD_CAN_RECV, frame.length + 4);
+    }
+
+    if(!can_rx_frames1.isEmpty())
+    {
+        uint8_t buf[12];
+        frame = can_rx_frames1.dequeue();
+        buf[0] = (frame.id >> 24) & 0xff;
+        buf[1] = (frame.id >> 16) & 0xff;
+        buf[2] = (frame.id >> 8) & 0xff;
+        buf[3] = frame.id & 0xff;
+        // FIXME: grab extflags and put in here.
+        for(uint8_t i = 0; i < frame.length; i++)
+            buf[i+4] = frame.data.bytes[i];
+        
+        send(buf, CMD_CAN_RECV, frame.length + 4);
+        if(mode == CMD_CAN_MODE_CITM)
+            send(buf, CMD_ISO_RECV, frame.length + 4);
+    }
+
+    // Check if we have isotp frames to send
+    if(isotp_tx_go > 0)
+    {
+        uint8_t num_bytes = (isotp_tx_length - isotp_tx_index > 7) ? 7 : (isotp_tx_length - isotp_tx_index);
+        isotp_tx_buffer[isotp_tx_index - 1] = 0x20 | isotp_tx_PCIIndex; // Set PCI Byte
+
+        CreateCanFrame(isotp_tx_arbid, isotp_tx_extended, num_bytes + 1, &isotp_tx_buffer[isotp_tx_index - 1], true, 0x00, &frame);
+        if(SendFrame(frame) == 0) // Successfully sent
+        {
+            /* Move to the next frame and check if we're done */
+            if(++isotp_tx_PCIIndex > 15)
+                isotp_tx_PCIIndex = 0;
+            isotp_tx_index += num_bytes;
+            if(isotp_tx_index == isotp_tx_length)
+            {
+                isotp_tx_go = 0;
+                isotp_tx_PCIIndex = 0;
+                isotp_tx_index = 0;
+                isotp_tx_length = 0;
+                if (mode != CMD_CAN_MODE_CITM)
+                {
+                    device->setRXFilter(0, 0, 0x7FF, false);
+                    device->detachCANInterrupt(0);
+                }
+                else
+                {
+                    Can0.setRXFilter(0, 0, 0x7FF, false);
+                    Can0.detachCANInterrupt(0);
+                    Can1.setRXFilter(0, 0, 0x7FF, false);
+                    Can1.detachCANInterrupt(0);
+                }
+            }
+        }
+    }
+
+    // handle Serial-incoming data    
+    for (uint32_t count = Serial.available(); count > 0; count--)
+    {
+        serial_buffer[serial_buf_index++] = Serial.read();
+        if (serial_buf_index == 2)
+        {
+            serial_buf_count = serial_buffer[0] << 8 | serial_buffer[1];
         }
         
-        if (inbufidx == inbufcount)
+        if (serial_buf_index == serial_buf_count)
         // we've got enough of the packet
         {
             count = 1;  // exit the loop
@@ -208,89 +387,275 @@ void loop() {
     }
         
     // if we've received an entire message, process it here
-    if (inbufidx && inbufidx == inbufcount)
+    if (serial_buf_index && serial_buf_index == serial_buf_count)
     {
-        switch (inbuf[1])  // cmd byte
+        // Check if we've been initialized and we're not trying to initialize
+        if(initialized == 0 && serial_buffer[2] != CMD_CAN_BAUD && serial_buffer[2] != CMD_CAN_MODE)
+        {
+            log("CAN Not Initialized", 19);
+            // clear counters for next message
+            serial_buf_index = 0;
+            serial_buf_count = 0;
+        }
+
+        switch (serial_buffer[2])  // cmd byte
         {
             case CMD_CHANGE_BAUD:
-                SerialUSB.begin(*(uint32_t*)(inbuf+2));
-                while (!SerialUSB);
+                Serial.begin(*(unsigned int*)(serial_buffer+3));
+                while (!Serial);
                 send(&results, CMD_CHANGE_BAUD_RESULT, 1);
                 break;
-                
+
             case CMD_PING:
-                send(inbuf+2, CMD_PING_RESPONSE, inbufcount-2);
+                send(serial_buffer+3, CMD_PING_RESPONSE, serial_buf_count-3);
                 break;
-                
+
+            case CMD_CAN_MODE:
+                mode = serial_buffer[3]; // Stores the desired mode
+                results = 1;
+                send(&results, CMD_CAN_MODE_RESULT, 1);
+                break;
+
             case CMD_CAN_BAUD:
-                sbaud = BAUD_LIST[inbuf[2]];
-KEEP_TRYING:
-                if (Can0.set_baudrate(sbaud))                   // init can bus : baudrate = 500k
+                if(initialized == 0) // First init
                 {
-                    SerialUSB.write("@\x05\x01INIT", 7);
+                    //Initialize based on mode
+                    if(mode == CMD_CAN_MODE_SNIFF_CAN0)
+                    {
+                        device = &Can0;
+                        results = Init_Sniff(serial_buffer[3]);
+                    } 
+                    else if (mode == CMD_CAN_MODE_SNIFF_CAN1)
+                    {
+                        device = &Can1;
+                        results = Init_Sniff(serial_buffer[3]);
+                    }
+                    else if (mode == CMD_CAN_MODE_CITM)
+                    {
+                        results = Init_CITM(serial_buffer[3]);
+                    }
+                    else
+                    {
+                        logHexStr(mode, "Invalid mode", 12);
+                        results = 0;
+                        initialized = 0;
+                    }
                 }
-                else
+                else // Just changing the baud rate
                 {
-                    log("FAIL on reINIT", 14);
-                    delay(100);
-                    goto KEEP_TRYING;
+                    if (mode == CMD_CAN_MODE_SNIFF_CAN0)
+                    {
+                        Can0.set_baudrate(baud_rates_table[serial_buffer[3]]);
+                        results = 1; //TODO: Error checking
+                    }
+                    else if(mode == CMD_CAN_MODE_SNIFF_CAN1)
+                    {
+                        Can1.set_baudrate(baud_rates_table[serial_buffer[3]]);
+                        results = 1; //TODO: Error checking
+                    }
+                    else if (mode == CMD_CAN_MODE_CITM)
+                    {
+                        Can0.set_baudrate(baud_rates_table[serial_buffer[3]]);
+                        Can1.set_baudrate(baud_rates_table[serial_buffer[3]]);
+                        results = 1; //TODO: Error checking
+                    }
+                    else
+                    {
+                        results = 0;
+                    }
                 }
-    
-                while (!SerialUSB);
+                send(&results, CMD_CAN_BAUD_RESULT, 1);
                 break;
                 
             case CMD_CAN_SEND:
-                //log("sending", 7);
-                // len, cmd, canid, canid2, extflag
-                canId = inbuf[5] | 
-                        (inbuf[4] << 8) |
-                        (inbuf[3] << 16) |
-                        (inbuf[2] << 24);
-                extflag = inbuf[6];
-                len = inbuf[0] - 7;
-                
-                //results = CAN.sendMsgBuf(canId, extflag, len, inbuf+7);
-                frame0.id = canId;
-                frame0.fid
-                = (extflag >> 0)&1;
-                frame0.rtr = (extflag >> 1)&1;
-                frame0.extended = (extflag >> 2)&1;
-                //CanMsg.dlc = (extflag >> 3)&1;
-                frame0.length = len;
-                memcpy(frame0.data.bytes, inbuf+7, len);
-                //CAN.EnqueueTX(CanMsg);
-                Can0.sendFrame(frame0);
-                Can1.sendFrame(frame0);
-                
+                frame.id = (uint32_t)serial_buffer[6] | 
+                           ((uint32_t)serial_buffer[5] << 8) |
+                           ((uint32_t)serial_buffer[4] << 16) |
+                           ((uint32_t)serial_buffer[3] << 24);
+                frame.extended = serial_buffer[7];
+                frame.length = serial_buf_count - 8;
+                for(uint8_t i = 0; i < frame.length; i++)
+                {
+                    frame.data.bytes[i] = serial_buffer[8+i];
+                }
+
+                results = SendFrame(frame);
                 send(&results, CMD_CAN_SEND_RESULT, 1);
                 
                 break;
+
+            case CMD_SET_FILT_MASK:
+                log("Not Implemented", 15);
+                break;
+
+            case CMD_CAN_SEND_ISOTP:
+                results = SendIsoTPFrame(serial_buffer);
+                send(&results, CMD_CAN_SEND_ISOTP_RESULT, 1);
+                break;
                 
+            case CMD_CAN_RECV_ISOTP:
+                results = RecvIsoTPFrame(serial_buffer);
+                send(&results, CMD_CAN_RECV_ISOTP_RESULT, 1);
+                break;
+
+            case CMD_CAN_SENDRECV_ISOTP:
+                results = RecvIsoTPFrame(serial_buffer);
+                results |= SendIsoTPFrame(serial_buffer);
+                send(&results, CMD_CAN_SENDRECV_ISOTP_RESULT, 1);
+                break;
+
             default:
-                SerialUSB.write("@\x15\x03BAD COMMAND: ");
-                SerialUSB.print(inbuf[1]);
+                Serial.write("@\x15\x03""BAD COMMAND: ");
+                Serial.print(serial_buffer[2]);
                 
         }
         // clear counters for next message
-        inbufidx = 0;
-        inbufcount = 0;
+        serial_buf_index = 0;
+        serial_buf_count = 0;
+    }
+}
 
-/*
-  //By default there are 7 mailboxes for each device that are RX boxes
-  //This sets each mailbox to have an open filter that will accept extended
-  //or standard frames
-  int filter;
-  //extended
-  for (filter = 0; filter < 3; filter++) {
-  Can0.setRXFilter(filter, 0, 0, true);
-  Can1.setRXFilter(filter, 0, 0, true);
-  }  
-  //standard
-  //for (int filter = 3; filter < 7; filter++) {
-  //Can0.setRXFilter(filter, 0, 0, false);
-  //Can1.setRXFilter(filter, 0, 0, false);
-  //}  
-*/
+
+/*********************************************************************************************************
+ Helper Functions
+*********************************************************************************************************/
+
+/* Creates a can frame from the given data */
+void CreateCanFrame(uint32_t arbid, uint8_t extended, uint8_t len, uint8_t data[], bool padding, uint8_t padding_byte, CAN_FRAME *frame)
+{
+    frame->id = arbid;
+    frame->extended = extended;
+
+    for(uint8_t i = 0; i < len; i++)
+        frame->data.bytes[i] = data[i];
+
+    if(!padding)
+        frame->length = len;
+    else
+    {
+        for(uint8_t i = len; i < 8; i++)
+            frame->data.bytes[i] = padding_byte;
+        frame->length = 8;
+    }
+}
+
+/* Send a CAN frame on the correct interface based on the mode */
+uint8_t SendFrame(CAN_FRAME frame)
+{
+    uint8_t results = 0;
+    if (mode == CMD_CAN_MODE_SNIFF_CAN0 && !Can0.sendFrame(frame))
+    {
+        log("Failed sending on Can0", 22);
+        results = 1;
+    }
+    else if (mode == CMD_CAN_MODE_SNIFF_CAN1 && !Can1.sendFrame(frame))
+    {
+        log("Failed sending on Can1", 22);
+        results = 2;
+    }
+    else if (mode == CMD_CAN_MODE_CITM)
+    {
+        if(!Can0.sendFrame(frame))
+        {
+            log("Failed sending on Can0", 22);
+            results = 1;
+        }
+        if(!Can1.sendFrame(frame))
+        {
+            log("Failed sending on Can1", 22);
+            results = 2;
+        }
     }
 
+    return results;
 }
+
+uint8_t SendIsoTPFrame(uint8_t serial_buffer[])
+{
+    CAN_FRAME frame;
+    uint8_t results;
+    
+    isotp_tx_arbid = ((uint32_t)serial_buffer[3] << 24) | 
+                     ((uint32_t)serial_buffer[4] << 16) |
+                     ((uint32_t)serial_buffer[5] << 8) |
+                     (uint32_t)serial_buffer[6];
+    isotp_rx_arbid = ((uint32_t)serial_buffer[7] << 24) | 
+                     ((uint32_t)serial_buffer[8] << 16) |
+                     ((uint32_t)serial_buffer[9] << 8) |
+                     (uint32_t)serial_buffer[10];
+    isotp_tx_extended = serial_buffer[11];
+    /* If we're sending < 7 bytes, we can just send it */
+    if(serial_buf_count <= 19)
+    {
+        serial_buffer[11] = serial_buf_count - 12; // Set the PCI byte for single
+        CreateCanFrame(isotp_tx_arbid, isotp_tx_extended, serial_buf_count - 10,
+                       &serial_buffer[11], true, 0x00, &frame);
+        results = SendFrame(frame);
+    }
+    /* > 7 bytes. Send out the First PCI message, save off the rest of the data
+       for after we get the FC message */
+    else
+    {
+        if(mode == CMD_CAN_MODE_SNIFF_CAN0 || mode == CMD_CAN_MODE_SNIFF_CAN1)
+        {
+            device->setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
+            device->setCallback(0, (mode == CMD_CAN_MODE_SNIFF_CAN0) ? IsoTP_Can0_cb : IsoTP_Can1_cb);
+        }
+        else if(mode == CMD_CAN_MODE_CITM)
+        {
+            Can0.setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
+            Can0.setCallback(0, IsoTP_Can0_cb);
+            Can1.setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
+            Can1.setCallback(0, IsoTP_Can1_cb);
+        }
+        isotp_tx_go = 0;
+        isotp_tx_index = 6;
+        isotp_tx_length = serial_buf_count - 12;
+        isotp_tx_PCIIndex = 0;
+        /* Copy the data from the serial buffer into the isotp buffer */
+        for(uint16_t i = isotp_tx_index; i < isotp_tx_length; i++)
+            isotp_tx_buffer[i] = serial_buffer[i + 12];
+        
+        serial_buffer[10] = 0x10 | (isotp_tx_length >> 8); // Set the PCI byte for first
+        serial_buffer[11] = (uint8_t)(isotp_tx_length & 0x00FF);
+        CreateCanFrame(isotp_tx_arbid, isotp_tx_extended, 8, &serial_buffer[10], false, 0x00, &frame);
+        results = SendFrame(frame);
+    }
+
+    return results;
+}
+ 
+uint8_t RecvIsoTPFrame(uint8_t serial_buffer[])
+{
+    isotp_tx_arbid = ((uint32_t)serial_buffer[3] << 24) | 
+                     ((uint32_t)serial_buffer[4] << 16) |
+                     ((uint32_t)serial_buffer[5] << 8) |
+                     (uint32_t)serial_buffer[6];
+    isotp_rx_arbid = ((uint32_t)serial_buffer[7] << 24) | 
+                     ((uint32_t)serial_buffer[8] << 16) |
+                     ((uint32_t)serial_buffer[9] << 8) |
+                     (uint32_t)serial_buffer[10];
+    isotp_tx_extended = serial_buffer[11];
+
+    /* Start listening for a reply */
+    if(mode == CMD_CAN_MODE_SNIFF_CAN0 || mode == CMD_CAN_MODE_SNIFF_CAN1)
+    {
+        device->setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
+        device->setCallback(0, (mode == CMD_CAN_MODE_SNIFF_CAN0) ? IsoTP_Can0_cb : IsoTP_Can1_cb);
+    }
+    else if(mode == CMD_CAN_MODE_CITM)
+    {
+        Can0.setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
+        Can0.setCallback(0, IsoTP_Can0_cb);
+        Can1.setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
+        Can1.setCallback(0, IsoTP_Can1_cb);
+    }
+    return 0; //TODO: Error checking
+}
+
+
+/*********************************************************************************************************
+  END FILE
+*********************************************************************************************************/
+
+
