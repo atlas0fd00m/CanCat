@@ -11,10 +11,10 @@ uint8_t SendIsoTPFrame(uint8_t serial_buffer[]);
 uint8_t RecvIsoTPFrame(uint8_t serial_buffer[]);
 
 /* circular buffers for receiving and sending CAN frames */
-Queue<CAN_FRAME> can_rx_frames0(32);
-Queue<CAN_FRAME> can_rx_frames1(32);
-Queue<CAN_FRAME> can_tx_frames0(16);
-Queue<CAN_FRAME> can_tx_frames1(16);
+Queue<CAN_FRAME> can_rx_frames0(128);
+Queue<CAN_FRAME> can_rx_frames1(128);
+Queue<CAN_FRAME> can_tx_frames0(32);
+Queue<CAN_FRAME> can_tx_frames1(32);
 
 /* Buffer for receiving serial commands */
 uint8_t serial_buffer[SERIAL_BUF_SIZE];
@@ -584,6 +584,7 @@ uint8_t SendIsoTPFrame(uint8_t serial_buffer[])
                      ((uint32_t)serial_buffer[9] << 8) |
                      (uint32_t)serial_buffer[10];
     isotp_tx_extended = serial_buffer[11];
+
     /* If we're sending < 7 bytes, we can just send it */
     if(serial_buf_count <= 19)
     {
