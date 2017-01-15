@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-import cancat
-import threading
 import time
+import cancat
+import struct
+import threading
 
 class UDS:
     def __init__(self, c, tx_arbid, rx_arbid):
@@ -65,4 +66,12 @@ class UDS:
             arbid, msg = self.ReassembleIsoTP(start_index = currIdx, service = 0x67)
             print arbid, msg.encode('hex')
 
+    def readDID(self, ecuarbid, did, resparbid=None):
+        if resparbid == None:
+            resparbid = ecuarbid + 8 # by ISO-TP Spec
+
+        currIdx = self.c.getCanMsgCount()
+        self.c.ISOTPxmit_recv(ecuarbid, resparbid, "22".decode('hex') + struct.pack('>H', did))
+        
+        return self.ReassembleIsoTP(start_index = currIdx)
 
