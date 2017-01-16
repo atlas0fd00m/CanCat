@@ -1248,7 +1248,7 @@ class CanInTheMiddleInterface(CanInterface):
         self.bookmark_info_iso = {}
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
         if load_filename is None:
-            setCanMode(CMD_CAN_MODE_CITM)
+            self.setCanMode(CMD_CAN_MODE_CITM)
         
 
     def genCanMsgsIso(self, start=0, stop=None, arbids=None):
