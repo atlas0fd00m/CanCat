@@ -1,6 +1,6 @@
 import struct
 
-def msg_encode(data):
+def msg_encode(data, verbose=False):
     olist = []
     dlen = len(data)
     
@@ -28,7 +28,7 @@ def msg_encode(data):
         for dataidx in range(6, dlen, 7):
             ftype = 2
             b0 = (ftype << 4) | frameidx
-            print hex(b0)
+            if verbose: print hex(b0)
             olist.append( "%c%s" % (b0, data[dataidx:dataidx+7]) )
 
             frameidx += 1
@@ -37,12 +37,21 @@ def msg_encode(data):
     return olist
 
 
+class IncompleteIsoTpMsg(Exception):
+    def __init__(self, output, length):
+        self.output = output
+        self.length = length
+
+    #def __repr__(self):
+    def __str__(self):
+        return "Data incomplete.  Remaining length: %d bytes.  Current data: %r"\
+                % (self.length, self.output)
 
 def msg_decode(msglist, verbose=False):
-    messages = []
-    output = []
+    output = None
 
     nextidx = 0
+    length = None
     for msg in msglist:
 
         ctrl = ord(msg[0])
@@ -52,14 +61,19 @@ def msg_decode(msglist, verbose=False):
             data = msg[1:]
 
             nextidx = 0
-            messages.append(''.join(output))
+            return data
 
         elif ftype == 1:
-            length = struct.unpack(">H", msg[1:3])[0] & 0xfff
+            output = []
+            length = struct.unpack(">H", msg[0:2])[0] & 0xfff
+            if verbose: print "length: %d" % length
+
             idx = ctrl & 0xf
             if verbose: print "\t\t\t%x" % idx
 
-            output.append(msg[2:])
+            msg = msg[2:]
+            output.append(msg)
+            length -= len(msg)
             nextidx += 1
 
         elif ftype == 2:
@@ -71,8 +85,68 @@ def msg_decode(msglist, verbose=False):
                 #raise Exception("Indexing Bug: idx: %x != nextidx: %x" % (idx, nextidx))
                 print("Indexing Bug: idx: %x != nextidx: %x" % (idx, nextidx))
 
-            output.append(msg[1:])
+            msg = msg[1:]
+            output.append(msg)
+            length -= len(msg)
             nextidx += 1
+
+        elif ftype == 3:
+            if verbose: print "Flow Control packet found: %r" % (msg.encode('hex'))
+        else:
+            if verbose: print "Doesn't fit: %r" % (msg.encode('hex'))
+
+        if nextidx >= 0x10:
+            nextidx = 0
+
+    if length:
+        raise IncompleteIsoTpMsg(output, length)
+
+    return ''.join(output)
+
+
+def msgs_decode(msglist, verbose=False):
+    output = None
+    messages = []
+
+    nextidx = 0
+    for msg in msglist:
+
+        ctrl = ord(msg[0])
+        ftype = (ctrl >> 4)
+        if ftype == 0:
+            # Single packet message
+            data = msg[1:]
+
+            nextidx = 0
+            messages.append(data)
+
+        elif ftype == 1:
+            output = []
+            length = struct.unpack(">H", msg[1:3])[0] & 0xfff
+            idx = ctrl & 0xf
+            if verbose: print "\t\t\t%x" % idx
+
+            output.append(msg[2:])
+            nextidx += 1
+            messages.append(output)
+
+        elif ftype == 2:
+            if not length:
+                raise Exception("Cannot parse ISO-TP, type 2 without type 1")
+            idx = ctrl & 0xf
+            if verbose: print "\t\t\t%x" % idx
+            if idx != (nextidx):
+                #raise Exception("Indexing Bug: idx: %x != nextidx: %x" % (idx, nextidx))
+                print("Indexing Bug: idx: %x != nextidx: %x" % (idx, nextidx))
+
+            msg = msg[1:]
+            output.append(msg)
+            length -= len(msg)
+            nextidx += 1
+
+            if not length:
+                messages[-1] = ''.join(output)
+
         elif ftype == 3:
             if verbose: print "Flow Control packet found: %r" % (msg.encode('hex'))
         else:
@@ -82,3 +156,4 @@ def msg_decode(msglist, verbose=False):
             nextidx = 0
 
     return messages
+

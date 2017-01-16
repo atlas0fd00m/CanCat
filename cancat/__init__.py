@@ -490,7 +490,9 @@ class CanInterface:
         Transmit an ISOTP can message. tx_arbid is the arbid we're transmitting,
         and rx_arbid is the arbid we're listening for
         '''
-        msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag) + message
+        self._last_tx_msg_idx = self.getCanMsgCount()
+
+        msg = struct.pack('>IIB', tx_arbid, rx_arbid, extflag) + message
         for i in range(count):
             self._send(CMD_CAN_SEND_ISOTP, msg)
             ts, result = self.recv(CMD_CAN_SEND_ISOTP_RESULT, timeout)
@@ -503,7 +505,7 @@ class CanInterface:
 
         return resval
 
-    def ISOTPrecv(self, tx_arbid, rx_arbid, extflag=0, timeout=3, count=1):
+    def ISOTPrecv(self, tx_arbid, rx_arbid, extflag=0, timeout=3, count=1, start_msg_idx=None):
         '''
         Receives an ISOTP can message. This function just causes
         the hardware to send the appropriate flow control command
@@ -511,25 +513,34 @@ class CanInterface:
         tx_arbid for the flow control frame. The ISOTP frame
         itself needs to be extracted from the received can messages
         '''
-        msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag)
+        # first set the CANCat to respond to Flow Control messages
+        resval = self._isotp_enable_flowcontrol(tx_arbid, rx_arbid, extflag)
+
+        msg = self._getIsoTpMsg(rx_arbid, start_index=start_msg_idx, timeout=timeout)
+
+        return resval
+
+    def _isotp_enable_flowcontrol(self, tx_arbid, rx_arbid, extflag):
+        msg = struct.pack('>IIB', tx_arbid, rx_arbid, extflag)
         for i in range(count):
             self._send(CMD_CAN_RECV_ISOTP, msg)
             ts, result = self.recv(CMD_CAN_RECV_ISOTP_RESULT, timeout)
 
         if result == None:
-            print "ISOTPrecv: Return is None!?"
+            print "_isotp_enable_flowcontrol: Return is None!?"
         resval = ord(result)
         if resval != 0:
-            print "ISOTPrecv() failed: %s" % CAN_RESPS.get(resval)
+            print "_isotp_enable_flowcontrol() failed: %s" % CAN_RESPS.get(resval)
 
         return resval
 
-    def ISOTPxmit_recv(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1):
+    def ISOTPxmit_recv(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1, service=0x67):
         '''
         Transmit an ISOTP can message, then wait for a response.
         tx_arbid is the arbid we're transmitting, and rx_arbid 
         is the arbid we're listening for
         '''
+        currIdx = self.c.getCanMsgCount()
         msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag) + message
         for i in range(count):
             self._send(CMD_CAN_SENDRECV_ISOTP, msg)
@@ -541,7 +552,55 @@ class CanInterface:
         if resval != 0:
             print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
 
-        return resval
+        arbid, msg = self.ReassembleIsoTP(start_index = currIdx, service = service)
+        return arbid, msg
+
+    def _isotp_get_msg(self, rx_arbid, start_index=0, service=None, timeout=None):
+        ''' 
+        Internal Method to piece together a valid ISO-TP message from received CAN packets.
+        '''
+        found = False
+        complete = False
+        starttime = time.time()
+
+        while not complete and (timeout and (time.time()-starttime < timeout)):
+            msgs = [msg for idx, ts, arbid, msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid])]
+
+        
+            try:
+                # Check that the message is for the expected service, if specified
+                if service is not None:
+                    # Check if this is the right service, or there was an error
+                    if ord(msg[1]) == service or ord(msg[1]) == 0x7f:
+                        msg_found = True
+                        return isotp.msg_decode(msgs)
+                else:
+                    msg_found = True
+                    return isotp.msg_decode(msgs)
+
+            except IncompleteIsoTpMsg, e:
+                print e
+
+            time.sleep(0.1)
+
+
+
+
+
+    def ReassembleIsoTP(self, rx_arbid, start_index = 0, service = None):
+        msg_found = False
+        while msg_found is False:
+            for idx, ts, arbid, msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid]):
+                # Check that the message is for the expected service, if specified
+                if service is not None:
+                    # Check if this is the right service, or there was an error
+                    if ord(msg[1]) == service or ord(msg[1]) == 0x7f:
+                        msg_found = True
+                        return arbid, msg
+                else:
+                    msg_found = True
+                    return arbid, msg
+            time.sleep(0.1)
 
     def CANsniff(self):
         '''
