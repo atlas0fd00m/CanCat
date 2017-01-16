@@ -11,6 +11,7 @@ it is a lot like the architecture for RfCat, and we may make it moreso.  current
 
 currently supported CAN-transceiver combinations:
 * Arduino with SeeedStudio's CANBUS Shield
+* Arduino DUE with Togglebit.net's CAN shield
 
 possibly future options:
 * "Macchina" from RechargeCar.com (they have included cool other toys for talking to other buses)
