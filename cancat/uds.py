@@ -1,28 +1,18 @@
 #!/usr/bin/env python
-import cancat
-import threading
 import time
+import cancat
+import struct
+import threading
 
 class UDS:
-    def __init__(self, c, tx_arbid, rx_arbid):
+    def __init__(self, c, tx_arbid, rx_arbid=None):
         self.c = c
+
+        if rx_arbid == None:
+            rx_arbid = tx_arbid + 8 # by UDS spec
+
         self.tx_arbid = tx_arbid
         self.rx_arbid = rx_arbid
-
-    def ReassembleIsoTP(self, start_index = 0, service = None):
-        msg_found = False
-        while msg_found is False:
-            for idx, ts, arbid, msg in self.c.genCanMsgs(start=start_index, arbids=[self.rx_arbid]):
-                # Check that the message is for the expected service, if specified
-                if service is not None:
-                    # Check if this is the right service, or there was an error
-                    if ord(msg[1]) == service or ord(msg[1]) == 0x7f:
-                        msg_found = True
-                        return arbid, msg
-                else:
-                    msg_found = True
-                    return arbid, msg
-            time.sleep(0.1)
 
     def SendTesterPresent(self):
         while self.TesterPresent is True:
@@ -44,25 +34,77 @@ class UDS:
             del self.t
 
     def DiagnosticSessionControl(self, session):
-        currIdx = self.c.getCanMsgCount()
-        self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, "\x10" + chr(session))
-        arbid, msg = self.ReassembleIsoTP(start_index = currIdx, service = 0x50)
-        print arbid, msg.encode('hex')
+        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, "\x10" + chr(session), service=0x50)
+        print msg.encode('hex')
         
     def SecurityService(self, level):
-        currIdx = self.c.getCanMsgCount()
-        self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, "\x27" + chr(level))
-        arbid, msg = self.ReassembleIsoTP(start_index = currIdx, service = 0x67)
-        print arbid, msg.encode('hex')
-        if(msg[1] == 0x7f):
-            print "Error getting seed:", msg
-        else:
-            seed = msg[3:6]
+        txmsg = "\x27" + chr(level)
+        print "sending", self.tx_arbid, txmsg.encode('hex')
+        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, txmsg, service=0x67)
+        #arbid, msg = self.ReassembleIsoTP(start_index = currIdx, service = 0x67)
+        print "got", msg.encode('hex')
+        print "msg[0]:", msg[0].encode('hex')
 
+        if(msg[0].encode('hex') == '7f'):
+            print "Error getting seed:", msg.encode('hex')
+
+        else:
+            seed = msg[2:5]
+            hexified_seed = " ".join(x.encode('hex') for x in seed)
             key = seed # Replace this with a call to the actual response computation function
             currIdx = self.c.getCanMsgCount()
-            self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, "\x27" + chr(level+1) + key)
-            arbid, msg = self.ReassembleIsoTP(start_index = currIdx, service = 0x67)
-            print arbid, msg.encode('hex')
+            msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, txmsg, service=0x67)
+            #arbid, msg = self.ReassembleIsoTP(start_index = currIdx, service = 0x67)
+            print "got", msg.encode('hex')
+            return msg
 
+    def readDID(self, did, ecuarbid=None, resparbid=None):
+        '''
+        Read the Data Identifier specified from the ECU.  i
+        For hackery purposes, the xmit and recv ARBIDs can be specified.
 
+        Returns: The response ISO-TP message as a string
+        '''
+        if ecuarbid == None:
+            ecuarbid = self.tx_arbid
+
+        if resparbid == None:
+            resparbid = self.rx_arbid
+
+        msg = self.c.ISOTPxmit_recv(ecuarbid, resparbid, "22".decode('hex') + struct.pack('>H', did), service=0x62)
+        
+        return msg
+
+    def readMemoryByAddress(self, address, length, lenlen=1, addrlen=4):
+        '''
+        Work in progress!
+        '''
+        if lenlen == 1:
+            lfmt = "B"
+        else:
+            lfmt = "H"
+
+        lenlenbyte = (lenlen << 4) | addrlen
+
+        data = "23".decode('hex') + struct.pack('<BI' + lfmt, lenlenbyte, address, length)
+
+        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, service=0x63)
+        
+        return msg
+
+    def writeMemoryByAddress(self, address, data, lenlen=1, addrlen=4):
+        '''
+        Work in progress!
+        '''
+        if lenlen == 1:
+            lfmt = "B"
+        else:
+            lfmt = "H"
+
+        lenlenbyte = (lenlen << 4) | addrlen
+
+        data = "3d".decode('hex') + struct.pack('<BI' + lfmt, lenlenbyte, address, length)
+
+        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, service=0x63)
+        
+        return msg

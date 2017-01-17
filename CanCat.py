@@ -59,6 +59,6 @@ if __name__ == "__main__":
         if baud_val == None:
             raise Exception("Invalid baud: %s.  Must use one of the following: %s" % (ifo.baud, baud_nums))
 
-    interactive(ifo.port, intro=intro, InterfaceClass=interface, load_filename=ifo.filename, can_baud=baud_val)
+    results = interactive(ifo.port, intro=intro, InterfaceClass=interface, load_filename=ifo.filename, can_baud=baud_val)
     if results == -1:
         print "Error.  Try '-h' from CLI for help."
