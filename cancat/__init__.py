@@ -7,6 +7,8 @@ import struct
 import threading
 import cPickle as pickle
 
+from cancat import iso_tp
+
 # defaults for Linux:
 serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
 baud = 500000
@@ -540,7 +542,7 @@ class CanInterface:
         tx_arbid is the arbid we're transmitting, and rx_arbid 
         is the arbid we're listening for
         '''
-        currIdx = self.c.getCanMsgCount()
+        currIdx = self.getCanMsgCount()
         msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag) + message
         for i in range(count):
             self._send(CMD_CAN_SENDRECV_ISOTP, msg)
@@ -552,8 +554,8 @@ class CanInterface:
         if resval != 0:
             print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
 
-        arbid, msg = self.ReassembleIsoTP(start_index = currIdx, service = service)
-        return arbid, msg
+        msg = self._isotp_get_msg(rx_arbid, start_index = currIdx, service = service, timeout = timeout)
+        return msg
 
     def _isotp_get_msg(self, rx_arbid, start_index=0, service=None, timeout=None):
         ''' 
@@ -561,46 +563,36 @@ class CanInterface:
         '''
         found = False
         complete = False
-        starttime = time.time()
+        starttime = lasttime = time.time()
 
-        while not complete and (timeout and (time.time()-starttime < timeout)):
+        while not complete and (not timeout or (lasttime-starttime < timeout)):
             msgs = [msg for idx, ts, arbid, msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid])]
 
         
-            try:
-                # Check that the message is for the expected service, if specified
-                if service is not None:
-                    # Check if this is the right service, or there was an error
-                    if ord(msg[1]) == service or ord(msg[1]) == 0x7f:
+            if len(msgs):
+                try:
+                    # Check that the message is for the expected service, if specified
+                    if service is not None:
+                        msg = iso_tp.msg_decode(msgs)
+                        # Check if this is the right service, or there was an error
+                        if ord(msg[0]) == service or ord(msg[0]) == 0x7f:
+                            msg_found = True
+                            return msg
+                        print "Hey, we got here, wrong service code?"
+                        print msg.encode('hex')
+                    else:
                         msg_found = True
-                        return isotp.msg_decode(msgs)
-                else:
-                    msg_found = True
-                    return isotp.msg_decode(msgs)
+                        return iso_tp.msg_decode(msgs)
 
-            except IncompleteIsoTpMsg, e:
-                print e
+                except iso_tp.IncompleteIsoTpMsg, e:
+                    #print e # debugging only, this is expected
+                    pass
 
             time.sleep(0.1)
+            lasttime = time.time()
+            #print "_isotp_get_msg: status: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
 
-
-
-
-
-    def ReassembleIsoTP(self, rx_arbid, start_index = 0, service = None):
-        msg_found = False
-        while msg_found is False:
-            for idx, ts, arbid, msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid]):
-                # Check that the message is for the expected service, if specified
-                if service is not None:
-                    # Check if this is the right service, or there was an error
-                    if ord(msg[1]) == service or ord(msg[1]) == 0x7f:
-                        msg_found = True
-                        return arbid, msg
-                else:
-                    msg_found = True
-                    return arbid, msg
-            time.sleep(0.1)
+        print "_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
 
     def CANsniff(self):
         '''

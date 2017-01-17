@@ -44,11 +44,11 @@ class IncompleteIsoTpMsg(Exception):
 
     #def __repr__(self):
     def __str__(self):
-        return "Data incomplete.  Remaining length: %d bytes.  Current data: %r"\
+        return "Data incomplete.  Remaining length: %r bytes.  Current data: %r"\
                 % (self.length, self.output)
 
 def msg_decode(msglist, verbose=False):
-    output = None
+    output = []
 
     nextidx = 0
     length = None
@@ -64,9 +64,8 @@ def msg_decode(msglist, verbose=False):
             return data
 
         elif ftype == 1:
-            output = []
             length = struct.unpack(">H", msg[0:2])[0] & 0xfff
-            if verbose: print "length: %d" % length
+            if verbose: print "length: %r" % length
 
             idx = ctrl & 0xf
             if verbose: print "\t\t\t%x" % idx
@@ -98,7 +97,10 @@ def msg_decode(msglist, verbose=False):
         if nextidx >= 0x10:
             nextidx = 0
 
-    if length:
+    if length != None and length < 0:
+        print "Extra bytes at the end: %r" % (output[-1][length:])
+
+    if length == None or length > 0:
         raise IncompleteIsoTpMsg(output, length)
 
     return ''.join(output)
