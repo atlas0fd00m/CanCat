@@ -36,6 +36,10 @@ class UDS:
     def DiagnosticSessionControl(self, session):
         msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, "\x10" + chr(session), service=0x50)
         print msg.encode('hex')
+
+    def ReadMemoryByAddress(self, address, size):
+        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, "\x23\x24" + struct.pack(">I", address) + struct.pack(">H", size))
+        return msg
         
     def SecurityService(self, level):
         txmsg = "\x27" + chr(level)
