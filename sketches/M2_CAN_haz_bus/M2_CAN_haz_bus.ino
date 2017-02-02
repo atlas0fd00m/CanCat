@@ -110,7 +110,7 @@ void IsoTP_cb(CAN_FRAME *frame, CANRaw *device)
         CAN_FRAME tx_frame;
         tx_frame.data.byte[0] = 0x30;
 
-        //TODO: Support for configurable padding
+        //TODO: Support for configurable padding and delay
         CreateCanFrame(isotp_tx_arbid, isotp_tx_extended, 1, tx_frame.data.byte, true, 0x00, &tx_frame);
 
         if(mode == CMD_CAN_MODE_SNIFF_CAN0 && !can_tx_frames0.enqueue(&tx_frame))
@@ -354,18 +354,6 @@ void loop()
                 isotp_tx_PCIIndex = 1;
                 isotp_tx_index = 0;
                 isotp_tx_length = 0;
-                if (mode != CMD_CAN_MODE_CITM)
-                {
-                    device->setRXFilter(0, 0, 0x7FF, false);
-                    device->detachCANInterrupt(0);
-                }
-                else
-                {
-                    Can0.setRXFilter(0, 0, 0x7FF, false);
-                    Can0.detachCANInterrupt(0);
-                    Can1.setRXFilter(0, 0, 0x7FF, false);
-                    Can1.detachCANInterrupt(0);
-                }
             }
         }
     }
