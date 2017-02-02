@@ -75,6 +75,23 @@ class UDS:
         
         return msg
 
+    def writeDID(self, did, data, ecuarbid=None, resparbid=None):
+        '''
+        Write the Data Identifier specified from the ECU.  i
+        For hackery purposes, the xmit and recv ARBIDs can be specified.
+
+        Returns: The response ISO-TP message as a string
+        '''
+        if ecuarbid == None:
+            ecuarbid = self.tx_arbid
+
+        if resparbid == None:
+            resparbid = self.rx_arbid
+
+        msg = self.c.ISOTPxmit_recv(ecuarbid, resparbid, "22".decode('hex') + struct.pack('>H', did), service=0x62)
+        
+        return msg
+
     def readMemoryByAddress(self, address, length, lenlen=1, addrlen=4):
         '''
         Work in progress!
