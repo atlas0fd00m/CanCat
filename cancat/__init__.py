@@ -492,8 +492,6 @@ class CanInterface:
         Transmit an ISOTP can message. tx_arbid is the arbid we're transmitting,
         and rx_arbid is the arbid we're listening for
         '''
-        self._last_tx_msg_idx = self.getCanMsgCount()
-
         msg = struct.pack('>IIB', tx_arbid, rx_arbid, extflag) + message
         for i in range(count):
             self._send(CMD_CAN_SEND_ISOTP, msg)
@@ -511,11 +509,13 @@ class CanInterface:
         '''
         Receives an ISOTP can message. This function just causes
         the hardware to send the appropriate flow control command
-        when an ISOTP frame is received freom rx_arbid, using
+        when an ISOTP frame is received from rx_arbid, using
         tx_arbid for the flow control frame. The ISOTP frame
         itself needs to be extracted from the received can messages
         '''
-        # first set the CANCat to respond to Flow Control messages
+        if start_msg_idx is None:
+            start_msg_idx = self.getCanMsgCount()
+        # set the CANCat to respond to Flow Control messages
         resval = self._isotp_enable_flowcontrol(tx_arbid, rx_arbid, extflag)
 
         msg = self._getIsoTpMsg(rx_arbid, start_index=start_msg_idx, timeout=timeout)
@@ -524,9 +524,8 @@ class CanInterface:
 
     def _isotp_enable_flowcontrol(self, tx_arbid, rx_arbid, extflag):
         msg = struct.pack('>IIB', tx_arbid, rx_arbid, extflag)
-        for i in range(count):
-            self._send(CMD_CAN_RECV_ISOTP, msg)
-            ts, result = self.recv(CMD_CAN_RECV_ISOTP_RESULT, timeout)
+        self._send(CMD_CAN_RECV_ISOTP, msg)
+        ts, result = self.recv(CMD_CAN_RECV_ISOTP_RESULT, timeout)
 
         if result == None:
             print "_isotp_enable_flowcontrol: Return is None!?"
@@ -536,7 +535,7 @@ class CanInterface:
 
         return resval
 
-    def ISOTPxmit_recv(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1, service=0x67):
+    def ISOTPxmit_recv(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1, service=None):
         '''
         Transmit an ISOTP can message, then wait for a response.
         tx_arbid is the arbid we're transmitting, and rx_arbid 
