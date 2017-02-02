@@ -16,7 +16,8 @@
 #define CMD_CHANGE_BAUD_RESULT   0x32
 #define CMD_CAN_BAUD_RESULT      0x33
 #define CMD_CAN_SEND_RESULT      0x34
-#define CMD_SET_FILT_MASK        0x36 // 0x35 is used by CAN in the middle
+#define CMD_ISO_RECV             0x35
+#define CMD_SET_FILT_MASK        0x36
 
 #define CMD_PING                 0x41
 #define CMD_CHANGE_BAUD          0x42

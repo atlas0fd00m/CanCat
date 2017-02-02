@@ -36,10 +36,10 @@
 unsigned char len = 0;
 unsigned char buf[MAX_BUF_SIZE];
 
-unsigned int count = 0;
-unsigned char inbuf[MAX_BUF_SIZE];
-unsigned char inbufcount = 0;
-unsigned char inbufidx = 0;
+uint32_t count = 0;
+uint8_t inbuf[MAX_BUF_SIZE];
+uint16_t inbufcount = 0;
+uint16_t inbufidx = 0;
 INT32U canId;
 INT8U results;
 INT8U  extflag;
@@ -143,9 +143,9 @@ void loop()
     {
         //logHexStr((INT32U)count, "readloopcount", 13);
         inbuf[inbufidx++] = Serial.read();
-        if (inbufidx==1)
+        if (inbufidx==2)
         {
-            inbufcount = inbuf[0];
+            inbufcount = inbuf[0] << 8u | inbuf[1];
             //logHexStr(inbufcount, "Setting inbufcount", 17);
         }
         
@@ -155,7 +155,7 @@ void loop()
             count = 1;  // exit the loop
         }        
     }
-        
+
     // if we've received an entire message, process it here
     if (inbufidx && inbufidx == inbufcount)
     {
@@ -165,26 +165,26 @@ void loop()
         INT8U results_iso = CAN_FAIL;
 
         // Check if we've been initialized and we're not trying to initialize
-        if(initialized == 0 && inbuf[1] != CMD_CAN_BAUD)
+        if(initialized == 0 && inbuf[2] != CMD_CAN_BAUD)
         {
             log("CAN Not Initialized", 19);
             goto NOT_INITIALIZED;
         }
-
-        switch (inbuf[1])  // cmd byte
+            
+        switch (inbuf[2])  // cmd byte
         {
             case CMD_CHANGE_BAUD:
-                Serial.begin(*(unsigned int*)(inbuf+2));
+                Serial.begin(*(unsigned int*)(inbuf+3));
                 while (!Serial);
                 send(&results, CMD_CHANGE_BAUD_RESULT, 1);
                 break;
                 
             case CMD_PING:
-                send(inbuf+2, CMD_PING_RESPONSE, inbufcount-2);
+                send(inbuf+3, CMD_PING_RESPONSE, inbufcount-3);
                 break;
                 
             case CMD_CAN_BAUD:
-                baud = inbuf[2];
+                baud = inbuf[3];
 KEEP_TRYING_ISO:
                 if(CAN_OK == ISO_CAN.begin(baud))                   // init can bus : baudrate = 500k
                 {
@@ -217,12 +217,12 @@ KEEP_TRYING_VEH:
                 
             case CMD_CAN_SEND:
                 // len, cmd, canid, canid2, extflag
-                canId = (INT32U)inbuf[5] | 
-                        ((INT32U)inbuf[4] << 8) |
-                        ((INT32U)inbuf[3] << 16) |
-                        ((INT32U)inbuf[2] << 24);
-                extflag = inbuf[6];
-                len = inbuf[0] - 7;
+                canId = (INT32U)inbuf[6] | 
+                        ((INT32U)inbuf[5] << 8) |
+                        ((INT32U)inbuf[4] << 16) |
+                        ((INT32U)inbuf[3] << 24);
+                extflag = inbuf[7];
+                len = inbufcount - 8;
                 while(results_veh != CAN_OK && 
                       results_iso != CAN_OK &&
                       fail_veh < 10 &&
@@ -251,13 +251,13 @@ KEEP_TRYING_VEH:
 
             case CMD_SET_FILT_MASK:
                 // Loop through all 8 values (2 masks, 6 filters) and set them
-                for(uint8_t i = 5; i <=33; i += 4)
+                for(uint8_t i = 6; i <=34; i += 4)
                 {
                     uint32_t val = inbuf[i] | 
                                    (inbuf[i - 1] << 8) |
                                    (inbuf[i - 2] << 16) |
                                    (inbuf[i - 3] << 24);
-                    if(i <= 9) // First two are masks
+                    if(i <= 10) // First two are masks
                     {
                         VEH_CAN.init_Mask((i / 4) - 1, 0, val);
                         ISO_CAN.init_Mask((i / 4) - 1, 0, val);
@@ -271,8 +271,8 @@ KEEP_TRYING_VEH:
 
                 
             default:
-                Serial.write("@\x15\x03""BAD COMMAND: ");
-                Serial.print(inbuf[1]);
+                Serial.write("@\x15\x03BAD COMMAND: ");
+                Serial.print(inbuf[2]);
                 
         }
 NOT_INITIALIZED:
