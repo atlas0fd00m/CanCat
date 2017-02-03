@@ -1,6 +1,7 @@
 #include <due_can.h>
 #include "queue.h"
 #include "defines.h"
+#include <limits.h>
 
 #define Serial SerialUSB
 
@@ -13,8 +14,8 @@ uint8_t RecvIsoTPFrame(uint8_t serial_buffer[]);
 /* circular buffers for receiving and sending CAN frames */
 Queue<CAN_FRAME> can_rx_frames0(128);
 Queue<CAN_FRAME> can_rx_frames1(128);
-Queue<CAN_FRAME> can_tx_frames0(32);
-Queue<CAN_FRAME> can_tx_frames1(32);
+Queue<CAN_FRAME> can_tx_frames0(128);
+Queue<CAN_FRAME> can_tx_frames1(128);
 
 /* Buffer for receiving serial commands */
 uint8_t serial_buffer[SERIAL_BUF_SIZE];
@@ -35,6 +36,8 @@ volatile uint16_t isotp_tx_index = 0;
 volatile uint16_t isotp_tx_length = 0;
 volatile uint8_t isotp_tx_go = 0;
 uint8_t isotp_tx_PCIIndex = 1;
+unsigned long isotp_sep_time = 0;
+unsigned long isotp_last_tx_time;
 
 /* Functions for serial communication */
 void send(unsigned char *data, unsigned char cmd, unsigned char len)
@@ -147,11 +150,16 @@ void IsoTP_cb(CAN_FRAME *frame, CANRaw *device)
             isotp_tx_length = 0;
         }
 
-        /* Check for a wait message, frame limit or separation time which are
-           currently unimplemented. */
-        else if((frame->data.bytes[0] & 0x0F) == 0x01 || frame->data.bytes[1] != 0 || frame->data.bytes[2] != 0)
+        /* Check for a wait message  */
+        else if((frame->data.bytes[0] & 0x0F) == 0x01)
         {
-            log("Flow Control specifies frame or time limits, which is unimplemented", 67);
+            isotp_tx_go = 0; // Suspend sending messages
+        }
+
+        /* Check for block size */
+        else if(frame->data.bytes[1] != 0)
+        {
+            log("Block size specified, which is unimplemented", 67);
             if (mode != CMD_CAN_MODE_CITM)
             {
                 device->setRXFilter(0, 0, 0x7FF, false);
@@ -167,10 +175,52 @@ void IsoTP_cb(CAN_FRAME *frame, CANRaw *device)
             isotp_tx_index = 0;
             isotp_tx_length = 0;
         }
+        
+        /* Check for separation time */
+        else if(frame->data.bytes[2] != 0)
+        {
+            switch(frame->data.bytes[2])
+            {
+                case 0xf1:
+                    isotp_sep_time = 100;
+                    break;
+                case 0xf2:
+                    isotp_sep_time = 200;
+                    break;
+                case 0xf3:
+                    isotp_sep_time = 300;
+                    break;
+                case 0xf4:
+                    isotp_sep_time = 400;
+                    break;
+                case 0xf5:
+                    isotp_sep_time = 500;
+                    break;
+                case 0xf6:
+                    isotp_sep_time = 600;
+                    break;
+                case 0xf7:
+                    isotp_sep_time = 700;
+                    break;
+                case 0xf8:
+                    isotp_sep_time = 800;
+                    break;
+                case 0xf9:
+                    isotp_sep_time = 900;
+                    break;
+                default:
+                    isotp_sep_time = frame->data.bytes[2] * 1000;
+                    break;
+            }
+            isotp_last_tx_time = micros();
+            isotp_tx_go = 1;
+        }
+
+        /* No flow control, we can just finish sending the message */
         else
         {
-            /* No flow control, we can just finish sending the message */
             isotp_tx_go = 1;
+            isotp_sep_time = 0;
         }
     }
     if(mode == CMD_CAN_MODE_SNIFF_CAN0 && !can_rx_frames0.enqueue(frame))
@@ -287,18 +337,18 @@ void loop()
     /* Send enqueued frames */
     if(!can_tx_frames0.isEmpty())
     {
-        frame = can_tx_frames0.dequeue();
-        if(!Can0.sendFrame(frame))
+        frame = can_tx_frames0.peek();
+        if(Can0.sendFrame(frame))
         {
-            log("Error Sending on CAN0", 21);
+            can_tx_frames0.remove();
         }
     }
     if(!can_tx_frames1.isEmpty())
     {
-        frame = can_tx_frames1.dequeue();
-        if(!Can1.sendFrame(frame))
+        frame = can_tx_frames1.peek();
+        if(Can1.sendFrame(frame))
         {
-            log("Error Sending on CAN1", 21);
+            can_tx_frames1.remove();
         }
     }
 
@@ -335,8 +385,18 @@ void loop()
             send(buf, CMD_ISO_RECV, frame.length + 4);
     }
 
-    // Check if we have isotp frames to send
-    if(isotp_tx_go > 0)
+    // handle micros() rollover edge case where isotp_last_tx_time + isotp_sep_time < ULONG_MAX 
+    // but the micros timer has already rolled over
+    if(isotp_sep_time > 0 && micros() < isotp_last_tx_time)
+    {
+        unsigned long diff = ULONG_MAX - isotp_last_tx_time;
+        if(diff >= isotp_sep_time)
+            isotp_last_tx_time = ULONG_MAX - isotp_sep_time + 1;
+    }
+    
+    // Check if we have isotp frames to send, and enough time has elapsed if rate limiting is requested
+    if(isotp_tx_go > 0 && 
+       ((isotp_sep_time == 0) || ((isotp_last_tx_time + isotp_sep_time) < micros())))
     {
         uint8_t num_bytes = (isotp_tx_length - isotp_tx_index > 7) ? 7 : (isotp_tx_length - isotp_tx_index);
         isotp_tx_buffer[isotp_tx_index - 1] = 0x20 | isotp_tx_PCIIndex; // Set PCI Byte
@@ -345,6 +405,7 @@ void loop()
         if(SendFrame(frame) == 0) // Successfully sent
         {
             /* Move to the next frame and check if we're done */
+            isotp_last_tx_time = micros();
             if(++isotp_tx_PCIIndex > 15)
                 isotp_tx_PCIIndex = 0;
             isotp_tx_index += num_bytes;
@@ -354,6 +415,7 @@ void loop()
                 isotp_tx_PCIIndex = 1;
                 isotp_tx_index = 0;
                 isotp_tx_length = 0;
+                isotp_sep_time = 0;
             }
         }
     }
@@ -531,24 +593,25 @@ void CreateCanFrame(uint32_t arbid, uint8_t extended, uint8_t len, uint8_t data[
 uint8_t SendFrame(CAN_FRAME frame)
 {
     uint8_t results = 0;
-    if (mode == CMD_CAN_MODE_SNIFF_CAN0 && !Can0.sendFrame(frame))
+
+    if (mode == CMD_CAN_MODE_SNIFF_CAN0 && !can_tx_frames0.enqueue(&frame))
     {
         log("Failed sending on Can0", 22);
         results = 1;
     }
-    else if (mode == CMD_CAN_MODE_SNIFF_CAN1 && !Can1.sendFrame(frame))
+    else if (mode == CMD_CAN_MODE_SNIFF_CAN1 && !can_tx_frames1.enqueue(&frame))
     {
         log("Failed sending on Can1", 22);
         results = 2;
     }
     else if (mode == CMD_CAN_MODE_CITM)
     {
-        if(!Can0.sendFrame(frame))
+        if(!can_tx_frames0.enqueue(&frame))
         {
             log("Failed sending on Can0", 22);
             results = 1;
         }
-        if(!Can1.sendFrame(frame))
+        if(!can_tx_frames1.enqueue(&frame))
         {
             log("Failed sending on Can1", 22);
             results = 2;
