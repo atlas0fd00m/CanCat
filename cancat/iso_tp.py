@@ -50,6 +50,7 @@ class IncompleteIsoTpMsg(Exception):
 def msg_decode(msglist, verbose=False):
     output = []
 
+    count = 0
     nextidx = 0
     length = None
     for msg in msglist:
@@ -60,8 +61,8 @@ def msg_decode(msglist, verbose=False):
             # Single packet message
             data = msg[1:]
 
-            nextidx = 0
-            return data
+            #nextidx = 0
+            return data, count
 
         elif ftype == 1:
             length = struct.unpack(">H", msg[0:2])[0] & 0xfff
@@ -97,13 +98,15 @@ def msg_decode(msglist, verbose=False):
         if nextidx >= 0x10:
             nextidx = 0
 
+        count += 1
+
     if length != None and length < 0:
         print "Extra bytes at the end: %r" % (output[-1][length:])
 
     if length == None or length > 0:
         raise IncompleteIsoTpMsg(output, length)
 
-    return ''.join(output)
+    return ''.join(output), count
 
 
 def msgs_decode(msglist, verbose=False):
