@@ -115,18 +115,7 @@ void IsoTP_cb(CAN_FRAME *frame, CANRaw *device)
 
         //TODO: Support for configurable padding and delay
         CreateCanFrame(isotp_tx_arbid, isotp_tx_extended, 1, tx_frame.data.byte, true, 0x00, &tx_frame);
-
-        if(mode == CMD_CAN_MODE_SNIFF_CAN0 && !can_tx_frames0.enqueue(&tx_frame))
-            log("TX ENQ Err CAN0", 15);
-        else if(mode == CMD_CAN_MODE_SNIFF_CAN1 && !can_tx_frames1.enqueue(&tx_frame))
-            log("TX ENQ Err CAN1", 15);
-        else if(mode == CMD_CAN_MODE_CITM)
-        {
-            if(device == &Can0 && !can_tx_frames0.enqueue(&tx_frame))
-                log("TX ENQ Err CAN0", 15);
-            else if(device == &Can1 && !can_tx_frames1.enqueue(&tx_frame))
-                log("TX ENQ Err CAN1", 15);
-        }
+        SendFrame(tx_frame);
     }
     else if ((frame->data.bytes[0] & 0xF0) == 0x30) /* Flow control message */
     {
@@ -615,6 +604,22 @@ uint8_t SendFrame(CAN_FRAME frame)
         {
             log("Failed sending on Can1", 22);
             results = 2;
+        }
+    }
+
+    /* Send the frame back up to be recorded with the other CAN frames */
+    if(results == 0)
+    {
+        if(mode == CMD_CAN_MODE_SNIFF_CAN0 && !can_rx_frames0.enqueue(&frame))
+            log("Failed enqueueing sent message", 30);
+        else if(mode == CMD_CAN_MODE_SNIFF_CAN1 && !can_rx_frames1.enqueue(&frame))
+            log("Failed enqueueing sent message", 30);
+        else if(mode == CMD_CAN_MODE_CITM)
+        {
+            if(!can_rx_frames0.enqueue(&frame))
+                log("Failed enqueueing sent message", 30);
+            else if(!can_rx_frames1.enqueue(&frame))
+                log("Failed enqueueing sent message", 30);
         }
     }
 

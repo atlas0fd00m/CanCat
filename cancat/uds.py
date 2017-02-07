@@ -212,7 +212,6 @@ class UDS:
             block_idx += 1
             if block_idx > 0xff:
                 block_idx = 0
->>>>>>> 6e33fb9... Finished getting RequestUpload working. Updated firmware to be more robust to sending large numbers of messages. Implemented ISOTP flow control
 
         if resparbid == None:
             resparbid = self.rx_arbid
@@ -312,7 +311,25 @@ class UDS:
             except Exception, e:
                 print e
 
-        return success
+    def SecurityAccess(self, level, key):
+        txmsg = "\x27" + chr(level)
+        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, txmsg, service = 0x67)
+        if msg is None:
+            return "\x00\x7f\x00\x35"
+        if(ord(msg[0]) == 0x7f):
+            print "Error getting seed:", msg.encode('hex')
+
+        else:
+            seed = msg[2:5]
+            hexified_seed = " ".join(x.encode('hex') for x in seed)
+            key = str(bytearray(self._key_from_seed(hexified_seed, key)))
+            txmsg = "\x27" + chr(level+1) + key
+            msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, txmsg, service = 0x67)
+            return msg
+
+    def _key_from_seed(self, seed, secret):
+        print "Not implemented in this class"
+        return 0
 
 
 def printUDSSession(c, tx_arbid, rx_arbid=None):
