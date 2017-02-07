@@ -88,15 +88,14 @@ class UDS:
         # check if the response is something we know about and can help out
         if msg != None and len(msg):
             svc = ord(data[0])
-            code = ord(msg[0])
+            code = ord(msg[2])
 
             if code == svc + 0x40:
                 print "Positive Response!"
 
             negresprepr = NEG_RESP_CODES.get(code)
             if negresprepr != None:
-                print negresprepr + "\n"
-                raise Exception("NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s" % (svc, UDS_SVCS.get(svc), code, negresprepr))
+                print "NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s" % (svc, UDS_SVCS.get(svc), code, negresprepr)
 
         return msg
 
