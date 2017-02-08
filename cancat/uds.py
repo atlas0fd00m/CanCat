@@ -132,46 +132,26 @@ class UDS:
             del self.t
 
     def DiagnosticSessionControl(self, session):
+        currIdx = self.c.getCanMsgCount()
         return self._do_Function(SVC_DIAGNOSTICS_SESSION_CONTROL, chr(session), service=0x50)
 
     def ReadMemoryByAddress(self, address, size):
-        return self._do_Function(SVC_READ_MEMORY_BY_ADDRESS, subfunc=0x24, data=struct.pack(">I", address) + struct.pack(">H", size), service = 0x63)
+        currIdx = self.c.getCanMsgCount()
+        return self._do_Function(SVC_READ_MEMORY_BY_ADDRESS, subfunc=0x24, data=struct.pack(">IH", address, size), service = 0x63)
         
-    def SecurityService(self, level):
-        txmsg = "\x27" + chr(level)
-        print "sending", self.tx_arbid, txmsg.encode('hex')
-        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, txmsg, service=0x67)
-        #arbid, msg = self.ReassembleIsoTP(start_index = currIdx, service = 0x67)
-        print "got", msg.encode('hex')
-        print "msg[0]:", msg[0].encode('hex')
-
-        if(msg[0].encode('hex') == '7f'):
-            print "Error getting seed:", msg.encode('hex')
-
-        else:
-            seed = msg[2:5]
-            hexified_seed = " ".join(x.encode('hex') for x in seed)
-            key = seed # Replace this with a call to the actual response computation function
-            currIdx = self.c.getCanMsgCount()
-            msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, txmsg, service=0x67)
-            #arbid, msg = self.ReassembleIsoTP(start_index = currIdx, service = 0x67)
-            print "got", msg.encode('hex')
-            return msg
-
-    def readDID(self, did, ecuarbid=None, resparbid=None):
+    def ReadDID(self, did):
         '''
-        Read the Data Identifier specified from the ECU.  i
-        For hackery purposes, the xmit and recv ARBIDs can be specified.
+        Read the Data Identifier specified from the ECU.
 
         Returns: The response ISO-TP message as a string
         '''
         msg = self._do_Function(SVC_READ_DATA_BY_IDENTIFIER, struct.pack('>H', did), service=0x62)
+        #msg = self.xmit_recv("22".decode('hex') + struct.pack('>H', did), service=0x62)
         return msg
 
-    def writeDID(self, did, data, ecuarbid=None, resparbid=None):
+    def WriteDID(self, did, data):
         '''
-        Write the Data Identifier specified from the ECU.  i
-        For hackery purposes, the xmit and recv ARBIDs can be specified.
+        Write the Data Identifier specified from the ECU.
 
         Returns: The response ISO-TP message as a string
         '''
@@ -190,7 +170,7 @@ class UDS:
         except TypeError:
             print "Cannot parse addressAndLengthFormatIdentifier", hex(addr_format)
             return None
-        msg = self.xmit_recv("\x34" + struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data)))
+        msg = self.xmit_recv("\x34" + struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data)), service = 0x74)
 
         # Parse the response
         if ord(msg[0]) != 0x74:
@@ -206,18 +186,18 @@ class UDS:
         data_idx = 0
         block_idx = 1
         while data_idx < len(data):
-            msg = self.xmit_recv("\x36" + chr(block_idx) + data[data_idx:data_idx+max_txfr_len-2])
+            msg = self.xmit_recv("\x36" + chr(block_idx) + data[data_idx:data_idx+max_txfr_len-2], service = 0x76)
             data_idx += max_txfr_len - 2
             block_idx += 1
             if block_idx > 0xff:
                 block_idx = 0
 
-        if resparbid == None:
-            resparbid = self.rx_arbid
+            # error checking
+            if ord(msg[0]) == 0x7f and ord(msg[2]) != 0x78:
+                print "Error sending data: {}".format(msg.encode('hex'))
+                return None
 
-        msg = self.c.ISOTPxmit_recv(ecuarbid, resparbid, "22".decode('hex') + struct.pack('>H', did), service=0x62)
-        
-        return msg
+            # TODO: need to figure out how to get 2nd isotp message to verify that this worked
 
         # Send RequestTransferExit
         self._do_Function(SVC_REQUEST_TRANSFER_EXIT, service = 0x77)
@@ -255,6 +235,9 @@ class UDS:
         #msg = self.xmit_recv(data, service=0x63)
         
         return msg
+
+
+
 
     def RequestUpload(self, addr, length, data_format = 0x00, addr_format = 0x44):
         '''
@@ -313,9 +296,11 @@ class UDS:
             except Exception, e:
                 print e
 
+        return success
+
+
     def SecurityAccess(self, level, key):
-        txmsg = "\x27" + chr(level)
-        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, txmsg, service = 0x67)
+        msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service = 0x67)
         if msg is None:
             return "\x00\x7f\x00\x35"
         if(ord(msg[0]) == 0x7f):
@@ -325,14 +310,13 @@ class UDS:
             seed = msg[2:5]
             hexified_seed = " ".join(x.encode('hex') for x in seed)
             key = str(bytearray(self._key_from_seed(hexified_seed, key)))
-            txmsg = "\x27" + chr(level+1) + key
-            msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, txmsg, service = 0x67)
+
+            msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level+1, data=key, service = 0x67)
             return msg
 
     def _key_from_seed(self, seed, secret):
         print "Not implemented in this class"
         return 0
-
 
 def printUDSSession(c, tx_arbid, rx_arbid=None):
     if rx_arbid == None:
@@ -346,3 +330,4 @@ def printUDSSession(c, tx_arbid, rx_arbid=None):
         idx, ts, arbid, msg = msgs[msgs_idx]
 
         
+
