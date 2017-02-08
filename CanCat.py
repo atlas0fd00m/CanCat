@@ -4,6 +4,7 @@ import sys
 import readline
 import rlcompleter
 readline.parse_and_bind("tab: complete")
+import os
 
 from cancat import *
 
@@ -30,6 +31,10 @@ you interact with the CanCat tool:
 
 if __name__ == "__main__":
     import argparse
+
+    # Fix up the python module search path for execution in a different working directory
+    sys.path.append(os.getcwd())
+    sys.path.append(sys.path[0] + "/cancat")
 
     interfaces = [iface[:-9] for iface in globals().keys() if iface.endswith('Interface')]
     interface_names = ', '.join(interfaces)
