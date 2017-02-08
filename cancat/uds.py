@@ -219,6 +219,9 @@ class UDS:
         
         return msg
 
+        # Send RequestTransferExit
+        self._do_Function(SVC_REQUEST_TRANSFER_EXIT, service = 0x77)
+
     def readMemoryByAddress(self, address, length, lenlen=1, addrlen=4):
         '''
         Work in progress!
