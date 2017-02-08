@@ -34,7 +34,7 @@ uint8_t isotp_tx_buffer[ISOTP_BUF_SIZE];
 volatile uint16_t isotp_tx_index = 0;
 volatile uint16_t isotp_tx_length = 0;
 volatile uint8_t isotp_tx_go = 0;
-uint8_t isotp_tx_PCIIndex = 0;
+uint8_t isotp_tx_PCIIndex = 1;
 
 /* Functions for serial communication */
 void send(unsigned char *data, unsigned char cmd, unsigned char len)
@@ -351,7 +351,7 @@ void loop()
             if(isotp_tx_index == isotp_tx_length)
             {
                 isotp_tx_go = 0;
-                isotp_tx_PCIIndex = 0;
+                isotp_tx_PCIIndex = 1;
                 isotp_tx_index = 0;
                 isotp_tx_length = 0;
                 if (mode != CMD_CAN_MODE_CITM)
@@ -612,7 +612,7 @@ uint8_t SendIsoTPFrame(uint8_t serial_buffer[])
         isotp_tx_go = 0;
         isotp_tx_index = 6;
         isotp_tx_length = serial_buf_count - 12;
-        isotp_tx_PCIIndex = 0;
+        isotp_tx_PCIIndex = 1;
         /* Copy the data from the serial buffer into the isotp buffer */
         for(uint16_t i = isotp_tx_index; i < isotp_tx_length; i++)
             isotp_tx_buffer[i] = serial_buffer[i + 12];
