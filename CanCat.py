@@ -32,9 +32,8 @@ you interact with the CanCat tool:
 if __name__ == "__main__":
     import argparse
 
-    # Fix up the python module search path for execution in a different working directory
-    sys.path.append(os.getcwd())
-    sys.path.append(sys.path[0] + "/cancat")
+    # Make it easy to find modules in CWD
+    sys.path.append('.')
 
     interfaces = [iface[:-9] for iface in globals().keys() if iface.endswith('Interface')]
     interface_names = ', '.join(interfaces)
