@@ -565,24 +565,24 @@ class CanInterface:
         starttime = lasttime = time.time()
 
         while not complete and (not timeout or (lasttime-starttime < timeout)):
-            msgs = [(idx, msg) for idx, ts, arbid, msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid])]
+            msgs = [msg for msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid])]
 
-        
             if len(msgs):
                 try:
                     # Check that the message is for the expected service, if specified
-                    msg, index = iso_tp.msg_decode([msg for idx,msg in msgs])
+                    arbid, msg, count = iso_tp.msg_decode(msgs)
                     if ord(msg[0]) == 0x7e:  # response for TesterPresent... ignore
-                        start_index = msgs[index][0] + 1
+                        start_index = msgs[count-1][0] + 1
 
                     if service is not None:
                         # Check if this is the right service, or there was an error
                         if ord(msg[0]) == service or ord(msg[0]) == 0x7f:
                             msg_found = True
                             return msg
+
                         print "Hey, we got here, wrong service code?"
                         print msg.encode('hex')
-                        start_index = msgs[index][0] + 1
+                        start_index = msgs[count-1][0] + 1
                     else:
                         msg_found = True
                         return msg

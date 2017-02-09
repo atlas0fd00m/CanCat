@@ -4,6 +4,8 @@ import cancat
 import struct
 import threading
 
+import cancat.iso_tp as cisotp
+
 NEG_RESP_CODES = {
         0x10:'GeneralReject',
         0x11:'ServiceNotSupported',
@@ -69,8 +71,38 @@ SVC_CONTROL_DTC_SETTING =                   0x85
 
 UDS_SVCS = { v:k for k,v in globals().items() if k.startswith('SVC_') }
 
+POS_RESP_CODES = { (k|0x40) : "OK_" + v.lower() for k,v in UDS_SVCS.items() }
+POS_RESP_CODES[0] = 'Success'
+
+NEG_RESP_REPR = {}
+for k,v in NEG_RESP_CODES.items():
+    NEG_RESP_REPR[k] = 'ERR_' + v
+
+RESP_CODES = {}
+RESP_CODES.update(NEG_RESP_REPR)
+RESP_CODES.update(POS_RESP_CODES)
 
 
+class NegativeResponseException(Exception):
+    def __init__(self, neg_code, svc, msg):
+        self.neg_code = neg_code
+        self.msg = msg
+        self.svc = svc
+
+    def __repr__(self):
+        negresprepr = NEG_RESP_CODES.get(self.neg_code)
+        return "NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s" % \
+            (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg.encode('hex'))
+
+    def __str__(self):
+        negresprepr = NEG_RESP_CODES.get(self.neg_code)
+        return "NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s   \tmsg: %s" % \
+            (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg.encode('hex'))
+
+
+SURVIVABLE_NEGS = (
+    (0x7f, 0x78),
+    )
 
 class UDS:
     def __init__(self, c, tx_arbid, rx_arbid=None):
@@ -88,14 +120,18 @@ class UDS:
         # check if the response is something we know about and can help out
         if msg != None and len(msg):
             svc = ord(data[0])
-            code = ord(msg[2])
+            code = ord(msg[0])
+            subcode = ord(msg[2])
 
             if code == svc + 0x40:
                 print "Positive Response!"
 
             negresprepr = NEG_RESP_CODES.get(code)
             if negresprepr != None:
-                print "NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s" % (svc, UDS_SVCS.get(svc), code, negresprepr)
+                print negresprepr + "\n"
+                if not (code,subcode) in SURVIVABLE_NEGS:
+                    raise NegativeResponseException(code, svc, msg)
+
 
         return msg
 
@@ -114,11 +150,15 @@ class UDS:
 
     def SendTesterPresent(self):
         while self.TesterPresent is True:
-            self.c.CANxmit(self.tx_arbid, "023E000000000000".decode('hex'))
+            if self.TesterPresentRequestsResponse:
+                self.c.CANxmit(self.tx_arbid, "023E000000000000".decode('hex'))
+            else:
+                self.c.CANxmit(self.tx_arbid, "023E800000000000".decode('hex'))
             time.sleep(2.0)
 
-    def StartTesterPresent(self):
+    def StartTesterPresent(self, request_response=True):
         self.TesterPresent = True
+        self.TesterPresentRequestsResponse=request_response
         self.t = threading.Thread(target = self.SendTesterPresent)
         self.t.setDaemon(True)
         self.t.start()
@@ -138,6 +178,7 @@ class UDS:
     def ReadMemoryByAddress(self, address, size):
         currIdx = self.c.getCanMsgCount()
         return self._do_Function(SVC_READ_MEMORY_BY_ADDRESS, subfunc=0x24, data=struct.pack(">IH", address, size), service = 0x63)
+        #return self.xmit_recv("\x23\x24" + struct.pack(">I", address) + struct.pack(">H", size), service = 0x63)
         
     def ReadDID(self, did):
         '''
@@ -193,9 +234,15 @@ class UDS:
                 block_idx = 0
 
             # error checking
-            if ord(msg[0]) == 0x7f and ord(msg[2]) != 0x78:
+            if msg is not None and ord(msg[0]) == 0x7f and ord(msg[2]) != 0x78:
                 print "Error sending data: {}".format(msg.encode('hex'))
                 return None
+            if msg is None:
+                print "Didn't get a response?"
+                data_idx -= max_txfr_len - 2
+                block_idx -= 1
+                if block_idx == 0:
+                    block_idx = 0xff
 
             # TODO: need to figure out how to get 2nd isotp message to verify that this worked
 
@@ -235,8 +282,6 @@ class UDS:
         #msg = self.xmit_recv(data, service=0x63)
         
         return msg
-
-
 
 
     def RequestUpload(self, addr, length, data_format = 0x00, addr_format = 0x44):
@@ -318,7 +363,8 @@ class UDS:
         print "Not implemented in this class"
         return 0
 
-def printUDSSession(c, tx_arbid, rx_arbid=None):
+
+def printUDSSession(c, tx_arbid, rx_arbid=None, paginate=45):
     if rx_arbid == None:
         rx_arbid = tx_arbid + 8 # by UDS spec
 
@@ -326,8 +372,20 @@ def printUDSSession(c, tx_arbid, rx_arbid=None):
 
     msgs_idx = 0
     
-    while True:
-        idx, ts, arbid, msg = msgs[msgs_idx]
+    linect = 1
+    while msgs_idx < len(msgs):
+        arbid, isotpmsg, count = cisotp.msg_decode(msgs, msgs_idx)
+        #print "Message: (%s:%s) \t %s" % (count, msgs_idx, isotpmsg.encode('hex'))
+        svc = ord(isotpmsg[0])
+        mtype = (RESP_CODES, UDS_SVCS)[arbid==tx_arbid].get(svc, '')
 
+        print "Message: (%s:%s) \t %-30s %s" % (count, msgs_idx, isotpmsg.encode('hex'), mtype)
+        msgs_idx += count
+
+        if paginate:
+            if (linect % paginate)==0:
+                raw_input("%x)  PRESS ENTER" % linect)
+
+        linect += 1
         
 

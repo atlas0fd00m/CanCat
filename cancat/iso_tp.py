@@ -1,3 +1,4 @@
+import sys
 import struct
 
 def msg_encode(data, verbose=False):
@@ -47,25 +48,41 @@ class IncompleteIsoTpMsg(Exception):
         return "Data incomplete.  Remaining length: %r bytes.  Current data: %r"\
                 % (self.length, self.output)
 
-def msg_decode(msglist, verbose=False):
+
+def msg_decode(msglist, offset=0, verbose=False, cancat=True):
     output = []
 
     count = 0
     nextidx = 0
     length = None
-    for msg in msglist:
+    midx = offset
+    arbid = 0
+
+    while midx < len(msglist) and (length == None or length > 0):
+        if cancat:
+            idx, ts, narbid, msg = msglist[midx]
+        else:
+            msg = msglist[midx]
+            narbid = 0
 
         ctrl = ord(msg[0])
         ftype = (ctrl >> 4)
         if ftype == 0:
+            if len(output):
+                msg = ''.join(output)
+                print "Failed to reach length %d:  only got %d" % (length, len(msg))
+                return arbid, msg, count
+
             # Single packet message
             data = msg[1:]
+            if verbose: print "0: %r" % data.encode('hex')
 
-            #nextidx = 0
-            return data, count
+            return narbid, data, count+1
 
         elif ftype == 1:
             length = struct.unpack(">H", msg[0:2])[0] & 0xfff
+            arbid = narbid
+
             if verbose: print "length: %r" % length
 
             idx = ctrl & 0xf
@@ -73,6 +90,7 @@ def msg_decode(msglist, verbose=False):
 
             msg = msg[2:]
             output.append(msg)
+            if verbose: print "1: %r" % msg.encode('hex')
             length -= len(msg)
             nextidx += 1
 
@@ -87,6 +105,7 @@ def msg_decode(msglist, verbose=False):
 
             msg = msg[1:]
             output.append(msg)
+            if verbose: print "2: %r" % msg.encode('hex')
             length -= len(msg)
             nextidx += 1
 
@@ -99,14 +118,15 @@ def msg_decode(msglist, verbose=False):
             nextidx = 0
 
         count += 1
+        midx += 1
 
     if length != None and length < 0:
-        print "Extra bytes at the end: %r" % (output[-1][length:])
+        if verbose: print "Extra bytes at the end: %r" % (output[-1][length:])
 
     if length == None or length > 0:
         raise IncompleteIsoTpMsg(output, length)
 
-    return ''.join(output), count
+    return arbid, ''.join(output), count
 
 
 def msgs_decode(msglist, verbose=False):
