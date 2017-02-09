@@ -4,6 +4,7 @@ import sys
 import readline
 import rlcompleter
 readline.parse_and_bind("tab: complete")
+import os
 
 from cancat import *
 
@@ -30,6 +31,9 @@ you interact with the CanCat tool:
 
 if __name__ == "__main__":
     import argparse
+
+    # Make it easy to find modules in CWD
+    sys.path.append('.')
 
     interfaces = [iface[:-9] for iface in globals().keys() if iface.endswith('Interface')]
     interface_names = ', '.join(interfaces)
@@ -59,6 +63,6 @@ if __name__ == "__main__":
         if baud_val == None:
             raise Exception("Invalid baud: %s.  Must use one of the following: %s" % (ifo.baud, baud_nums))
 
-    interactive(ifo.port, intro=intro, InterfaceClass=interface, load_filename=ifo.filename, can_baud=baud_val)
+    results = interactive(ifo.port, intro=intro, InterfaceClass=interface, load_filename=ifo.filename, can_baud=baud_val)
     if results == -1:
         print "Error.  Try '-h' from CLI for help."

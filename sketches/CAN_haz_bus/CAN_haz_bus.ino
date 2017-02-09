@@ -16,7 +16,8 @@
 #define CMD_CHANGE_BAUD_RESULT   0x32
 #define CMD_CAN_BAUD_RESULT      0x33
 #define CMD_CAN_SEND_RESULT      0x34
-#define CMD_SET_FILT_MASK        0x36 // 0x35 is used by CAN in the middle
+#define CMD_ISO_RECV             0x35
+#define CMD_SET_FILT_MASK        0x36
 
 #define CMD_PING                 0x41
 #define CMD_CHANGE_BAUD          0x42
@@ -26,10 +27,10 @@
 unsigned char len = 0;
 unsigned char buf[MAX_BUF_SIZE];
 
-unsigned int count = 0;
-unsigned char inbuf[MAX_BUF_SIZE];
-unsigned char inbufcount = 0;
-unsigned char inbufidx = 0;
+uint32_t count = 0;
+uint8_t inbuf[MAX_BUF_SIZE];
+uint16_t inbufcount = 0;
+uint16_t inbufidx = 0;
 INT32U canId;
 INT8U results;
 INT8U  extflag;
@@ -99,9 +100,9 @@ void loop()
     {
         //logHexStr((INT32U)count, "readloopcount", 13);
         inbuf[inbufidx++] = Serial.read();
-        if (inbufidx==1)
+        if (inbufidx==2)
         {
-            inbufcount = inbuf[0];
+            inbufcount = inbuf[0] << 8u | inbuf[1];
             //logHexStr(inbufcount, "Setting inbufcount", 17);
         }
         
@@ -116,26 +117,26 @@ void loop()
     if (inbufidx && inbufidx == inbufcount)
     {
         // Check if we've been initialized and we're not trying to initialize
-        if(initialized == 0 && inbuf[1] != CMD_CAN_BAUD)
+        if(initialized == 0 && inbuf[2] != CMD_CAN_BAUD)
         {
             log("CAN Not Initialized", 19);
             goto NOT_INITIALIZED;
         }
             
-        switch (inbuf[1])  // cmd byte
+        switch (inbuf[2])  // cmd byte
         {
             case CMD_CHANGE_BAUD:
-                Serial.begin(*(unsigned int*)(inbuf+2));
+                Serial.begin(*(unsigned int*)(inbuf+3));
                 while (!Serial);
                 send(&results, CMD_CHANGE_BAUD_RESULT, 1);
                 break;
                 
             case CMD_PING:
-                send(inbuf+2, CMD_PING_RESPONSE, inbufcount-2);
+                send(inbuf+3, CMD_PING_RESPONSE, inbufcount-3);
                 break;
                 
             case CMD_CAN_BAUD:
-                baud = inbuf[2];
+                baud = inbuf[3];
 KEEP_TRYING:
                 if(CAN_OK == CAN.begin(baud))                   // init can bus : baudrate = 500k
                 {
@@ -157,16 +158,16 @@ KEEP_TRYING:
             case CMD_CAN_SEND:
                 //log("sending", 7);
                 // len, cmd, canid, canid2, extflag
-                canId = inbuf[5] | 
-                        (inbuf[4] << 8) |
-                        (inbuf[3] << 16) |
-                        (inbuf[2] << 24);
-                extflag = inbuf[6];
-                len = inbuf[0] - 7;
+                canId = inbuf[6] | 
+                        (inbuf[5] << 8) |
+                        (inbuf[4] << 16) |
+                        (inbuf[3] << 24);
+                extflag = inbuf[7];
+                len = inbufcount - 8;
                 failCnt = 0;
                 do
                 {
-                  results = CAN.sendMsgBuf(canId, extflag, len, inbuf+7);
+                  results = CAN.sendMsgBuf(canId, extflag, len, inbuf+8);
                   if(results != CAN_OK)
                   {
                     failCnt++;
@@ -182,13 +183,13 @@ KEEP_TRYING:
 
             case CMD_SET_FILT_MASK:
                 // Loop through all 8 values (2 masks, 6 filters) and set them
-                for(uint8_t i = 5; i <=33; i += 4)
+                for(uint8_t i = 6; i <=34; i += 4)
                 {
                     uint32_t val = inbuf[i] | 
                                    (inbuf[i - 1] << 8) |
                                    (inbuf[i - 2] << 16) |
                                    (inbuf[i - 3] << 24);
-                    if(i <= 9) // First two are masks
+                    if(i <= 10) // First two are masks
                     {
                         CAN.init_Mask((i / 4) - 1, 0, val);
                     }
@@ -201,7 +202,7 @@ KEEP_TRYING:
                 
             default:
                 Serial.write("@\x15\x03BAD COMMAND: ");
-                Serial.print(inbuf[1]);
+                Serial.print(inbuf[2]);
                 
         }
 NOT_INITIALIZED:

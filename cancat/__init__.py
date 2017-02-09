@@ -7,6 +7,8 @@ import struct
 import threading
 import cPickle as pickle
 
+from cancat import iso_tp
+
 # defaults for Linux:
 serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
 baud = 500000
@@ -25,6 +27,9 @@ CMD_CAN_SEND_RESULT         = 0x34
 CMD_ISO_RECV                = 0x35
 CMD_SET_FILT_MASK           = 0x36
 CMD_CAN_MODE_RESULT         = 0x37
+CMD_CAN_SEND_ISOTP_RESULT   = 0x38
+CMD_CAN_RECV_ISOTP_RESULT   = 0x39
+CMD_CAN_SENDRECV_ISOTP_RESULT = 0x3A
 
 CMD_PING                    = 0x41
 CMD_CHANGE_BAUD             = 0x42
@@ -34,6 +39,10 @@ CMD_CAN_MODE                = 0x45
 CMD_CAN_MODE_SNIFF_CAN0     = 0x00 # Start sniffing on can 0
 CMD_CAN_MODE_SNIFF_CAN1     = 0x01 # Start sniffing on can 1
 CMD_CAN_MODE_CITM           = 0x02 # Start CITM between can1 and can2
+CMD_CAN_SEND_ISOTP          = 0x46
+CMD_CAN_RECV_ISOTP          = 0x47
+CMD_CAN_SENDRECV_ISOTP      = 0x48
+
 
 CAN_RESP_OK                 = (0)
 CAN_RESP_FAILINIT           = (1)
@@ -436,7 +445,7 @@ class CanInterface:
         '''
         Send a message to the CanCat transceiver (not the CAN bus)
         '''
-        msgchar = chr(len(message) + 2)
+        msgchar = struct.pack(">H", len(message) + 3) # 2 byte Big Endian
         msg = msgchar + chr(cmd) + message
         self.log("XMIT: %s" % repr(msg))
 
@@ -477,6 +486,116 @@ class CanInterface:
             print "CANxmit() failed: %s" % CAN_RESPS.get(resval)
 
         return resval
+
+    def ISOTPxmit(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1):
+        '''
+        Transmit an ISOTP can message. tx_arbid is the arbid we're transmitting,
+        and rx_arbid is the arbid we're listening for
+        '''
+        msg = struct.pack('>IIB', tx_arbid, rx_arbid, extflag) + message
+        for i in range(count):
+            self._send(CMD_CAN_SEND_ISOTP, msg)
+            ts, result = self.recv(CMD_CAN_SEND_ISOTP_RESULT, timeout)
+
+        if result == None:
+            print "ISOTPxmit: Return is None!?"
+        resval = ord(result)
+        if resval != 0:
+            print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
+
+        return resval
+
+    def ISOTPrecv(self, tx_arbid, rx_arbid, extflag=0, timeout=3, count=1, start_msg_idx=None):
+        '''
+        Receives an ISOTP can message. This function just causes
+        the hardware to send the appropriate flow control command
+        when an ISOTP frame is received from rx_arbid, using
+        tx_arbid for the flow control frame. The ISOTP frame
+        itself needs to be extracted from the received can messages
+        '''
+        if start_msg_idx is None:
+            start_msg_idx = self.getCanMsgCount()
+        # set the CANCat to respond to Flow Control messages
+        resval = self._isotp_enable_flowcontrol(tx_arbid, rx_arbid, extflag)
+
+        msg = self._getIsoTpMsg(rx_arbid, start_index=start_msg_idx, timeout=timeout)
+
+        return msg
+
+    def _isotp_enable_flowcontrol(self, tx_arbid, rx_arbid, extflag):
+        msg = struct.pack('>IIB', tx_arbid, rx_arbid, extflag)
+        self._send(CMD_CAN_RECV_ISOTP, msg)
+        ts, result = self.recv(CMD_CAN_RECV_ISOTP_RESULT, timeout)
+
+        if result == None:
+            print "_isotp_enable_flowcontrol: Return is None!?"
+        resval = ord(result)
+        if resval != 0:
+            print "_isotp_enable_flowcontrol() failed: %s" % CAN_RESPS.get(resval)
+
+        return resval
+
+    def ISOTPxmit_recv(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1, service=None):
+        '''
+        Transmit an ISOTP can message, then wait for a response.
+        tx_arbid is the arbid we're transmitting, and rx_arbid 
+        is the arbid we're listening for
+        '''
+        currIdx = self.getCanMsgCount()
+        msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag) + message
+        for i in range(count):
+            self._send(CMD_CAN_SENDRECV_ISOTP, msg)
+            ts, result = self.recv(CMD_CAN_SENDRECV_ISOTP_RESULT, timeout)
+
+        if result == None:
+            print "ISOTPxmit: Return is None!?"
+        resval = ord(result)
+        if resval != 0:
+            print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
+
+        msg = self._isotp_get_msg(rx_arbid, start_index = currIdx, service = service, timeout = timeout)
+        return msg
+
+    def _isotp_get_msg(self, rx_arbid, start_index=0, service=None, timeout=None):
+        ''' 
+        Internal Method to piece together a valid ISO-TP message from received CAN packets.
+        '''
+        found = False
+        complete = False
+        starttime = lasttime = time.time()
+
+        while not complete and (not timeout or (lasttime-starttime < timeout)):
+            msgs = [msg for msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid])]
+
+            if len(msgs):
+                try:
+                    # Check that the message is for the expected service, if specified
+                    arbid, msg, count = iso_tp.msg_decode(msgs)
+                    if ord(msg[0]) == 0x7e:  # response for TesterPresent... ignore
+                        start_index = msgs[count-1][0] + 1
+
+                    if service is not None:
+                        # Check if this is the right service, or there was an error
+                        if ord(msg[0]) == service or ord(msg[0]) == 0x7f:
+                            msg_found = True
+                            return msg
+
+                        print "Hey, we got here, wrong service code?"
+                        print msg.encode('hex')
+                        start_index = msgs[count-1][0] + 1
+                    else:
+                        msg_found = True
+                        return msg
+
+                except iso_tp.IncompleteIsoTpMsg, e:
+                    #print e # debugging only, this is expected
+                    pass
+
+            time.sleep(0.1)
+            lasttime = time.time()
+            #print "_isotp_get_msg: status: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
+
+        print "_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
 
     def CANsniff(self):
         '''
