@@ -456,52 +456,26 @@ void loop()
                 break;
 
             case CMD_CAN_BAUD:
-                if(initialized == 0) // First init
+                //Initialize based on mode
+                if(mode == CMD_CAN_MODE_SNIFF_CAN0)
                 {
-                    //Initialize based on mode
-                    if(mode == CMD_CAN_MODE_SNIFF_CAN0)
-                    {
-                        device = &Can0;
-                        results = Init_Sniff(serial_buffer[3]);
-                    } 
-                    else if (mode == CMD_CAN_MODE_SNIFF_CAN1)
-                    {
-                        device = &Can1;
-                        results = Init_Sniff(serial_buffer[3]);
-                    }
-                    else if (mode == CMD_CAN_MODE_CITM)
-                    {
-                        results = Init_CITM(serial_buffer[3]);
-                    }
-                    else
-                    {
-                        logHexStr(mode, "Invalid mode", 12);
-                        results = 0;
-                        initialized = 0;
-                    }
+                    device = &Can0;
+                    results = Init_Sniff(serial_buffer[3]);
+                } 
+                else if (mode == CMD_CAN_MODE_SNIFF_CAN1)
+                {
+                    device = &Can1;
+                    results = Init_Sniff(serial_buffer[3]);
                 }
-                else // Just changing the baud rate
+                else if (mode == CMD_CAN_MODE_CITM)
                 {
-                    if (mode == CMD_CAN_MODE_SNIFF_CAN0)
-                    {
-                        Can0.set_baudrate(baud_rates_table[serial_buffer[3]]);
-                        results = 1; //TODO: Error checking
-                    }
-                    else if(mode == CMD_CAN_MODE_SNIFF_CAN1)
-                    {
-                        Can1.set_baudrate(baud_rates_table[serial_buffer[3]]);
-                        results = 1; //TODO: Error checking
-                    }
-                    else if (mode == CMD_CAN_MODE_CITM)
-                    {
-                        Can0.set_baudrate(baud_rates_table[serial_buffer[3]]);
-                        Can1.set_baudrate(baud_rates_table[serial_buffer[3]]);
-                        results = 1; //TODO: Error checking
-                    }
-                    else
-                    {
-                        results = 0;
-                    }
+                    results = Init_CITM(serial_buffer[3]);
+                }
+                else
+                {
+                    logHexStr(mode, "Invalid mode", 12);
+                    results = 0;
+                    initialized = 0;
                 }
                 send(&results, CMD_CAN_BAUD_RESULT, 1);
                 break;
