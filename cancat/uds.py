@@ -105,8 +105,9 @@ SURVIVABLE_NEGS = (
     )
 
 class UDS:
-    def __init__(self, c, tx_arbid, rx_arbid=None):
+    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True):
         self.c = c
+        self.verbose = verbose
 
         if rx_arbid == None:
             rx_arbid = tx_arbid + 8 # by UDS spec
@@ -124,11 +125,13 @@ class UDS:
             subcode = ord(msg[2])
 
             if code == svc + 0x40:
-                print "Positive Response!"
+                if self.verbose: 
+                    print "Positive Response!"
 
             negresprepr = NEG_RESP_CODES.get(code)
             if negresprepr != None:
-                print negresprepr + "\n"
+                if self.verbose: 
+                    print negresprepr + "\n"
                 if not (code,subcode) in SURVIVABLE_NEGS:
                     raise NegativeResponseException(code, svc, msg)
 
@@ -335,11 +338,14 @@ class UDS:
         success = []
         for x in range(start, end):
             try:
-                print x
-                val = u2.ReadDID(x)
+                if self.verbose: 
+                    sys.stderr.write(' %x ' % x)
+
+                val = self.ReadDID(x)
                 success.append((x, val))
             except Exception, e:
-                print e
+                if self.verbose:
+                    print e
 
         return success
 
