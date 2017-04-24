@@ -1,7 +1,7 @@
 # CanCat
 swiss army knife of Controller Area Networks (CAN) often used in cars and building automation, etc...
 
-made possible through collaboration with my friends at GRIMM (SMFS), most notably Matt Carpenter.
+made possible through collaboration with my friends at GRIMM (SMFS), most notably Matt Carpenter and Tim Brom.
 
 CanCat is made up of two parts:
 1) Firmware for a compatible CAN-transceiver
