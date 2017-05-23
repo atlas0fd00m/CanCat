@@ -35,26 +35,6 @@
 #define CMD_CAN_SENDRECV_ISOTP   0x48
 
 /* constants for setting baudrate for the CAN bus */
-uint32_t baud_rates_table[19] = {
-    0,      // Index 0 is unused
-    5000,   // CAN_5KBPS    = 1
-    10000,  // CAN_10KBPS   = 2
-    20000,  // CAN_20KBPS   = 3
-    25000,  // CAN_25KBPS   = 4 
-    31250,  // CAN_31K25BPS = 5
-    33000,  // CAN_33KBPS   = 6
-    40000,  // CAN_40KBPS   = 7
-    50000,  // CAN_50KBPS   = 8
-    80000,  // CAN_80KBPS   = 9
-    83300,  // CAN_83K3BPS  = 10
-    95000,  // CAN_95KBPS   = 11
-    100000, // CAN_100KBPS  = 12
-    125000, // CAN_125KBPS  = 13
-    200000, // CAN_200KBPS  = 14
-    250000, // CAN_250KBPS  = 15
-    500000, // CAN_500KBPS  = 16
-    666000, // CAN_666KBPS  = 17
-    1000000,// CAN_1000KBPS = 18
-};
-
+#define NUM_BAUD_RATES 19
+extern uint32_t baud_rates_table[NUM_BAUD_RATES];
 #endif

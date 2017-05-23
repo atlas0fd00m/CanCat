@@ -72,7 +72,7 @@ void logHexStr(INT32U num, char* prefix, int len)
 
 void setup()
 {
-    Serial.begin(500000);
+    Serial.begin(4000000);
     while (!Serial);
 }
 
