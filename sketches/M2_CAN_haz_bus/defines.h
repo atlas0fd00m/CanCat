@@ -1,6 +1,8 @@
 #ifndef __DEFINES_H__
 #define __DEFINES_H__
 
+#include "queue.h"
+
 #define CAN_RX_BUF_SIZE 32
 #define CAN_TX_BUF_SIZE 16
 #define ISOTP_BUF_SIZE 4095 // ISO-TP max length is 4095 bytes
@@ -35,26 +37,27 @@
 #define CMD_CAN_SENDRECV_ISOTP   0x48
 
 /* constants for setting baudrate for the CAN bus */
-uint32_t baud_rates_table[19] = {
-    0,      // Index 0 is unused
-    5000,   // CAN_5KBPS    = 1
-    10000,  // CAN_10KBPS   = 2
-    20000,  // CAN_20KBPS   = 3
-    25000,  // CAN_25KBPS   = 4 
-    31250,  // CAN_31K25BPS = 5
-    33000,  // CAN_33KBPS   = 6
-    40000,  // CAN_40KBPS   = 7
-    50000,  // CAN_50KBPS   = 8
-    80000,  // CAN_80KBPS   = 9
-    83300,  // CAN_83K3BPS  = 10
-    95000,  // CAN_95KBPS   = 11
-    100000, // CAN_100KBPS  = 12
-    125000, // CAN_125KBPS  = 13
-    200000, // CAN_200KBPS  = 14
-    250000, // CAN_250KBPS  = 15
-    500000, // CAN_500KBPS  = 16
-    666000, // CAN_666KBPS  = 17
-    1000000,// CAN_1000KBPS = 18
-};
+#define NUM_BAUD_RATES 19
+extern uint32_t baud_rates_table[NUM_BAUD_RATES];
+
+/* circular buffers for receiving and sending CAN frames */
+#define CAN_BUFFER_LEN 128
+extern Queue<CAN_FRAME> can_rx_frames0;
+extern Queue<CAN_FRAME> can_rx_frames1;
+extern Queue<CAN_FRAME> can_tx_frames0;
+extern Queue<CAN_FRAME> can_tx_frames1;
+
+/* General purpose functions */
+void CreateCanFrame(uint32_t arbid, uint8_t extended, uint8_t len, uint8_t data[], bool padding, uint8_t padding_byte, CAN_FRAME *frame);
+uint8_t SendFrame(CAN_FRAME frame);
+void log(const char* msg, uint8_t len);
+void logHex(uint32_t num);
+
+/* The device in use */
+extern CANRaw *device;
+
+/* Initialization status and operating mode */
+extern uint8_t initialized;
+extern uint8_t mode;
 
 #endif

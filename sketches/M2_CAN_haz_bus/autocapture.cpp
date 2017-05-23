@@ -1,0 +1,1 @@
+/* Placeholder for code to automatically capture to SD Card */

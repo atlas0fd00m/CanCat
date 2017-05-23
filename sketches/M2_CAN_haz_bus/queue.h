@@ -50,7 +50,6 @@ bool Queue<T>::enqueue(T const* item) {
 template <class T>
 T Queue<T>::dequeue() {
     T item;
-    #warning "Need to do error checking here too"
     if(isEmpty())
     {
         return item;
@@ -70,7 +69,6 @@ T Queue<T>::dequeue() {
 template <class T>
 T Queue<T>::peek() {
     T item;
-    #warning "Need to do error checking here too"
     if(isEmpty())
     {
         return item;
