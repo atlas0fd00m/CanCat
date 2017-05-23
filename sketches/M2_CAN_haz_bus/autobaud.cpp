@@ -1,10 +1,7 @@
 #include <due_can.h>
 #include "defines.h"
 
-extern void log(const char* msg, uint8_t len);
-extern void logHex(uint32_t num);
-extern uint32_t baud_rates_table[];
-
+/* Attempts to determine the baud rate using the autobaud feature in the CAN peripheral */
 void autobaud(CANRaw *device)
 {
     uint32_t reg_val;
