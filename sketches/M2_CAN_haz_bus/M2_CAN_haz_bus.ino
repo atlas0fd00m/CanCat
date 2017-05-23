@@ -1,7 +1,8 @@
 #include <due_can.h>
-#include "queue.h"
-#include "defines.h"
 #include <limits.h>
+#include "autobaud.h"
+#include "defines.h"
+#include "queue.h"
 
 #define Serial SerialUSB
 
@@ -38,6 +39,28 @@ volatile uint8_t isotp_tx_go = 0;
 uint8_t isotp_tx_PCIIndex = 1;
 unsigned long isotp_sep_time = 0;
 unsigned long isotp_last_tx_time;
+
+uint32_t baud_rates_table[NUM_BAUD_RATES] = {
+    0,      // CAN_AUTO     = 0
+    5000,   // CAN_5KBPS    = 1
+    10000,  // CAN_10KBPS   = 2
+    20000,  // CAN_20KBPS   = 3
+    25000,  // CAN_25KBPS   = 4 
+    31250,  // CAN_31K25BPS = 5
+    33000,  // CAN_33KBPS   = 6
+    40000,  // CAN_40KBPS   = 7
+    50000,  // CAN_50KBPS   = 8
+    80000,  // CAN_80KBPS   = 9
+    83300,  // CAN_83K3BPS  = 10
+    95000,  // CAN_95KBPS   = 11
+    100000, // CAN_100KBPS  = 12
+    125000, // CAN_125KBPS  = 13
+    200000, // CAN_200KBPS  = 14
+    250000, // CAN_250KBPS  = 15
+    500000, // CAN_500KBPS  = 16
+    666000, // CAN_666KBPS  = 17
+    1000000,// CAN_1000KBPS = 18
+};
 
 /* Functions for serial communication */
 void send(unsigned char *data, unsigned char cmd, unsigned char len)
@@ -262,7 +285,10 @@ void IsoTP_Can1_cb(CAN_FRAME *frame)
  */
 uint8_t Init_Sniff(uint8_t baud)
 {
-    device->init(baud_rates_table[baud]);
+    if(baud == 0)
+        autobaud(device);
+    else
+        device->init(baud_rates_table[baud]);
     
     device->setRXFilter(5, 0, 0, false);
     device->setRXFilter(6, 0, 0, true);

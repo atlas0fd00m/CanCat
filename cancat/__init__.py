@@ -11,7 +11,7 @@ from cancat import iso_tp
 
 # defaults for Linux:
 serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
-baud = 500000
+baud = 4000000
 
 
 # command constants (used to identify messages between 
@@ -57,6 +57,7 @@ CAN_RESP_FAIL               = (0xff)
 CAN_RESPS = { v: k for k,v in globals().items() if k.startswith('CAN_RESP') }
 
 # constants for setting baudrate for the CAN bus
+CAN_AUTOBPS  = 0
 CAN_5KBPS    = 1
 CAN_10KBPS   = 2
 CAN_20KBPS   = 3
