@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import sys
 import time
 import cancat
 import struct
@@ -105,9 +106,10 @@ SURVIVABLE_NEGS = (
     )
 
 class UDS:
-    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True):
+    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
         self.c = c
         self.verbose = verbose
+        self.extflag = extflag
 
         if rx_arbid == None:
             rx_arbid = tx_arbid + 8 # by UDS spec
@@ -130,7 +132,7 @@ class UDS:
 
             negresprepr = NEG_RESP_CODES.get(code)
             if negresprepr != None:
-                if self.verbose: 
+                if self.verbose > 1: 
                     print negresprepr + "\n"
                 if not (code,subcode) in SURVIVABLE_NEGS:
                     raise NegativeResponseException(code, svc, msg)
@@ -148,7 +150,7 @@ class UDS:
         if data != None:
             omsg += data
 
-        msg = self.xmit_recv(omsg, service=service)
+        msg = self.xmit_recv(omsg, extflag=self.extflag, service=service)
         return msg
 
     def SendTesterPresent(self):
@@ -214,7 +216,7 @@ class UDS:
         except TypeError:
             print "Cannot parse addressAndLengthFormatIdentifier", hex(addr_format)
             return None
-        msg = self.xmit_recv("\x34" + struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data)), service = 0x74)
+        msg = self.xmit_recv("\x34" + struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data)), extflag=self.extflag, service = 0x74)
 
         # Parse the response
         if ord(msg[0]) != 0x74:
@@ -230,7 +232,7 @@ class UDS:
         data_idx = 0
         block_idx = 1
         while data_idx < len(data):
-            msg = self.xmit_recv("\x36" + chr(block_idx) + data[data_idx:data_idx+max_txfr_len-2], service = 0x76)
+            msg = self.xmit_recv("\x36" + chr(block_idx) + data[data_idx:data_idx+max_txfr_len-2], extflag=self.extflag, service = 0x76)
             data_idx += max_txfr_len - 2
             block_idx += 1
             if block_idx > 0xff:
@@ -334,18 +336,29 @@ class UDS:
 
 
 
-    def ScanDIDs(self, start=0, end=0x10000):
+    def ScanDIDs(self, start=0, end=0x10000, delay=0):
         success = []
-        for x in range(start, end):
-            try:
-                if self.verbose: 
-                    sys.stderr.write(' %x ' % x)
+        try:
+            for x in range(start, end):
+                try:
+                    if self.verbose: 
+                        sys.stderr.write(' %x ' % x)
 
-                val = self.ReadDID(x)
-                success.append((x, val))
-            except Exception, e:
-                if self.verbose:
-                    print e
+                    val = self.ReadDID(x)
+                    success.append((x, val))
+
+                except KeyboardInterrupt:
+                    raise
+
+                except Exception, e:
+                    if self.verbose > 1:
+                        print e
+
+                time.sleep(delay)
+
+        except KeyboardInterrupt:
+            print "Stopping Scan during DID 0x%x " % x
+            return success
 
         return success
 
