@@ -28,125 +28,177 @@ the goals of CanCat are multiple:
 github collab/pull requests should make this a good point of collaboration.
 
 
-REQUIRED SOFTWARE:
+## Required Software:
 * CANBUS_Shield from SeeedStudio  (for Firmware compilation)
     http://www.seeedstudio.com/wiki/CAN-BUS_Shield
     https://github.com/Seeed-Studio/CAN_BUS_Shield
 
 * Python 2.7
 
-HIGHLY RECOMMENDED SOFTWARE:
+## Highly Recommended Software:
 * IPython
 
 
-GETTING STARTED:
+## Getting Started:
 once you have the required software installed, your CanCat device flashed, the interface is yours to choose.  currently, we simply enjoy using ipython to interact with the CAN bus and do analysis.
 CanCat is currently centered around the class CanInterface (or some subclass of it, like FordInterface, GMInterface, etc...)
 
 connect to the device (old way):
 
+```python
 >>> import cancat
 
 >>> CANalysis = cancat.CanInterface('/dev/ttyACM0', 115200) # your device may vary
 
 >>> CANalysis.ping()
-
+```
 
 set the can bus interface baud rate (500kbps is most common, others are often slower, depending on your car):
 
+```python
 >>> CANalysis.setCanBaud(cancat.CAN_125KBPS)    # medium speed CAN baudrate for Fords
+```
 
 once you connect to the device and set the device, you will automatically capture any messages the CanCat device sees on the CAN bus it is attached to.  it will store these messages for analysis
 
 save your analysis/capture session periodically (only when you say save will it save)
 
+```python
 >>> CANalysis.saveSessionToFile('filename_for_this_session')
+```
 
 once you save it once, the name will be cached so you can simply save it again to the same file by typing:
 
+```python
 >>> CANalysis.saveSessionToFile()
+```
 
 other than that, "help" is your friend :)
 
+```python
 >>> help(cancat)
-
+```
 
 connect to the device(new way - Linux):
 
+```bash
 $ ./CanCat.py -h
 
-$ ./CanCat.py -p /dev/ttyACM0                  # if CanCat device is /dev/ttyACM0
+$ ./CanCat.py -p /dev/ttyACM0  # if CanCat device is /dev/ttyACM0
 
 $ ./CanCat.py -f filename_of_previous_capture  # no CanCat device required
+```
 
-'CanCat, the greatest thing since J2534!'                                                                                                                                                              
-                                                                                                                                                                                                       
-                                                                                                                                                                                                       Research Mode: enjoy the raw power of cancat                                                                                                                                                           
+```
+'CanCat, the greatest thing since J2534!'
 
-                                                                                                                                                                                                       currently your environment has an object called "c" for CanCat.  this is how 
-                                                                                                                                                                                                       you interact with the CanCat dongle:
-   >>> c.ping()
-   >>> c.placeBookmark('')
-   >>> c.snapshotCanMsgs()
-   >>> c.printSessionStats()
-   >>> c.printCanMsgs()
-   >>> c.printCanSessions()
-   >>> c.CANxmit('message', )
-   >>> c.CANreplay()
-   >>> c.saveSessionToFile('file_to_save_session_to')
-   >>> help(c)
+Research Mode: enjoy the raw power of CanCat
+
+currently your environment has an object called "c" for CanCat.  this is how 
+you interact with the CanCat tool:
+    >>> c.ping()
+    >>> c.placeBookmark('')
+    >>> c.snapshotCanMsgs()
+    >>> c.printSessionStats()
+    >>> c.printCanMsgs()
+    >>> c.printCanSessions()
+    >>> c.CANxmit('message', )
+    >>> c.CANreplay()
+    >>> c.saveSessionToFile('file_to_save_session_to')
+    >>> help(c)
+```
 
 (Note: The following two are used interchangeably in our notes:)
-(">>>" is the default interactive python prompt.)
-("In [#]:" is the IPython prompt)
-
+(`>>>` is the default interactive python prompt.)
+(`In [#]:` is the IPython prompt)
 
 see if the CanCat is communicating correctly with your computer (only if you have a device connected)
 
+```python
 In [1]: c.ping()
-
-
-
+```
 
 set the can bus interface baud rate (500kbps is most common, others are often slower, depending on your car):
 
-In [2]: c.setCanBaud(cancat.CAN_125KBPS)    # medium speed CAN baudrate for Fords
+```python
+In [2]: c.setCanBaud(cancat.CAN_125KBPS)  # medium speed CAN baudrate for Fords
+```
 
 once you connect to the device and set the device, you will automatically capture any messages the CanCat device sees on the CAN bus it is attached to.  it will store these messages for analysis
 
-
 save your analysis/capture session periodically (only saves when when you tell it to)
 
+```python
 In [3]: c.saveSessionToFile('filename_for_this_session')
-
+```
 
 once you save it once, the name will be cached so you can simply save it again to the same file by typing:
 
+```python
 In [4]: c.saveSessionToFile()
-
+```
 
 other than that, "help" is your friend :)
 
+```python
 In [5]: help(cancat)
-
+```
 
 or tab-completion
 
+```python
 In [6]: c.<PRESS_TAB_KEY>
-c.CANrecv                          c.genCanMsgs                       c.ping                             c.recv                             c.saveSessionToFile
-c.CANreplay                        c.getArbitrationIds                c.placeCanBookmark                 c.recvall                          c.setCanBaud
-c.CANsniff                         c.getBookmarkFromMsgIndex          c.port                             c.register_handler                 c.setCanBookmarkComment
-c.CANxmit                          c.getCanMsgCount                   c.printAsciiStrings                c.remove_handler                   c.setCanBookmarkCommentByMsgIndex
-c.bookmark_info                    c.getMsgIndexFromBookmark          c.printBookmarks                   c.reprBookmark                     c.setCanBookmarkName
-c.bookmarks                        c.getSessionStats                  c.printCanMsgs                     c.reprBookmarks                    c.setCanBookmarkNameByMsgIndex
-c.clearCanMsgs                     c.getSessionStatsByBookmark        c.printCanMsgsByBookmark           c.reprCanMsgs                      c.snapshotCanMessages
-c.comments                         c.loadFromFile                     c.printCanSessions                 c.reprCanMsgsByBookmark            c.verbose
-c.filterCanMsgs                    c.log                              c.printSessionStats                c.restoreSession                   
-c.filterCanMsgsByBookmark          c.name                             c.printSessionStatsByBookmark      c.saveSession                      
-
+c.CANrecv
+c.genCanMsgs
+c.ping
+c.recv
+c.saveSessionToFile
+c.CANreplay
+c.getArbitrationIds
+c.placeCanBookmark
+c.recvall
+c.setCanBaud
+c.CANsniff
+c.getBookmarkFromMsgIndex
+c.port
+c.register_handler
+c.setCanBookmarkComment
+c.CANxmit
+c.getCanMsgCount
+c.printAsciiStrings
+c.remove_handler
+c.setCanBookmarkCommentByMsgIndex
+c.bookmark_info
+c.getMsgIndexFromBookmark
+c.printBookmarks
+c.reprBookmark
+c.setCanBookmarkName
+c.bookmarks
+c.getSessionStats
+c.printCanMsgs
+c.reprBookmarks
+c.setCanBookmarkNameByMsgIndex
+c.clearCanMsgs
+c.getSessionStatsByBookmark
+c.printCanMsgsByBookmark
+c.reprCanMsgs
+c.snapshotCanMessages
+c.comments
+c.loadFromFile
+c.printCanSessions
+c.reprCanMsgsByBookmark
+c.verbose
+c.filterCanMsgs
+c.log
+c.printSessionStats
+c.restoreSession
+c.filterCanMsgsByBookmark
+c.name
+c.printSessionStatsByBookmark
+c.saveSession
+```
 
 (start with the functions that start with "print" to get familiar with the toolset.
-
 
 hack fun!
 @
@@ -183,13 +235,15 @@ Most of the commands for CanInTheMiddle are the same as the normal CanCat interf
 Functions that report only what has been received on the Isolation side have Iso appended 
 to the end of the function name. For example:
 
-`$ citm.getCanMsgCount() # The number of CAN packets seen in aggregate`
+```sh
+$ citm.getCanMsgCount() # The number of CAN packets seen in aggregate
 
-`$ citm.getCanMsgCountIso() # The number of CAN packets received on the Isolation network`
+$ citm.getCanMsgCountIso() # The number of CAN packets received on the Isolation network
 
-`$ citm.printCanMsgs() # Prints all CAN messages`
+$ citm.printCanMsgs() # Prints all CAN messages
 
-`$ citm.printCanMsgsIso() # prints all CAN messages received on the Isolation network`
+$ citm.printCanMsgsIso() # prints all CAN messages received on the Isolation network
+```
 
 Placing a bookmark places a bookmark simultaneously on both the Isolation information and the aggregate information.
 
