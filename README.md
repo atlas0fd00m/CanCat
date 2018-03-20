@@ -38,9 +38,48 @@ github collab/pull requests should make this a good point of collaboration.
 ## Highly Recommended Software:
 * IPython
 
+## Installation
+1) Install pyserial:
+```
+$ pip install --user pyserial
+```
+2) Install ipython (optional, but required for interactive use):
+```
+$ pip install --user ipython
+```
+3) Install the [Arduino IDE](https://github.com/arduino/arduino-builder).  If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
+
+4) (Optional) Install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform.  The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE.  NOTE: It has only been tested in Linux so far.
+
+5) Clone CanCat and build the desired firmware.  If not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device.  NOTE: You may need to modify the paths in the makefile to suit your environment.
+```
+$ git clone https://github.com/atlas0fd00m/CanCat
+$ cd CanCat/sketches
+$ make m2
+$ make bootloader
+$ make flash
+```
+6) Unplug and replug in the USB connector to your CAN device (to remove it from bootloader mode)
+
+7) Start CanCat and do a connectivity check.  `c.ping()` confirms that the CanCat python script is communicating properly with the CAN device, `c.getCanMsgCount()` shows that CAN messages are being received by CanCat.
+```
+$ cd CanCat
+$ ./CanCat.py -p /dev/ttyACM0 
+
+In [1]: c.ping()
+Out[1]: (1521577490.792667, 'ABCDEFGHIJKL')
+
+In [2]: c.getCanMsgCount()
+Out[2]: 1900
+
+In [3]: c.getCanMsgCount()
+Out[3]: 2127
+
+In [4]: 
+```
 
 ## Getting Started:
-once you have the required software installed, your CanCat device flashed, the interface is yours to choose.  currently, we simply enjoy using ipython to interact with the CAN bus and do analysis.
+Once you have the required software installed, your CanCat device flashed, the interface is yours to choose.  currently, we simply enjoy using ipython to interact with the CAN bus and do analysis.
 CanCat is currently centered around the class CanInterface (or some subclass of it, like FordInterface, GMInterface, etc...)
 
 connect to the device (old way):
@@ -203,8 +242,7 @@ c.saveSession
 hack fun!
 @
 
-CAN-In-The-Middle
-=======
+# CAN-In-The-Middle
 
 CAN-In-The-Middle is another way to utilize your CanCat. It requires two CAN shields 
 on one arduino. One of the CAN shields needs to be modified so that the CS pin of the 
