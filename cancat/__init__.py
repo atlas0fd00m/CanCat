@@ -135,9 +135,9 @@ def handleLogHexToScreen(message, canbuf):
 def handleCanMsgsDuringSniff(message, canbuf):
     idx, ts = canbuf._submitMessage(CMD_CAN_RECV, message)
     ts = time.time()
-    arbid, data = self._splitCanMsg(message)
+    arbid, data = canbuf._splitCanMsg(message)
 
-    print reprCanMsg(ts, arbid, data)
+    print reprCanMsg(idx, ts, arbid, data)
 
 default_cmdhandlers = {
         CMD_LOG : handleLogToScreen,
