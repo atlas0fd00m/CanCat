@@ -132,12 +132,16 @@ def handleLogHexToScreen(message, canbuf):
     num = struct.unpack("<L", message)
     print('LOG: %x' % num)
 
-def handleCanMsgsDuringSniff(message, canbuf):
+def handleCanMsgsDuringSniff(message, canbuf, arbids=None):
     idx, ts = canbuf._submitMessage(CMD_CAN_RECV, message)
     ts = time.time()
     arbid, data = self._splitCanMsg(message)
 
-    print reprCanMsg(ts, arbid, data)
+    if arbids:
+        if arbid in arbids:
+            print reprCanMsg(idx, ts, arbid, data)
+    else:
+        print reprCanMsg(idx, ts, arbid, data)
 
 default_cmdhandlers = {
         CMD_LOG : handleLogToScreen,
@@ -598,14 +602,14 @@ class CanInterface:
 
         print "_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
 
-    def CANsniff(self):
+    def CANsniff(self, arbids=None):
         '''
         set a handler for CMD_CAN_RECV messages that print them to stdout.
         Messages are still stored in the CMD_CAN_RECV mailbox for analysis,
         this simply allows you to see the as they are received... not always
         advisable, as there are *MANY* almost all the time :)
         '''
-        self.register_handler(CMD_CAN_RECV, handleCanMsgsDuringSniff)
+        self.register_handler(CMD_CAN_RECV, lambda msg, obj: handleCanMsgsDuringSniff(msg, obj, arbids))
         raw_input("Press Enter to stop sniffing")
         self.remove_handler(CMD_CAN_RECV)
 
