@@ -610,8 +610,10 @@ class CanInterface:
         advisable, as there are *MANY* almost all the time :)
         '''
         self.register_handler(CMD_CAN_RECV, lambda msg, obj: handleCanMsgsDuringSniff(msg, obj, arbids))
-        raw_input("Press Enter to stop sniffing")
-        self.remove_handler(CMD_CAN_RECV)
+        try:
+            raw_input("Press Enter to stop sniffing")
+        finally:
+            self.remove_handler(CMD_CAN_RECV)
 
     def CANreplay(self, start_bkmk=None, stop_bkmk=None, start_msg=0, stop_msg=None, arbids=None, timing=TIMING_FAST):
         '''
