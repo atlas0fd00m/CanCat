@@ -692,7 +692,7 @@ class CanInterface:
         if stop == None:
             stop = len(messages)
 
-        for idx in xrange(start, stop):
+        for idx in xrange(start, stop+1):
             ts, msg = messages[idx]
 
             arbid, data = self._splitCanMsg(msg)
@@ -1315,7 +1315,7 @@ class CanInTheMiddleInterface(CanInterface):
         if stop == None:
             stop = len(messages)
 
-        for idx in xrange(start, stop):
+        for idx in xrange(start, stop+1):
             ts, msg = messages[idx]
 
             arbid, data = self._splitCanMsg(msg)
