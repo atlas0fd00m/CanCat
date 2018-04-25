@@ -698,7 +698,7 @@ class CanInterface:
         if stop == None:
             stop = len(messages)
 
-        for idx in xrange(start, stop + 1):
+        for idx in xrange(start, stop):
             ts, msg = messages[idx]
 
             arbid, data = self._splitCanMsg(msg)
@@ -1321,7 +1321,11 @@ class CanInTheMiddleInterface(CanInterface):
         if stop == None:
             stop = len(messages)
 
+<<<<<<< HEAD
         for idx in xrange(start, stop + 1):
+=======
+        for idx in xrange(start, stop):
+>>>>>>> parent of 3800ec1... Add 1 to the end of xrange() calls to ensure that function calls with start/stop are inclusive
             ts, msg = messages[idx]
 
             arbid, data = self._splitCanMsg(msg)
