@@ -697,6 +697,8 @@ class CanInterface:
         messages = self._messages.get(CMD_CAN_RECV, [])
         if stop == None:
             stop = len(messages)
+        else
+            stop = stop + 1 # This makes the stop index inclusive if specified
 
         for idx in xrange(start, stop):
             ts, msg = messages[idx]
