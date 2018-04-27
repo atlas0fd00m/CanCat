@@ -697,8 +697,10 @@ class CanInterface:
         messages = self._messages.get(CMD_CAN_RECV, [])
         if stop == None:
             stop = len(messages)
+        else:
+            stop = stop + 1 # This makes the stop index inclusive if specified
 
-        for idx in xrange(start, stop + 1):
+        for idx in xrange(start, stop):
             ts, msg = messages[idx]
 
             arbid, data = self._splitCanMsg(msg)
@@ -1320,8 +1322,10 @@ class CanInTheMiddleInterface(CanInterface):
         messages = self._messages.get(CMD_ISO_RECV, [])
         if stop == None:
             stop = len(messages)
+        else:
+            stop = stop + 1
 
-        for idx in xrange(start, stop + 1):
+        for idx in xrange(start, stop):
             ts, msg = messages[idx]
 
             arbid, data = self._splitCanMsg(msg)
