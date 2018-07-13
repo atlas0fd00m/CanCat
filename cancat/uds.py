@@ -123,19 +123,19 @@ class UDS:
         # check if the response is something we know about and can help out
         if msg != None and len(msg):
             svc = ord(data[0])
-            code = ord(msg[0])
-            subcode = ord(msg[2])
+            svc_resp = ord(msg[0])
+            errcode = ord(msg[2])
 
-            if code == svc + 0x40:
+            if svc_resp == svc + 0x40:
                 if self.verbose: 
                     print "Positive Response!"
 
-            negresprepr = NEG_RESP_CODES.get(code)
+            negresprepr = NEG_RESP_CODES.get(errcode)
             if negresprepr != None:
                 if self.verbose > 1: 
                     print negresprepr + "\n"
-                if not (code,subcode) in SURVIVABLE_NEGS:
-                    raise NegativeResponseException(code, svc, msg)
+                if not (errcode) in SURVIVABLE_NEGS:
+                    raise NegativeResponseException(errcode, svc, msg)
 
 
         return msg
@@ -366,7 +366,7 @@ class UDS:
     def SecurityAccess(self, level, key):
         msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service = 0x67)
         if msg is None:
-            return "\x00\x7f\x00\x35"
+            return msg
         if(ord(msg[0]) == 0x7f):
             print "Error getting seed:", msg.encode('hex')
 
@@ -377,6 +377,7 @@ class UDS:
 
             msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level+1, data=key, service = 0x67)
             return msg
+
 
     def _key_from_seed(self, seed, secret):
         print "Not implemented in this class"

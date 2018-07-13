@@ -579,7 +579,7 @@ class CanInterface:
                     if ord(msg[0]) == 0x7e:  # response for TesterPresent... ignore
                         start_index = msgs[count-1][0] + 1
 
-                    if service is not None:
+                    elif service is not None:
                         # Check if this is the right service, or there was an error
                         if ord(msg[0]) == service or ord(msg[0]) == 0x7f:
                             msg_found = True
@@ -601,6 +601,7 @@ class CanInterface:
             #print "_isotp_get_msg: status: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
 
         print "_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
+        return None
 
     def CANsniff(self, arbids=None):
         '''
