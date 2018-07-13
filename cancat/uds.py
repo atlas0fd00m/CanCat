@@ -131,7 +131,7 @@ class UDS:
                     print "Positive Response!"
 
             negresprepr = NEG_RESP_CODES.get(errcode)
-            if negresprepr != None:
+            if negresprepr != None and svc_resp != svc + 0x40:
                 if self.verbose > 1: 
                     print negresprepr + "\n"
                 if not (errcode) in SURVIVABLE_NEGS:
