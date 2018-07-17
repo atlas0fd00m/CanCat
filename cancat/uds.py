@@ -101,10 +101,6 @@ class NegativeResponseException(Exception):
             (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg.encode('hex'))
 
 
-SURVIVABLE_NEGS = (
-    (0x7f, 0x78),
-    )
-
 class UDS:
     def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
         self.c = c
@@ -134,7 +130,8 @@ class UDS:
             if negresprepr != None and svc_resp != svc + 0x40:
                 if self.verbose > 1: 
                     print negresprepr + "\n"
-                if not (errcode) in SURVIVABLE_NEGS:
+                # TODO: Implement getting final message if ResponseCorrectlyReceivedResponsePending is received
+                if errcode != 0x78: # Don't throw an exception for ResponseCorrectlyReceivedResponsePending
                     raise NegativeResponseException(errcode, svc, msg)
 
 
