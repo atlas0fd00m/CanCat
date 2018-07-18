@@ -120,7 +120,9 @@ class UDS:
         if msg != None and len(msg):
             svc = ord(data[0])
             svc_resp = ord(msg[0])
-            errcode = ord(msg[2])
+            errcode = 0
+            if len(msg) >= 3:
+                errcode = ord(msg[2])
 
             if svc_resp == svc + 0x40:
                 if self.verbose: 
