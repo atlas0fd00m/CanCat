@@ -200,7 +200,7 @@ class UDS:
 
         Returns: The response ISO-TP message as a string
         '''
-        msg = self._do_Function(SVC_WRITE_DATA_BY_IDENTIFIER,struct.pack('>H', did), service=0x62)
+        msg = self._do_Function(SVC_WRITE_DATA_BY_IDENTIFIER,struct.pack('>H', did) + data, service=0x62)
         #msg = self.xmit_recv("22".decode('hex') + struct.pack('>H', did), service=0x62)
         return msg
 
