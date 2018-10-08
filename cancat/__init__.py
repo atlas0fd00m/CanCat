@@ -189,17 +189,19 @@ class CanInterface:
 
         if load_filename != None:
             self.loadFromFile(load_filename)
-            return
 
-        if self.port == None:
+        # If we specify a file and no port, assume we just want to read the file, only try to guess
+        # ports if there is no file specified
+        if self.port == None and load_filename == None:
             self.port = getDeviceFile()
 
-        if self.port == None:    # we're already past the "load_filename" section, must have a port.
+        # No filename, can't guess the port, whatcha gonna do?
+        if self.port == None and load_filename == None:
             raise Exception("Cannot find device, and no filename specified.  Please try again.")
 
-
-        self._reconnect()
-        self._startRxThread()
+        if self.port != None:
+            self._reconnect()
+            self._startRxThread()
 
     def _startRxThread(self):
         self._go = True
