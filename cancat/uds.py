@@ -101,10 +101,6 @@ class NegativeResponseException(Exception):
             (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg.encode('hex'))
 
 
-SURVIVABLE_NEGS = (
-    (0x7f, 0x78),
-    )
-
 class UDS:
     def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
         self.c = c
@@ -124,7 +120,9 @@ class UDS:
         if msg != None and len(msg):
             svc = ord(data[0])
             svc_resp = ord(msg[0])
-            errcode = ord(msg[2])
+            errcode = 0
+            if len(msg) >= 3:
+                errcode = ord(msg[2])
 
             if svc_resp == svc + 0x40:
                 if self.verbose: 
@@ -134,7 +132,8 @@ class UDS:
             if negresprepr != None and svc_resp != svc + 0x40:
                 if self.verbose > 1: 
                     print negresprepr + "\n"
-                if not (errcode) in SURVIVABLE_NEGS:
+                # TODO: Implement getting final message if ResponseCorrectlyReceivedResponsePending is received
+                if errcode != 0x78: # Don't throw an exception for ResponseCorrectlyReceivedResponsePending
                     raise NegativeResponseException(errcode, svc, msg)
 
 
@@ -201,7 +200,7 @@ class UDS:
 
         Returns: The response ISO-TP message as a string
         '''
-        msg = self._do_Function(SVC_WRITE_DATA_BY_IDENTIFIER,struct.pack('>H', did), service=0x62)
+        msg = self._do_Function(SVC_WRITE_DATA_BY_IDENTIFIER,struct.pack('>H', did) + data, service=0x62)
         #msg = self.xmit_recv("22".decode('hex') + struct.pack('>H', did), service=0x62)
         return msg
 
