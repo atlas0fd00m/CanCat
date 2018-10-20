@@ -641,7 +641,7 @@ class CanInterface:
             delta_correction = newstamp - laststamp
 
             if timing == TIMING_INTERACTIVE:
-                raw_input("%s\nPress Enter to Transmit" % reprCanMsg(idx, ts, arbid, data))
+                raw_input("Press Enter to Transmit next message")
 
             elif timing == TIMING_REAL:
                 if last_time != -1:
@@ -651,6 +651,8 @@ class CanInterface:
                 last_time = ts
 
             self.CANxmit(arbid, data)
+            if timing == TIMING_INTERACTIVE:
+                print "Transmitted: %s" % reprCanMsg(idx, ts, arbid, data))
 
     def setCanBaud(self, baud_const=CAN_500KBPS):
         '''
