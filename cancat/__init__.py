@@ -652,7 +652,7 @@ class CanInterface:
 
             self.CANxmit(arbid, data)
             if timing == TIMING_INTERACTIVE:
-                print "Transmitted: %s" % reprCanMsg(idx, ts, arbid, data))
+                print "Transmitted: %s" % reprCanMsg(idx, ts, arbid, data)
 
     def setCanBaud(self, baud_const=CAN_500KBPS):
         '''
