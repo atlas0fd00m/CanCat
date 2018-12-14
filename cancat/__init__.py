@@ -978,7 +978,7 @@ class CanInterface:
         if stop_baseline_msg != None:
             self.log("ignoring arbids from baseline...")
             # get a list of baseline arbids
-            filter_ids = { arbid:1 for ts,arbid,data in self.genCanMsgs(start_baseline_msg, stop_baseline_msg) 
+            filter_ids = { arbid:1 for idx,ts,arbid,data in self.genCanMsgs(start_baseline_msg, stop_baseline_msg) 
                 }.keys()
         else:
             filter_ids = None
@@ -1040,8 +1040,17 @@ class CanInterface:
 
         return self.reprCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters)
 
-    def printCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False):
-        print self.reprCanMsgs(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty)
+    def printCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, paginate=None):
+        if paginate != None:
+            data = self.reprCanMsgs(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty).split('\n')
+            pidx = 0
+            while pidx <= len(data):
+                print '\n'.join(data[pidx: pidx + paginate])
+                pidx += paginate
+                inp = raw_input("PRESS ENTER TO CONTINUE")
+
+        else:
+            print self.reprCanMsgs(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty)
 
     def reprCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False):
         '''
@@ -1265,7 +1274,7 @@ class CanControl(cmd.Cmd):
         self.canbuf = CanBuffer(self.serialdev, self._baud)
 
 
-def hasAscii(msg, minbytes=4, strict=False):
+def hasAscii(msg, minbytes=3, strict=False):
     '''
     if minbytes == -1, every character has to be clean ASCII
     otherwise, look for strings of at least minbytes in length
