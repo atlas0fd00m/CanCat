@@ -1,8 +1,10 @@
-
 import cancat
 import struct
+import vstruct
+from J1939db import *
 
 
+### renderers for specific PF numbers
 def pf_c9(arbtup, data):
     b4 = data[3]
     req = "%.2x %.2x %.2x" % ([ord(d) for d in data[:3]])
@@ -17,45 +19,36 @@ def pf_eb(arbtup, data):
     idx = ord(data[0])
     return 'TP.DT idx: %.x' % idx
 
-def tp_cm_10(arbtup, data):
-    (cb, 
-            totsize,
-            pktct,
-            maxct,
-            tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
-
-    return 'TP.CM_RTS size:%.2x pktct:%.2x maxpkt:%.2x PGN: %.2x %.2x %.2x' % \
-            (totsize, pktct, maxct, tpf, tps, tsa)
-
-def tp_cm_11(arbtup, data):
-    (cb, 
-            maxpkts,
-            nextpkt,
-            reserved,
-            tpf, tps, tsa) = struct.unpack('<BBBHBBB', data)
-
-    return 'TP.CM_CTS        maxpkt:%.2x nxtpkt:%.2x PGN: %.2x %.2x %.2x' % \
-            (maxpkts, nextpkt, tpf, tps, tsa)
-
-def tp_cm_20(arbtup, data):
-    (cb, 
-            totsize,
-            pktct,
-            reserved,
-            tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
-
-    return 'TP.CM_BAM-Broadcast size:%.2x pktct:%.2x PGN: %.2x %.2x %.2x' % \
-            (totsize, pktct, tpf, tps, tsa)
-
-tp_cm_handlers = {
-        0x10:     ('RTS',           tp_cm_10),
-        0x11:     ('CTS',           tp_cm_11),
-        0x13:     ('EndOfMsgACK',   None),
-        0x20:     ('BAM-Broadcast', tp_cm_20),
-        0xff:     ('Abort',         None),
-        }
-
 def pf_ec(arbtup, data):
+    def tp_cm_10(arbtup, data):
+        (cb, totsize, pktct, maxct,
+                tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
+
+        return 'TP.CM_RTS size:%.2x pktct:%.2x maxpkt:%.2x PGN: %.2x%.2x%.2x' % \
+                (totsize, pktct, maxct, tpf, tps, tsa)
+
+    def tp_cm_11(arbtup, data):
+        (cb, maxpkts, nextpkt, reserved,
+                tpf, tps, tsa) = struct.unpack('<BBBHBBB', data)
+
+        return 'TP.CM_CTS        maxpkt:%.2x nxtpkt:%.2x PGN: %.2x%.2x%.2x' % \
+                (maxpkts, nextpkt, tpf, tps, tsa)
+
+    def tp_cm_20(arbtup, data):
+        (cb, totsize, pktct, reserved,
+                tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
+
+        return 'TP.CM_BAM-Broadcast size:%.2x pktct:%.2x PGN: %.2x%.2x%.2x' % \
+                (totsize, pktct, tpf, tps, tsa)
+
+    tp_cm_handlers = {
+            0x10:     ('RTS',           tp_cm_10),
+            0x11:     ('CTS',           tp_cm_11),
+            0x13:     ('EndOfMsgACK',   None),
+            0x20:     ('BAM-Broadcast', tp_cm_20),
+            0xff:     ('Abort',         None),
+            }
+
     cb = ord(data[0])
 
     htup = tp_cm_handlers.get(cb)
@@ -83,6 +76,10 @@ def pf_ef((prio, edp, dp, pf, ps, sa), data):
 
     return 'Proprietary A1'
     
+def pf_ff((prio, edp, dp, pf, ps, sa), data):
+    pgn = "%.2x :: %.2:%.2x - %s" % (sa, pf,ps, data.encode('hex'))
+    return "Proprietary B %s" % pgn
+
 pgn_pfs = {
         0x93:   ("Name Management", None),
         0xc9:   ("Request2",        pf_c9),
@@ -94,21 +91,21 @@ pgn_pfs = {
         0xee:   ("Address Claim",   pf_ee),
         0xef:   ("Proprietary",     pf_ef),
         0xfe:   ("Command Address", None),
-        0xff:   ("Proprietary B",   None),
+        0xff:   ("Proprietary B",   pf_ff),
         }
 
 def parseArbid(arbid):
     (prioPlus,
-        PF,
-        PS,
-        SA) = struct.unpack('BBBB', struct.pack(">I", arbid))
+        pf,
+        ps,
+        sa) = struct.unpack('BBBB', struct.pack(">I", arbid))
 
     prio = prioPlus >> 2
     edp = (prioPlus >> 1) & 1
     dp = prioPlus & 1
 
 
-    return prio, edp, dp, PF, PS, SA
+    return prio, edp, dp, pf, ps, sa
 
 class J1939(cancat.CanInterface):
     def __init__(self, c=None):
@@ -121,19 +118,32 @@ class J1939(cancat.CanInterface):
             comment = ''
 
         arbtup = parseArbid(arbid)
-        prio, edp, dp, PF, PS, SA = arbtup
+        prio, edp, dp, pf, ps, sa = arbtup
 
-        pfmeaning, handler = pgn_pfs.get(PF, ('',None))
+        # give name priority to the Handler, then the manual name (this module), then J1939PGNdb
+        pfmeaning, handler = pgn_pfs.get(pf, ('',None))
+
         if handler != None:
             enhanced = handler(arbtup, data)
             if enhanced != None:
                 pfmeaning = enhanced
 
+        elif not len(pfmeaning):
+            pgn = (pf<<8) | ps
+            res = J1939PGNdb.get(pgn)
+            if res == None:
+                res = J1939PGNdb.get(pf<<8)
+            if res != None:
+                pfmeaning = res.get("Name")
+
         return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Len: %.2x, Data: %-18s  %s\t\t%s" % \
-                (idx, ts, prio, edp, dp, PF, PS, SA, len(data), data.encode('hex'), pfmeaning, comment)
+                (idx, ts, prio, edp, dp, pf, ps, sa, len(data), data.encode('hex'), pfmeaning, comment)
 
 
     def _getLocals(self, idx, ts, arbid, msg):
-        prio, edp, dp, PF, PS, SA = parseArbid(arbid)
-        return {'idx':idx, 'ts':ts, 'arbid':arbid, 'msg':msg, 'priority':prio, 'edp':edp, 'dp':dp, 'pf':PF, 'ps':PS, 'sa':SA}
+        prio, edp, dp, pf, ps, sa = parseArbid(arbid)
+        pgn = (pf<<8) | ps
+        lcls = {'idx':idx, 'ts':ts, 'arbid':arbid, 'msg':msg, 'priority':prio, 'edp':edp, 'dp':dp, 'pf':pf, 'ps':ps, 'sa':sa, 'pgn':pgn}
+
+        return lcls
 
