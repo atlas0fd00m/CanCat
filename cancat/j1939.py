@@ -3,39 +3,99 @@ import cancat
 import struct
 
 
-def pf_eb(data):
+def pf_c9(arbtup, data):
+    b4 = data[3]
+    req = "%.2x %.2x %.2x" % ([ord(d) for d in data[:3]])
+    usexferpfn = ('', 'Use_Transfer_PGN', 'undef', 'NA')[b4 & 3]
+    
+    return "Request2: %s %s" % (req,  usexferpgn)
+
+def pf_eb(arbtup, data):
     if len(data) < 1:
-        return ''
+        return 'TP ERROR: NO DATA!'
 
     idx = ord(data[0])
-    return 'idx: %.x' % idx
+    return 'TP.DT idx: %.x' % idx
 
-def pf_ec(data):
-    out = []
+def tp_cm_10(arbtup, data):
     (cb, 
-            size,
+            totsize,
             pktct,
             maxct,
-            sendablect,
+            tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
+
+    return 'TP.CM_RTS size:%.2x pktct:%.2x maxpkt:%.2x PGN: %.2x %.2x %.2x' % \
+            (totsize, pktct, maxct, tpf, tps, tsa)
+
+def tp_cm_11(arbtup, data):
+    (cb, 
+            maxpkts,
             nextpkt,
-            seq) = struct.unpack('<BBBBBHB', data)
+            reserved,
+            tpf, tps, tsa) = struct.unpack('<BBBHBBB', data)
 
-    return 'CB: %.x size: %.2x pkt:%.2x/max:%.2x/sendable:%.2x/next:%.2x seq: %.2x' % \
-            (cb, size, pktct, maxct, sendablect, nextpkt, seq)
+    return 'TP.CM_CTS        maxpkt:%.2x nxtpkt:%.2x PGN: %.2x %.2x %.2x' % \
+            (maxpkts, nextpkt, tpf, tps, tsa)
 
+def tp_cm_20(arbtup, data):
+    (cb, 
+            totsize,
+            pktct,
+            reserved,
+            tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
 
-pgn_pfs = [
-        # normal
-        {
-        0xea:   ("Address Rqst ", None),
-        0xeb:   ("TP ", pf_eb),
-        0xec:   ("TP.CM",         pf_ec),
-        0xee:   ("Address Claim", None),
-        0xef:   ("Proprietary", None),
-        },
-        # page 2
-        {}
-        ]
+    return 'TP.CM_BAM-Broadcast size:%.2x pktct:%.2x PGN: %.2x %.2x %.2x' % \
+            (totsize, pktct, tpf, tps, tsa)
+
+tp_cm_handlers = {
+        0x10:     ('RTS',           tp_cm_10),
+        0x11:     ('CTS',           tp_cm_11),
+        0x13:     ('EndOfMsgACK',   None),
+        0x20:     ('BAM-Broadcast', tp_cm_20),
+        0xff:     ('Abort',         None),
+        }
+
+def pf_ec(arbtup, data):
+    cb = ord(data[0])
+
+    htup = tp_cm_handlers.get(cb)
+    if htup != None:
+        subname, cb_handler = htup
+
+        if cb_handler == None:
+            return 'TP.CM_%s' % subname
+
+        newmsg = cb_handler(arbtup, data)
+        if newmsg == None:
+            return 'TP.CM_%s' % subname
+
+        return newmsg
+
+    return 'TP.CM_%.2x' % cb
+
+def pf_ee((prio, edp, dp, pf, ps, sa), data):
+    if ps == 255 and sa == 254:
+        return 'CANNOT CLAIM ADDRESS'
+
+def pf_ef((prio, edp, dp, pf, ps, sa), data):
+    if dp:
+        return 'Proprietary A2'
+
+    return 'Proprietary A1'
+    
+pgn_pfs = {
+        0x93:   ("Name Management", None),
+        0xc9:   ("Request2",        pf_c9),
+        0xca:   ('Transfer',        None),
+        0xe8:   ("ACK        ",     None),
+        0xea:   ("Request      ",   None),
+        0xeb:   ("TP.DT",           pf_eb),
+        0xec:   ("TP.CM",           pf_ec),
+        0xee:   ("Address Claim",   pf_ee),
+        0xef:   ("Proprietary",     pf_ef),
+        0xfe:   ("Command Address", None),
+        0xff:   ("Proprietary B",   None),
+        }
 
 def parseArbid(arbid):
     (prioPlus,
@@ -60,12 +120,14 @@ class J1939(cancat.CanInterface):
         if comment == None:
             comment = ''
 
-        prio, edp, dp, PF, PS, SA = parseArbid(arbid)
+        arbtup = parseArbid(arbid)
+        prio, edp, dp, PF, PS, SA = arbtup
 
-        pgn_pf = pgn_pfs[dp]
-        pfmeaning, handler = pgn_pf.get(PF, ('',None))
+        pfmeaning, handler = pgn_pfs.get(PF, ('',None))
         if handler != None:
-            pfmeaning += " " + handler(data)
+            enhanced = handler(arbtup, data)
+            if enhanced != None:
+                pfmeaning = enhanced
 
         return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Len: %.2x, Data: %-18s  %s\t\t%s" % \
                 (idx, ts, prio, edp, dp, PF, PS, SA, len(data), data.encode('hex'), pfmeaning, comment)
