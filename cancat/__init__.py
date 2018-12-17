@@ -167,7 +167,9 @@ class CanInterface:
         self._inbuf = ''
         self._trash = []
         self._messages = {}
+        self._msg_events = {}
         self._queuelock = threading.Lock()
+
         self._shutdown = False
         self.verbose = verbose
         self.port = port
@@ -388,7 +390,10 @@ class CanInterface:
             if mbox == None:
                 mbox = []
                 self._messages[cmd] = mbox
+                self._msg_events[cmd] = threading.Event()
             mbox.append((timestamp, message))
+            self._msg_events[cmd].set()
+
         finally:
             self._queuelock.release()
         return len(mbox)-1, timestamp
@@ -653,6 +658,58 @@ class CanInterface:
 
             self.CANxmit(arbid, data)
 
+    def CANtailf(self, startmsg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[]):
+        '''
+        takes 
+
+        yield generator for messages to a given sink.
+
+        '''
+        if startmsg != None:
+            msg = startmsg
+
+        else:
+            msg = len(self.messages[MSG_CAN])
+    
+        '''
+        returns the received CAN messages between indexes "start_msg" and "stop_msg"
+        but only messages to ID's that *do not* appear in the the baseline indicated 
+        by "start_baseline_msg" and "stop_baseline_msg".
+
+        for message indexes, you *will* want to look into the bookmarking subsystem!
+        '''
+        self.log("starting filtering messages...")
+        if stop_baseline_msg != None:
+            self.log("ignoring arbids from baseline...")
+            # get a list of baseline arbids
+            filter_ids = { arbid:1 for idx,ts,arbid,data in self.genCanMsgs(start_baseline_msg, stop_baseline_msg) 
+                }.keys()
+        else:
+            filter_ids = None
+        self.log("filtering messages...")
+
+        if arbids != None and type(arbids) != list:
+            arbids = [arbids]
+
+        for idx,ts,arbid,msg in self.genCanMsgs(start_msg, stop_msg, arbids=arbids, tail=True):
+            if not ((arbids != None and arbid in arbids) or arbid not in ignore and (filter_ids==None or arbid not in filter_ids)):
+                self.log("skipping message: (%r, %r, %r, %r)" % ((idx, ts, arbid, msg)))
+                continue
+
+            # advanced filters allow python code to be handed in.  if any of the python code snippits result in "False" or 0, skip this message
+            skip = False
+            for advf in advfilters:
+                lcls = self._getLocals(idx, ts, arbid, msg)
+                if not eval(advf, lcls):
+                    skip = True
+
+            if skip:
+                self.log("skipping message(adv): (%r, %r, %r, %r)" % ((idx, ts, arbid, msg)))
+                continue
+
+            yield (idx, ts, arbid, msg) 
+        
+
     def setCanBaud(self, baud_const=CAN_500KBPS):
         '''
         set the baud rate for the CAN bus.  this has nothing to do with the 
@@ -693,27 +750,46 @@ class CanInterface:
         response = self.recv(CMD_PING_RESPONSE, wait=3)
         return response
 
-    def genCanMsgs(self, start=0, stop=None, arbids=None):
+    def genCanMsgs(self, start=0, stop=None, arbids=None, tail=False):
         '''
         CAN message generator.  takes in start/stop indexes as well as a list
         of desired arbids (list)
         '''
         messages = self._messages.get(CMD_CAN_RECV, [])
-        if stop == None:
+        if stop == None or tail:
             stop = len(messages)
         else:
             stop = stop + 1 # This makes the stop index inclusive if specified
 
-        for idx in xrange(start, stop):
+        idx = start
+        while tail or idx < stop:
+            # if we're off the end of the original request, and "tailing"
+            while tail and idx >= stop:
+                msglen = len(messages) 
+                self.log("stop=%d  len=%d" % (stop, msglen))
+                if stop == msglen:
+                    self.log("waiting for messages")
+                    # wait for trigger event so we're not constantly polling
+                    self._msg_events[CMD_CAN_RECV].wait()
+                    self._msg_events[CMD_CAN_RECV].clear()
+                    self.log("received 'new messages' event trigger")
+
+                # we've gained some messages since last check...
+                stop = len(messages)
+
+            # now actually handle messages
             ts, msg = messages[idx]
 
             arbid, data = self._splitCanMsg(msg)
 
             if arbids != None and arbid not in arbids:
                 # allow filtering of arbids
+                idx += 1
                 continue
 
             yield((idx, ts, arbid, data))
+            idx += 1
+
 
     def _splitCanMsg(self, msg):
         '''
@@ -966,7 +1042,7 @@ class CanInterface:
     def _getLocals(self, idx, ts, arbid, msg):
         return {'idx':idx, 'ts':ts, 'arbid':arbid, 'msg':msg}
 
-    def filterCanMsgs(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[]):
+    def filterCanMsgs(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], tail=False):
         '''
         returns the received CAN messages between indexes "start_msg" and "stop_msg"
         but only messages to ID's that *do not* appear in the the baseline indicated 
@@ -987,7 +1063,7 @@ class CanInterface:
         if arbids != None and type(arbids) != list:
             arbids = [arbids]
 
-        for idx,ts,arbid,msg in self.genCanMsgs(start_msg, stop_msg, arbids=arbids):
+        for idx,ts,arbid,msg in self.genCanMsgs(start_msg, stop_msg, arbids=arbids, tail=tail):
             if not ((arbids != None and arbid in arbids) or arbid not in ignore and (filter_ids==None or arbid not in filter_ids)):
                 self.log("skipping message: (%r, %r, %r, %r)" % ((idx, ts, arbid, msg)))
                 continue

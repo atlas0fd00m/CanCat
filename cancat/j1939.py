@@ -1,7 +1,48 @@
 import cancat
 import struct
-import vstruct
 from J1939db import *
+from J1939namedb import *
+
+import vstruct
+from vstruct.bitfield import *
+
+class NAME(VBitField):
+    def __init__(self):
+        VBitField.__init__(self)
+        self.arbaddrcap = v_bits(1)
+        self.ind_group = v_bits(3)
+        self.vehicle_system_instance = v_bits(4)
+        self.vehicle_system = v_bits(7)
+        self.reserved = v_bits(1)
+        self.function = v_bits(8)
+        self.function_instance = v_bits(5)
+        self.ecu_instance = v_bits(3)
+        self.mfg_code = v_bits(11)
+        self.identity_number = v_bits(21)
+
+    def minrepr(self):
+        mfgname = mfg_lookup.get(self.mfg_code)
+        return "id: 0x%x mfg: %s" % (self.identity_number, mfgname)
+
+#class NAME1(VBitField):
+    #def __init__(self):
+        #VBitField.__init__(self)
+        #self.identity_number = v_bits(21)
+        #self.mfg_code = v_bits(11)
+        #self.ecu_instance = v_bits(3)
+        #self.function_instance = v_bits(5)
+        #self.function = v_bits(8)
+        #self.reserved = v_bits(1)
+        #self.vehicle_system = v_bits(7)
+        #self.vehicle_system_instance = v_bits(4)
+        #self.ind_group = v_bits(3)
+        #self.arbaddrcap = v_bits(1)
+
+def parseName(name):
+    namebits= NAME()
+    rname = name[::-1]
+    namebits.vsParse(rname)
+    return namebits
 
 
 ### renderers for specific PF numbers
@@ -69,6 +110,9 @@ def pf_ec(arbtup, data):
 def pf_ee((prio, edp, dp, pf, ps, sa), data):
     if ps == 255 and sa == 254:
         return 'CANNOT CLAIM ADDRESS'
+    
+    addrinfo = parseName(data).minrepr()
+    return "Address Claim: %s" % addrinfo
 
 def pf_ef((prio, edp, dp, pf, ps, sa), data):
     if dp:
@@ -104,8 +148,11 @@ def parseArbid(arbid):
     edp = (prioPlus >> 1) & 1
     dp = prioPlus & 1
 
-
     return prio, edp, dp, pf, ps, sa
+
+def emitArbid(prio, edp, dp, pf, ps, sa):
+    prioPlus = prio<<2 | (edp<<1) | dp
+    return struct.unpack(">I", struct.pack('BBBB', prioPlus, pf, ps, sa))[0]
 
 class J1939(cancat.CanInterface):
     def __init__(self, c=None):
