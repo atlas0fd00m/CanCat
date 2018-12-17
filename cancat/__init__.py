@@ -704,10 +704,13 @@ class CanInterface:
         response = self.recv(CMD_PING_RESPONSE, wait=3)
         return response
 
-    def genCanMsgs(self, start=0, stop=None, arbids=None, tail=False):
+    def genCanMsgs(self, start=0, stop=None, arbids=None, tail=False, maxsecs=None):
         '''
         CAN message generator.  takes in start/stop indexes as well as a list
         of desired arbids (list)
+
+        maxsecs limits the number of seconds this generator will go for.  it's intended
+        for use with tail
         '''
 
         messages = self._messages.get(CMD_CAN_RECV, None)
@@ -720,8 +723,15 @@ class CanInterface:
         else:
             stop = stop + 1 # This makes the stop index inclusive if specified
 
+        starttime = time.time()
+
         idx = start
         while tail or idx < stop:
+            # obey our time restrictions
+            # placed here to ensure checking whether we're receiving messages or not
+            if maxsecs != None and time.time() > maxsecs+starttime:
+                return
+        
             # if we're off the end of the original request, and "tailing"
             if tail and idx >= stop:
                 msglen = len(messages) 
@@ -1003,7 +1013,7 @@ class CanInterface:
     def _getLocals(self, idx, ts, arbid, msg):
         return {'idx':idx, 'ts':ts, 'arbid':arbid, 'msg':msg}
 
-    def filterCanMsgs(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], tail=False):
+    def filterCanMsgs(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], tail=False, maxsecs=None):
         '''
         returns the received CAN messages between indexes "start_msg" and "stop_msg"
         but only messages to ID's that *do not* appear in the the baseline indicated 
@@ -1024,7 +1034,7 @@ class CanInterface:
         if arbids != None and type(arbids) != list:
             arbids = [arbids]
 
-        for idx,ts,arbid,msg in self.genCanMsgs(start_msg, stop_msg, arbids=arbids, tail=tail):
+        for idx,ts,arbid,msg in self.genCanMsgs(start_msg, stop_msg, arbids=arbids, tail=tail, maxsecs=maxsecs):
             if not ((arbids != None and arbid in arbids) or arbid not in ignore and (filter_ids==None or arbid not in filter_ids)):
                 self.log("skipping message: (%r, %r, %r, %r)" % ((idx, ts, arbid, msg)))
                 continue
@@ -1041,7 +1051,7 @@ class CanInterface:
                 continue
 
             yield (idx, ts, arbid, msg) 
-        
+
     def printCanMsgsByBookmark(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, 
                     arbids=None, ignore=[], advfilters=[]):
         '''
@@ -1089,7 +1099,7 @@ class CanInterface:
         else:
             print self.reprCanMsgs(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty)
 
-    def reprCanMsgsLines(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False):
+    def reprCanMsgsLines(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, tail=False):
         # FIXME: make different stats selectable using a bitfield arg (eg. REPR_TIME_DELTA | REPR_ASCII)
         '''
         String representation of a set of CAN Messages.
@@ -1100,8 +1110,6 @@ class CanInterface:
 
         Many functions wrap this one.
         '''
-        out = []
-
         if start_bkmk != None:
             start_msg = self.getMsgIndexFromBookmark(start_bkmk)
 
