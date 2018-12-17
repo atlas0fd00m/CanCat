@@ -323,7 +323,7 @@ class CanInterface:
                         self._in_lock.release()
 
                 self._inbuf += char
-                self.log("RECV: %s" % repr(self._inbuf))
+                self.log("RECV: %s" % repr(self._inbuf), 4)
 
                 # make sure we're synced
                 if self._rxtx_state == RXTX_SYNC:
@@ -398,7 +398,7 @@ class CanInterface:
             self._queuelock.release()
         return len(mbox)-1, timestamp
 
-    def log(self, message, verbose=1):
+    def log(self, message, verbose=2):
         '''
         print a log message.  Only prints if CanCat's verbose setting >=verbose
         '''
@@ -460,7 +460,7 @@ class CanInterface:
         '''
         msgchar = struct.pack(">H", len(message) + 3) # 2 byte Big Endian
         msg = msgchar + chr(cmd) + message
-        self.log("XMIT: %s" % repr(msg))
+        self.log("XMIT: %s" % repr(msg),  4)
 
         self._out_lock.acquire()
         try:
@@ -766,13 +766,14 @@ class CanInterface:
             # if we're off the end of the original request, and "tailing"
             while tail and idx >= stop:
                 msglen = len(messages) 
-                self.log("stop=%d  len=%d" % (stop, msglen))
+                self.log("stop=%d  len=%d" % (stop, msglen), 3)
+
                 if stop == msglen:
                     self.log("waiting for messages")
                     # wait for trigger event so we're not constantly polling
                     self._msg_events[CMD_CAN_RECV].wait()
                     self._msg_events[CMD_CAN_RECV].clear()
-                    self.log("received 'new messages' event trigger")
+                    self.log("received 'new messages' event trigger", 3)
 
                 # we've gained some messages since last check...
                 stop = len(messages)
@@ -1436,6 +1437,7 @@ class CanInTheMiddleInterface(CanInterface):
         
 
     def genCanMsgsIso(self, start=0, stop=None, arbids=None):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         CAN message generator.  takes in start/stop indexes as well as a list
         of desired arbids (list). Uses the isolation messages.
@@ -1458,6 +1460,7 @@ class CanInTheMiddleInterface(CanInterface):
             yield((idx, ts, arbid, data))
 
     def getCanMsgCountIso(self):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         the number of CAN messages we've received on the isolation side session
         '''
@@ -1465,20 +1468,24 @@ class CanInTheMiddleInterface(CanInterface):
         return len(canmsgs)
 
     def printSessionStatsByBookmarkIso(self, start=None, stop=None):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         Prints session stats only for messages between two bookmarks
         '''
         print self.getSessionStatsByBookmarkIso(start, stop)
 
     def printSessionStatsIso(self, start=0, stop=None):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         Print session stats by Arbitration ID (aka WID/PID/CANID/etc...)
         between two message indexes (where they sit in the CMD_CAN_RECV
         mailbox)
         '''
         print self.getSessionStatsIso(start, stop)
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
 
     def getSessionStatsByBookmarkIso(self, start=None, stop=None):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         returns session stats by bookmarks
         '''
@@ -1495,6 +1502,7 @@ class CanInTheMiddleInterface(CanInterface):
         return self.getSessionStatsIso(start=start_msg, stop=stop_msg)
 
     def getArbitrationIdsIso(self, start=0, stop=None, reverse=False):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         return a list of Arbitration IDs
         '''
@@ -1514,6 +1522,7 @@ class CanInTheMiddleInterface(CanInterface):
         return arbid_list
 
     def getSessionStatsIso(self, start=0, stop=None):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         out = []
         
         arbid_list = self.getArbitrationIdsIso(start=start, stop=stop, reverse=True)
@@ -1580,31 +1589,38 @@ class CanInTheMiddleInterface(CanInterface):
         return bkmk_index
 
     def getMsgIndexFromBookmarkIso(self, bkmk_index):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         return self.bookmarks_iso[bkmk_index]
 
     def getBookmarkFromMsgIndexIso(self, msg_index):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         bkmk_index = self.bookmarks_iso.index(msg_index)
         return bkmk_index
 
     def setCanBookmarkNameIso(self, bkmk_index, name):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         info = self.bookmark_info_iso[bkmk_index]
         info[name] = name
 
     def setCanBookmarkCommentIso(self, bkmk_index, comment):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         info = self.bookmark_info_iso[bkmk_index]
         info[name] = name
 
     def setCanBookmarkNameByMsgIndexIso(self, msg_index, name):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         bkmk_index = self.bookmarks_iso.index(msg_index)
         info = self.bookmark_info_iso[bkmk_index]
         info[name] = name
 
     def setCanBookmarkCommentByMsgIndexIso(self, msg_index, comment):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         bkmk_index = self.bookmarks_iso.index(msg_index)
         info = self.bookmark_info_iso[bkmk_index]
         info[name] = name
 
     def snapshotCanMessagesIso(self, name=None, comment=None):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         Save bookmarks at the start and end of some event you are about to do
         Bookmarks are named "Start_" + name and "Stop_" + name
@@ -1617,6 +1633,7 @@ class CanInTheMiddleInterface(CanInterface):
 
     def filterCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, 
                     arbids=None, ignore=[], advfilters=[]):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
 
         if start_bkmk != None:
             start_msg = self.getMsgIndexFromBookmarkIso(start_bkmk)
@@ -1641,6 +1658,7 @@ class CanInTheMiddleInterface(CanInterface):
         return self.filterCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters)
 
     def filterCanMsgsIso(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[]):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         Iso means the second CAN bus (M2's and DUE_CAN models have two CAN interfaces)
 
@@ -1684,9 +1702,11 @@ class CanInTheMiddleInterface(CanInterface):
         '''
         deprecated: use printCanMsgs(start_bkmk=foo, stop_bkmk=bar)
         '''
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         print self.reprCanMsgsByBookmarkIso(start_bkmk, stop_bkmk, start_baseline_bkmk, stop_baseline_bkmk, arbids, ignore, advfilters)
 
     def reprCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, arbids=None, ignore=[], advfilters=[]):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         deprecated: use reprCanMsgs(start_bkmk=foo, stop_bkmk=bar)
         '''
@@ -1715,9 +1735,11 @@ class CanInTheMiddleInterface(CanInterface):
         return self.reprCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters)
 
     def printCanMsgsIso(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[]):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         print self.reprCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters)
 
     def reprCanMsgsIso(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], adfilters=[]):
+        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         String representation of a set of CAN Messages.
         These can be filtered by start and stop message indexes, as well as
