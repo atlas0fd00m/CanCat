@@ -194,3 +194,25 @@ class J1939(cancat.CanInterface):
 
         return lcls
 
+    def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
+        arbid = emitArbid(prio, edp, dp, pf, ps, sa)
+        self.CANxmit(arbid, data)
+
+    def J1939recv(self, pf, ps, sa, edp=0, dp=0, count=1, advfilters=[]):
+        pass
+
+    def J1939xmit_recv(self, pf, ps, sa, data, recv_arbid=None, recv_count=1, prio=6, edp=0, dp=0, advfilters=[]):
+        arbid = emitArbid(prio, edp, dp, pf, ps, sa)
+        msgidx = self.getCanMsgCount()
+
+        self.CANxmit(arbid, data)
+        res = self.J1939recv(recv_arbid, recv_count, advfilters)
+
+        return res
+
+
+    def J1939_ClaimAddress(self, addr, name=0x4040404040404040, prio=0x18):
+        out = self.J1939xmit_recv(prioPlus, pf, ps, sa, timeout=2)
+
+    def J1939_ArpAddresses(self):
+        pass

@@ -611,18 +611,24 @@ class CanInterface:
         print "_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
         return None
 
-    def CANsniff(self, arbids=None):
+    def CANsniff(self, start_msg=None, arbids=None, advfilters=[], maxmsgs=None):
         '''
         set a handler for CMD_CAN_RECV messages that print them to stdout.
         Messages are still stored in the CMD_CAN_RECV mailbox for analysis,
         this simply allows you to see the as they are received... not always
         advisable, as there are *MANY* almost all the time :)
         '''
-        self.register_handler(CMD_CAN_RECV, lambda msg, obj: handleCanMsgsDuringSniff(msg, obj, arbids))
-        try:
-            raw_input("Press Enter to stop sniffing")
-        finally:
-            self.remove_handler(CMD_CAN_RECV)
+        count = 0
+        msg_gen = self.reprCanMsgsLines(start_msg=start_msg, arbids=arbids, advfilters=advfilters, tail=True)
+
+        while True:
+            if maxmsgs != None and maxmsgs < count:
+                return
+            line = msg_gen.next()
+            print line
+            
+            count += 1
+
 
     def CANreplay(self, start_bkmk=None, stop_bkmk=None, start_msg=0, stop_msg=None, arbids=None, timing=TIMING_FAST):
         '''
@@ -657,58 +663,6 @@ class CanInterface:
                 last_time = ts
 
             self.CANxmit(arbid, data)
-
-    def CANtailf(self, startmsg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[]):
-        '''
-        takes 
-
-        yield generator for messages to a given sink.
-
-        '''
-        if startmsg != None:
-            msg = startmsg
-
-        else:
-            msg = len(self.messages[MSG_CAN])
-    
-        '''
-        returns the received CAN messages between indexes "start_msg" and "stop_msg"
-        but only messages to ID's that *do not* appear in the the baseline indicated 
-        by "start_baseline_msg" and "stop_baseline_msg".
-
-        for message indexes, you *will* want to look into the bookmarking subsystem!
-        '''
-        self.log("starting filtering messages...")
-        if stop_baseline_msg != None:
-            self.log("ignoring arbids from baseline...")
-            # get a list of baseline arbids
-            filter_ids = { arbid:1 for idx,ts,arbid,data in self.genCanMsgs(start_baseline_msg, stop_baseline_msg) 
-                }.keys()
-        else:
-            filter_ids = None
-        self.log("filtering messages...")
-
-        if arbids != None and type(arbids) != list:
-            arbids = [arbids]
-
-        for idx,ts,arbid,msg in self.genCanMsgs(start_msg, stop_msg, arbids=arbids, tail=True):
-            if not ((arbids != None and arbid in arbids) or arbid not in ignore and (filter_ids==None or arbid not in filter_ids)):
-                self.log("skipping message: (%r, %r, %r, %r)" % ((idx, ts, arbid, msg)))
-                continue
-
-            # advanced filters allow python code to be handed in.  if any of the python code snippits result in "False" or 0, skip this message
-            skip = False
-            for advf in advfilters:
-                lcls = self._getLocals(idx, ts, arbid, msg)
-                if not eval(advf, lcls):
-                    skip = True
-
-            if skip:
-                self.log("skipping message(adv): (%r, %r, %r, %r)" % ((idx, ts, arbid, msg)))
-                continue
-
-            yield (idx, ts, arbid, msg) 
-        
 
     def setCanBaud(self, baud_const=CAN_500KBPS):
         '''
@@ -755,7 +709,12 @@ class CanInterface:
         CAN message generator.  takes in start/stop indexes as well as a list
         of desired arbids (list)
         '''
-        messages = self._messages.get(CMD_CAN_RECV, [])
+
+        messages = self._messages.get(CMD_CAN_RECV, None)
+
+        if start == None:
+            start = self.getCanMsgCount()
+
         if stop == None or tail:
             stop = len(messages)
         else:
@@ -764,19 +723,20 @@ class CanInterface:
         idx = start
         while tail or idx < stop:
             # if we're off the end of the original request, and "tailing"
-            while tail and idx >= stop:
+            if tail and idx >= stop:
                 msglen = len(messages) 
                 self.log("stop=%d  len=%d" % (stop, msglen), 3)
 
                 if stop == msglen:
-                    self.log("waiting for messages")
+                    self.log("waiting for messages", 3)
                     # wait for trigger event so we're not constantly polling
-                    self._msg_events[CMD_CAN_RECV].wait()
+                    self._msg_events[CMD_CAN_RECV].wait(1)
                     self._msg_events[CMD_CAN_RECV].clear()
                     self.log("received 'new messages' event trigger", 3)
 
                 # we've gained some messages since last check...
                 stop = len(messages)
+                continue    # to the big message loop.
 
             # now actually handle messages
             ts, msg = messages[idx]
@@ -1129,7 +1089,8 @@ class CanInterface:
         else:
             print self.reprCanMsgs(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty)
 
-    def reprCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False):
+    def reprCanMsgsLines(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False):
+        # FIXME: make different stats selectable using a bitfield arg (eg. REPR_TIME_DELTA | REPR_ASCII)
         '''
         String representation of a set of CAN Messages.
         These can be filtered by start and stop message indexes, as well as
@@ -1150,14 +1111,14 @@ class CanInterface:
 
         if start_msg in self.bookmarks:
             bkmk = self.bookmarks.index(start_msg)
-            out.append("starting from bookmark %d: '%s'" % 
+            yield ("starting from bookmark %d: '%s'" % 
                     (bkmk,
                     self.bookmark_info[bkmk].get('name'))
                     )
 
         if stop_msg in self.bookmarks:
             bkmk = self.bookmarks.index(stop_msg)
-            out.append("stoppng at bookmark %d: '%s'" % 
+            yield ("stoppng at bookmark %d: '%s'" % 
                     (bkmk,
                     self.bookmark_info[bkmk].get('name'))
                     )
@@ -1177,10 +1138,10 @@ class CanInterface:
         data_repeat = 0
         data_similar = 0
 
-        for idx, ts, arbid, msg in self.filterCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids=arbids, ignore=ignore, advfilters=advfilters):
+        for idx, ts, arbid, msg in self.filterCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids=arbids, ignore=ignore, advfilters=advfilters, tail=tail):
             # insert bookmark names/comments in appropriate places
             while next_bkmk_idx < len(self.bookmarks) and idx >= self.bookmarks[next_bkmk_idx]:
-                out.append(self.reprBookmark(next_bkmk_idx))
+                yield (self.reprBookmark(next_bkmk_idx))
                 next_bkmk_idx += 1
 
             msg_count += 1
@@ -1225,15 +1186,17 @@ class CanInterface:
 
             if pretty:
                 if delta_ts >= .95:
-                    out.append('')
+                    yield ('')
 
-            out.append(self._reprCanMsg(idx, ts, arbid, msg, comment='\t'.join(diff)))
+            yield (self._reprCanMsg(idx, ts, arbid, msg, comment='\t'.join(diff)))
 
             last_ts = ts
             last_msg = msg
 
-        out.append("Total Messages: %d  (repeat: %d / similar: %d)" % (msg_count, data_repeat, data_similar))
+        yield ("Total Messages: %d  (repeat: %d / similar: %d)" % (msg_count, data_repeat, data_similar))
 
+    def reprCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, tail=False):
+        out = [x for x in self.reprCanMsgsLines(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty, tail)]
         return "\n".join(out)
 
     def _reprCanMsg(self, idx, ts, arbid, msg, comment=None):
