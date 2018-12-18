@@ -24,20 +24,6 @@ class NAME(VBitField):
         mfgname = mfg_lookup.get(self.mfg_code)
         return "id: 0x%x mfg: %s" % (self.identity_number, mfgname)
 
-#class NAME1(VBitField):
-    #def __init__(self):
-        #VBitField.__init__(self)
-        #self.identity_number = v_bits(21)
-        #self.mfg_code = v_bits(11)
-        #self.ecu_instance = v_bits(3)
-        #self.function_instance = v_bits(5)
-        #self.function = v_bits(8)
-        #self.reserved = v_bits(1)
-        #self.vehicle_system = v_bits(7)
-        #self.vehicle_system_instance = v_bits(4)
-        #self.ind_group = v_bits(3)
-        #self.arbaddrcap = v_bits(1)
-
 def parseName(name):
     namebits= NAME()
     rname = name[::-1]
@@ -45,39 +31,123 @@ def parseName(name):
     return namebits
 
 
+def meldExtMsgs(msgs):
+    out = ['Ext Msg: %.2x->%.2x' % (msgs['sa'], msgs['da'])]
+    for arbtup, msg in msgs.get('msgs'):
+        out.append(msg.encode('hex'))
+
+    return ' '.join(out)
+
 ### renderers for specific PF numbers
-def pf_c9(arbtup, data):
+def pf_c9(arbtup, data, j1939):
     b4 = data[3]
     req = "%.2x %.2x %.2x" % ([ord(d) for d in data[:3]])
     usexferpfn = ('', 'Use_Transfer_PGN', 'undef', 'NA')[b4 & 3]
     
     return "Request2: %s %s" % (req,  usexferpgn)
 
-def pf_eb(arbtup, data):
+def pf_eb(arbtup, data, j1939):
+    (prio, edp, dp, pf, da, sa) = arbtup
     if len(data) < 1:
         return 'TP ERROR: NO DATA!'
 
     idx = ord(data[0])
-    return 'TP.DT idx: %.x' % idx
 
-def pf_ec(arbtup, data):
-    def tp_cm_10(arbtup, data):
+    msgdata = ''
+    extmsgs = j1939.getExtMsgs(sa, da)
+    extmsgs['msgs'].append((arbtup, data))
+    if len(extmsgs['msgs']) >= extmsgs['length']:
+        if extmsgs['type'] == 'BAM':
+            j1939.clearExtMsgs(sa, da)
+            msgdata = '\n\t' + meldExtMsgs(extmsgs)
+            # FIXME: do both here??
+
+    if len(extmsgs['msgs']) > extmsgs['length']:
+            #print "ERROR: too many messages in Extended Message between %.2x -> %.2x\n\t%r" % (sa, da, extmsgs['msgs'])
+            pass
+
+    return 'TP.DT idx: %.x%s' % (idx, msgdata)
+
+def pf_ec(arbtup, data, j1939):
+    def tp_cm_10(arbtup, data, j1939):
+        (prio, edp, dp, pf, da, sa) = arbtup
+
         (cb, totsize, pktct, maxct,
                 tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
+        
+        # check for old stuff
+        extmsgs = j1939.getExtMsgs(sa, da)
+        if len(extmsgs['msgs']):
+            extmsgs['sa'] = sa
+            extmsgs['da'] = da
+            print "\n new extended message, without closure...: "
+            print "\t" + meldExtMsgs(extmsgs)
+
+        j1939.clearExtMsgs(sa, da)
+
+        # store extended message information for other stuff...
+        extmsgs = j1939.getExtMsgs(sa, da)
+        extmsgs['sa'] = sa
+        extmsgs['da'] = da
+        extmsgs['length'] = pktct
+        extmsgs['type'] = 'direct'
+        extmsgs['adminmsgs'].append((arbtup, data))
 
         return 'TP.CM_RTS size:%.2x pktct:%.2x maxpkt:%.2x PGN: %.2x%.2x%.2x' % \
                 (totsize, pktct, maxct, tpf, tps, tsa)
 
-    def tp_cm_11(arbtup, data):
+    def tp_cm_11(arbtup, data, j1939):
+        (prio, edp, dp, pf, da, sa) = arbtup
+
         (cb, maxpkts, nextpkt, reserved,
                 tpf, tps, tsa) = struct.unpack('<BBBHBBB', data)
+
+        # store extended message information for other stuff...
+        extmsgs = j1939.getExtMsgs(sa, da)
+        extmsgs['adminmsgs'].append((arbtup, data))
 
         return 'TP.CM_CTS        maxpkt:%.2x nxtpkt:%.2x PGN: %.2x%.2x%.2x' % \
                 (maxpkts, nextpkt, tpf, tps, tsa)
 
-    def tp_cm_20(arbtup, data):
+    def tp_cm_13(arbtup, data, j1939):
+        (prio, edp, dp, pf, da, sa) = arbtup
+
+        (cb, totsize, pktct, maxct,
+                tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
+
+        # print out extended message and clear the buffers.
+        extmsgs = j1939.getExtMsgs(sa, da)
+        extmsgs['adminmsgs'].append((arbtup, data))
+
+        j1939.clearExtMsgs(sa, da)
+        msgdata = meldExtMsgs(extmsgs)
+
+        return 'TP.EndOfMsgACK PGN: %.2x%.2x%.2x\n\t%r' % \
+                (tpf, tps, tsa, msgdata)
+
+    def tp_cm_20(arbtup, data, j1939):
+        (prio, edp, dp, pf, da, sa) = arbtup
+
         (cb, totsize, pktct, reserved,
                 tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
+
+        # check for old stuff
+        extmsgs = j1939.getExtMsgs(sa, da)
+        if len(extmsgs['msgs']):
+            extmsgs['sa'] = sa
+            extmsgs['da'] = da
+            print "\n new extended message, without closure...: "
+            print "\t" + meldExtMsgs(extmsgs)
+
+        j1939.clearExtMsgs(sa, da)
+
+        # store extended message information for other stuff...
+        extmsgs = j1939.getExtMsgs(sa, da)
+        extmsgs['sa'] = sa
+        extmsgs['da'] = da
+        extmsgs['length'] = pktct
+        extmsgs['type'] = 'BAM'
+        extmsgs['adminmsgs'].append((arbtup, data))
 
         return 'TP.CM_BAM-Broadcast size:%.2x pktct:%.2x PGN: %.2x%.2x%.2x' % \
                 (totsize, pktct, tpf, tps, tsa)
@@ -99,7 +169,7 @@ def pf_ec(arbtup, data):
         if cb_handler == None:
             return 'TP.CM_%s' % subname
 
-        newmsg = cb_handler(arbtup, data)
+        newmsg = cb_handler(arbtup, data, j1939)
         if newmsg == None:
             return 'TP.CM_%s' % subname
 
@@ -107,21 +177,21 @@ def pf_ec(arbtup, data):
 
     return 'TP.CM_%.2x' % cb
 
-def pf_ee((prio, edp, dp, pf, ps, sa), data):
+def pf_ee((prio, edp, dp, pf, ps, sa), data, j1939):
     if ps == 255 and sa == 254:
         return 'CANNOT CLAIM ADDRESS'
     
     addrinfo = parseName(data).minrepr()
     return "Address Claim: %s" % addrinfo
 
-def pf_ef((prio, edp, dp, pf, ps, sa), data):
+def pf_ef((prio, edp, dp, pf, ps, sa), data, j1939):
     if dp:
         return 'Proprietary A2'
 
     return 'Proprietary A1'
     
-def pf_ff((prio, edp, dp, pf, ps, sa), data):
-    pgn = "%.2x :: %.2:%.2x - %s" % (sa, pf,ps, data.encode('hex'))
+def pf_ff((prio, edp, dp, pf, ps, sa), data, j1939):
+    pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, data.encode('hex'))
     return "Proprietary B %s" % pgn
 
 pgn_pfs = {
@@ -157,8 +227,7 @@ def emitArbid(prio, edp, dp, pf, ps, sa):
 class J1939(cancat.CanInterface):
     def __init__(self, c=None):
         cancat.CanInterface.__init__(self, port=None, orig_iface=c)
-        #me = c.saveSession()
-        #self.restoreSession(me)
+        self.extMsgs = {}
 
     def _reprCanMsg(self, idx, ts, arbid, data, comment=None):
         if comment == None:
@@ -171,7 +240,7 @@ class J1939(cancat.CanInterface):
         pfmeaning, handler = pgn_pfs.get(pf, ('',None))
 
         if handler != None:
-            enhanced = handler(arbtup, data)
+            enhanced = handler(arbtup, data, self)
             if enhanced != None:
                 pfmeaning = enhanced
 
@@ -193,6 +262,51 @@ class J1939(cancat.CanInterface):
         lcls = {'idx':idx, 'ts':ts, 'arbid':arbid, 'msg':msg, 'priority':prio, 'edp':edp, 'dp':dp, 'pf':pf, 'ps':ps, 'sa':sa, 'pgn':pgn}
 
         return lcls
+
+    def getExtMsgs(self, sa, da):
+        '''
+        returns a message list for a given source and destination (sa, da)
+
+        if no list exists for this pairing, one is created and an empty list is returned
+        '''
+        msglists = self.extMsgs.get(sa)
+        if msglists == None:
+            msglists = {}
+            self.extMsgs[sa] = msglists
+
+        mlist = msglists.get(da)
+        if mlist == None:
+            mlist = {'length':0, 'msgs':[], 'type':None, 'adminmsgs':[]}
+            msglists[da] = mlist
+
+        return mlist
+
+    def clearExtMsgs(self, sa, da=None):
+        '''
+        clear out extended messages metadata.
+
+        if da == None, this clears *all* message data for a given source address
+
+        returns whether the thing deleted exists previously
+        * if da == None, returns whether the sa had anything previously
+        * otherwise, if the list 
+        '''
+        exists = False
+        if da != None:
+            msglists = self.extMsgs.get(sa)
+            exists = bool(msglists != None and len(msglists))
+            self.extMsgs[sa] = {}
+            return exists
+
+        msglists = self.extMsgs.get(sa)
+        if msglists == None:
+            msglists = {}
+            self.extMsgs[sa] = msglists
+
+        mlist = msglists.get(da, {'length':0})
+        msglists[da] = {'length':0, 'msgs':[], 'type':None, 'adminmsgs':[]}
+        return bool(mlist['length'])
+
 
     def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
         arbid = emitArbid(prio, edp, dp, pf, ps, sa)
