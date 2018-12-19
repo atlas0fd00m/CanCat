@@ -1046,8 +1046,8 @@ class CanInterface:
 
         return self.filterCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters)
 
-    def _getLocals(self, idx, ts, arbid, msg):
-        return {'idx':idx, 'ts':ts, 'arbid':arbid, 'msg':msg}
+    def _getLocals(self, idx, ts, arbid, data):
+        return {'idx':idx, 'ts':ts, 'arbid':arbid, 'data':data}
 
     def filterCanMsgs(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], tail=False, maxsecs=None):
         '''

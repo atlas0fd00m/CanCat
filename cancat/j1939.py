@@ -87,6 +87,7 @@ def pf_eb(arbtup, data, j1939):
             # FIXME: do both here??
 
     if j1939.skip_TPDT and not len(msgdata):
+        #print "pf_eb: DONT_PRINT_THIS_MESSAGE"
         return cancat.DONT_PRINT_THIS_MESSAGE 
 
     if len(extmsgs['msgs']) > extmsgs['length']:
@@ -276,9 +277,15 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         extmsgs = j1939.getRealExtMsgs(sa, da)
         extmsgs['sa'] = sa
         extmsgs['da'] = da
+        extmsgs['pgn2'] = pgn2
+        extmsgs['pgn1'] = pgn1
+        extmsgs['pgn0'] = pgn0
+        extmsgs['maxct'] = maxct
         extmsgs['length'] = pktct
+        extmsgs['totsize'] = totsize
         extmsgs['type'] = 'direct'
         extmsgs['adminmsgs'].append((arbtup, data))
+
         # RESPOND!
         if da in j1939.myIDs:
             response = struct.pack('<BBBHBBB', CM_CTS, pktct, 1, 0, pgn2, pgn1, pgn0)
@@ -334,11 +341,11 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         extmsgs['adminmsgs'].append((arbtup, data))
 
     tp_cm_handlers = {
-            0x10:     ('RTS',           tp_cm_10),
-            0x11:     ('CTS',           tp_cm_11),
-            0x13:     ('EndOfMsgACK',   tp_cm_13),
-            0x20:     ('BAM-Broadcast', tp_cm_20),
-            0xff:     ('Abort',         None),
+            CM_RTS:     ('RTS',           tp_cm_10),
+            CM_CTS:     ('CTS',           tp_cm_11),
+            CM_EOM:     ('EndOfMsgACK',   tp_cm_13),
+            CM_BAM:     ('BAM-Broadcast', tp_cm_20),
+            CM_ABORT:   ('Abort',         None),
             }
 
     cb = ord(data[0])
@@ -368,10 +375,13 @@ def eb_handler(j1939, idx, ts, arbtup, data):
 
         # if this is the end of a message to *me*, reply accordingly
         if da in j1939.myIDs:
-            totsize = extmsgs['totsize']
+            print "responding...  extmsgs: %r" % extmsgs
             pgn2 = extmsgs['pgn2']
             pgn1 = extmsgs['pgn1']
             pgn0 = extmsgs['pgn0']
+            totsize = extmsgs['totsize']
+            maxct = extmsgs['maxct']
+            pktct = extmsgs['length']
             data = struct.pack('<BHBBBBB', CM_EOM, totsize, pktct, maxct, pgn2, pgn1, pgn0)
             j1939.J1939xmit(PF_TP_CM, sa, da,  data, prio=prio)
 
@@ -387,7 +397,7 @@ class J1939(cancat.CanInterface):
     def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         self.myIDs = []
         self.extMsgs = {}
-        self._RealExtMsgs = []
+        self._RealExtMsgs = {}
         self._RealExtMsgParts = {}
         self.skip_TPDT = False
 
@@ -408,6 +418,7 @@ class J1939(cancat.CanInterface):
         if handler != None:
             enhanced = handler(arbtup, data, self)
             if enhanced == cancat.DONT_PRINT_THIS_MESSAGE:
+                #print "_reprCanMsg: DONT_PRINT_THIS_MESSAGE"
                 return enhanced
 
             if enhanced != None:
@@ -425,10 +436,10 @@ class J1939(cancat.CanInterface):
                 (idx, ts, prio, edp, dp, pf, ps, sa, data.encode('hex'), pfmeaning, comment)
 
 
-    def _getLocals(self, idx, ts, arbid, msg):
+    def _getLocals(self, idx, ts, arbid, data):
         prio, edp, dp, pf, ps, sa = parseArbid(arbid)
         pgn = (pf<<8) | ps
-        lcls = {'idx':idx, 'ts':ts, 'arbid':arbid, 'msg':msg, 'priority':prio, 'edp':edp, 'dp':dp, 'pf':pf, 'ps':ps, 'sa':sa, 'pgn':pgn}
+        lcls = {'idx':idx, 'ts':ts, 'arbid':arbid, 'data':data, 'priority':prio, 'edp':edp, 'dp':dp, 'pf':pf, 'ps':ps, 'sa':sa, 'pgn':pgn}
 
         return lcls
 
@@ -462,7 +473,15 @@ class J1939(cancat.CanInterface):
 
         mlist = msglists.get(da)
         if mlist == None:
-            mlist = {'length':0, 'msgs':[], 'type':None, 'adminmsgs':[]}
+            mlist = {'length':0, 
+                    'msgs':[], 
+                    'type':None, 
+                    'adminmsgs':[], 
+                    'pgn0':None, 
+                    'pgn1':None, 
+                    'pgn2':None,   
+                    'totsize':0,
+                    }
             msglists[da] = mlist
 
         return mlist
@@ -500,7 +519,12 @@ class J1939(cancat.CanInterface):
         store a TP message.
         '''
         # FIXME: do we need thread-safety wrappers here?
-        self._RealExtMsgs.append((idx, ts, sa, da, msg, tptype))
+        msglist = self._RealExtMsgs.get((sa,da))
+        if msglist == None:
+            msglist = []
+            self._RealExtMsgs[(sa,da)] = msglist
+
+        msglist.append((idx, ts, sa, da, msg, tptype))
 
     # This is for the pretty printing stuff...
     def getExtMsgs(self, sa, da):
@@ -557,7 +581,7 @@ class J1939(cancat.CanInterface):
 
     def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
         arbid = emitArbid(prio, edp, dp, pf, ps, sa)
-        self.CANxmit(arbid, data, extflag=1)
+        return self.CANxmit(arbid, data, extflag=1)
 
     def J1939recv_tp(self, pgn, sa=0xfa, msgcount=1, timeout=1, advfilters=[]):
         extct = 256*msgcount
@@ -590,8 +614,7 @@ class J1939(cancat.CanInterface):
     def J1939xmit_recv(self, pf, ps, sa, data, recv_arbid=None, recv_count=1, prio=6, edp=0, dp=0, timeout=1, advfilters=[]):
         msgidx = self.getCanMsgCount()
 
-        self.J1939xmit(pf, ps, sa, data, prio, edp, dp)
-
+        res = self.J1939xmit(pf, ps, sa, data, prio, edp, dp)
         res = self.J1939recv(recv_count, timeout, advfilters, start_msg=msgidx)
 
         return res
@@ -612,6 +635,7 @@ class J1939(cancat.CanInterface):
     def J1939_ClaimAddress(self, addr, name=0x4040404040404040, prio=6):
         data = struct.pack(">Q", name)
         out = self.J1939xmit_recv(pf=PF_ADDRCLAIM, ps=0xff, sa=addr, data=data, recv_count=10, prio=prio<<2, timeout=2, advfilters=['pf==0xee'])
+        self.addID(addr)
         return out
 
     def J1939_ArpAddresses(self):
