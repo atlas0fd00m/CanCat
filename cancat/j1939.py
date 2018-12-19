@@ -2,9 +2,22 @@ import cancat
 import struct
 from J1939db import *
 from J1939namedb import *
+from cancat import *
 
 import vstruct
 from vstruct.bitfield import *
+
+PF_RQST =       0xea
+PF_TP_DT =      0xeb
+PF_TP_CM =      0xec
+PF_ADDRCLAIM =  0xee
+PF_PROPRIETRY=  0xef
+PF_KWP1 =       0xdb
+PF_KWP2 =       0xda
+PF_KWP3 =       0xce
+PF_KWP4 =       0xcd
+
+
 
 class NAME(VBitField):
     def __init__(self):
@@ -31,12 +44,19 @@ def parseName(name):
     return namebits
 
 
-def meldExtMsgs(msgs):
+def reprExtMsgs(msgs):
     out = ['Ext Msg: %.2x->%.2x' % (msgs['sa'], msgs['da'])]
     for arbtup, msg in msgs.get('msgs'):
         out.append(msg.encode('hex'))
 
     return ' '.join(out)
+
+def meldExtMsgs(msgs):
+    out = []
+    for arbtup, msg in msgs.get('msgs'):
+        out.append(msg)
+
+    return ''.join(out)
 
 ### renderers for specific PF numbers
 def pf_c9(arbtup, data, j1939):
@@ -59,8 +79,11 @@ def pf_eb(arbtup, data, j1939):
     if len(extmsgs['msgs']) >= extmsgs['length']:
         if extmsgs['type'] == 'BAM':
             j1939.clearExtMsgs(sa, da)
-            msgdata = '\n\t' + meldExtMsgs(extmsgs)
+            msgdata = '\n\t%s\n' % reprExtMsgs(extmsgs)
             # FIXME: do both here??
+
+    if j1939.skip_TPDT and not len(msgdata):
+        return cancat.DONT_PRINT_THIS_MESSAGE 
 
     if len(extmsgs['msgs']) > extmsgs['length']:
             #print "ERROR: too many messages in Extended Message between %.2x -> %.2x\n\t%r" % (sa, da, extmsgs['msgs'])
@@ -76,12 +99,12 @@ def pf_ec(arbtup, data, j1939):
                 tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
         
         # check for old stuff
+        prefix = ''
         extmsgs = j1939.getExtMsgs(sa, da)
         if len(extmsgs['msgs']):
             extmsgs['sa'] = sa
             extmsgs['da'] = da
-            print "\n new extended message, without closure...: "
-            print "\t" + meldExtMsgs(extmsgs)
+            prefix = " new TP message, without closure...: \n\t%r\n" % reprExtMsgs(extmsgs)
 
         j1939.clearExtMsgs(sa, da)
 
@@ -93,7 +116,7 @@ def pf_ec(arbtup, data, j1939):
         extmsgs['type'] = 'direct'
         extmsgs['adminmsgs'].append((arbtup, data))
 
-        return 'TP.CM_RTS size:%.2x pktct:%.2x maxpkt:%.2x PGN: %.2x%.2x%.2x' % \
+        return prefix + 'TP.CM_RTS size:%.2x pktct:%.2x maxpkt:%.2x PGN: %.2x%.2x%.2x' % \
                 (totsize, pktct, maxct, tpf, tps, tsa)
 
     def tp_cm_11(arbtup, data, j1939):
@@ -132,12 +155,12 @@ def pf_ec(arbtup, data, j1939):
                 tpf, tps, tsa) = struct.unpack('<BHBBBBB', data)
 
         # check for old stuff
+        prefix=''
         extmsgs = j1939.getExtMsgs(sa, da)
         if len(extmsgs['msgs']):
             extmsgs['sa'] = sa
             extmsgs['da'] = da
-            print "\n new extended message, without closure...: "
-            print "\t" + meldExtMsgs(extmsgs)
+            prefix = " new TP message, without closure...: \n\t%r\n" % reprExtMsgs(extmsgs)
 
         j1939.clearExtMsgs(sa, da)
 
@@ -149,7 +172,7 @@ def pf_ec(arbtup, data, j1939):
         extmsgs['type'] = 'BAM'
         extmsgs['adminmsgs'].append((arbtup, data))
 
-        return 'TP.CM_BAM-Broadcast size:%.2x pktct:%.2x PGN: %.2x%.2x%.2x' % \
+        return prefix + 'TP.CM_BAM-Broadcast size:%.2x pktct:%.2x PGN: %.2x%.2x%.2x' % \
                 (totsize, pktct, tpf, tps, tsa)
 
     tp_cm_handlers = {
@@ -204,7 +227,7 @@ pgn_pfs = {
         0xec:   ("TP.CM",           pf_ec),
         0xee:   ("Address Claim",   pf_ee),
         0xef:   ("Proprietary",     pf_ef),
-        0xfe:   ("Command Address", None),
+        #0xfe:   ("Command Address", None),
         0xff:   ("Proprietary B",   pf_ff),
         }
 
@@ -225,9 +248,10 @@ def emitArbid(prio, edp, dp, pf, ps, sa):
     return struct.unpack(">I", struct.pack('BBBB', prioPlus, pf, ps, sa))[0]
 
 class J1939(cancat.CanInterface):
-    def __init__(self, c=None):
-        cancat.CanInterface.__init__(self, port=None, orig_iface=c)
+    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
+        CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
         self.extMsgs = {}
+        self.skip_TPDT = False
 
     def _reprCanMsg(self, idx, ts, arbid, data, comment=None):
         if comment == None:
@@ -241,6 +265,9 @@ class J1939(cancat.CanInterface):
 
         if handler != None:
             enhanced = handler(arbtup, data, self)
+            if enhanced == cancat.DONT_PRINT_THIS_MESSAGE:
+                return enhanced
+
             if enhanced != None:
                 pfmeaning = enhanced
 
@@ -252,8 +279,8 @@ class J1939(cancat.CanInterface):
             if res != None:
                 pfmeaning = res.get("Name")
 
-        return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Len: %.2x, Data: %-18s  %s\t\t%s" % \
-                (idx, ts, prio, edp, dp, pf, ps, sa, len(data), data.encode('hex'), pfmeaning, comment)
+        return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Data: %-18s  %s\t\t%s" % \
+                (idx, ts, prio, edp, dp, pf, ps, sa, data.encode('hex'), pfmeaning, comment)
 
 
     def _getLocals(self, idx, ts, arbid, msg):
@@ -310,23 +337,93 @@ class J1939(cancat.CanInterface):
 
     def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
         arbid = emitArbid(prio, edp, dp, pf, ps, sa)
-        self.CANxmit(arbid, data)
+        self.CANxmit(arbid, data, extflag=1)
 
-    def J1939recv(self, pf, ps, sa, edp=0, dp=0, count=1, advfilters=[]):
-        pass
+    def J1939recv_tp(self, pgn, sa=0xfa, msgcount=1, timeout=1, advfilters=[]):
+        extct = 256*msgcount
+        out = []
+        ext_out = []
+        advfilters.append('pf in (0xeb, 0xec)')
 
-    def J1939xmit_recv(self, pf, ps, sa, data, recv_arbid=None, recv_count=1, prio=6, edp=0, dp=0, advfilters=[]):
-        arbid = emitArbid(prio, edp, dp, pf, ps, sa)
+        count = 0
+        for msg in self.filterCanMsgs(start_msg=None, advfilters=advfilters, tail=True, maxsecs=timeout):
+            (idx, ts, arbid, msg) = msg
+            out.append(msg)
+
+            if len(ext_out):
+                return ext_out
+
+        return out
+
+    def J1939recv(self, msgcount=1, timeout=1, advfilters=[], start_msg=None):
+        out = []
+
+        for msg in self.filterCanMsgs(start_msg=start_msg, advfilters=advfilters, tail=True, maxsecs=timeout):
+            #(idx, ts, arbid, data) = msg
+            out.append(msg)
+
+            if len(out) >= msgcount:
+                return out
+
+        return out
+
+    def J1939xmit_recv(self, pf, ps, sa, data, recv_arbid=None, recv_count=1, prio=6, edp=0, dp=0, timeout=1, advfilters=[]):
         msgidx = self.getCanMsgCount()
 
-        self.CANxmit(arbid, data)
-        res = self.J1939recv(recv_arbid, recv_count, advfilters)
+        self.J1939xmit(pf, ps, sa, data, prio, edp, dp)
+
+        res = self.J1939recv(recv_count, timeout, advfilters, start_msg=msgidx)
 
         return res
 
 
-    def J1939_ClaimAddress(self, addr, name=0x4040404040404040, prio=0x18):
-        out = self.J1939xmit_recv(prioPlus, pf, ps, sa, timeout=2)
+    def J1939_Request(self, rpf, rda_ge=0, redp=0, rdp=0, da=0xff, sa=0xfe, prio=0x6, recv_count=255, advfilters=[]):
+        pgnbytes = [rda_ge, rpf, redp<<1 | rdp]
+        data = ''.join([chr(x) for x in pgnbytes])
+
+        if not len(advfilters):
+            advfilters = 'pf in (0x%x, 0xeb, 0xec)' % rpf
+
+        # FIXME: this is only good for short requests... anything directed is likely to send back a TP message
+        msgs = self.J1939xmit_recv(PF_RQST, da, sa, data, recv_count=recv_count, prio=prio, timeout=2, advfilters=advfilters)
+        return msgs
+
+    def J1939_ClaimAddress(self, addr, name=0x4040404040404040, prio=6):
+        data = struct.pack(">Q", name)
+        out = self.J1939xmit_recv(pf=PF_ADDRCLAIM, ps=0xff, sa=addr, data=data, recv_count=10, prio=prio<<2, timeout=2, advfilters=['pf==0xee'])
+        return out
 
     def J1939_ArpAddresses(self):
-        pass
+        '''
+        Sends a request for all used addresses... not fully tested
+        '''
+        #idx = self.getCanMsgCount()
+        msgs = self.J1939_Request(PF_ADDRCLAIM, recv_count=255, advfilters=['pf==0xee'])
+
+        '''
+        # FIXME: these are way too loose, for discovery only. tighten down.
+        recv_filters = [
+                'pf < 0xf0',
+                #'pf == 0xee',
+                ]
+
+        msgs = self.J1939recv(msgcount=200, timeout=3, advfilters=recv_filters, start_msg=idx)
+        '''
+        for msg in msgs:
+            try:
+                msgrepr = self._reprCanMsg(*msg)
+                if msgrepr != cancat.DONT_PRINT_THIS_MESSAGE:
+                    print msgrepr
+            except Exception, e:
+                print e
+        '''
+        example (from start of ECU):
+        00000000 1545142410.990 pri/edp/dp: 6/0/0, PG: ea ff  Source: fe  Len: 03, Data: 00ee00              Request
+        00000001 1545142411.077 pri/edp/dp: 6/0/0, PG: ee ff  Source: 00  Len: 08, Data: 4cca4d0100000000    Address Claim: id: 0xdca4c mfg: Cummins Inc (formerly Cummins Engine Co) Columbus, IN USA
+    
+        currently ours:
+        00001903 1545142785.127 pri/edp/dp: 6/0/0, PG: ea ff  Source: fe  Len: 03, Data: 00ee00              Request
+
+        '''
+
+

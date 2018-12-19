@@ -3,6 +3,7 @@ import sys
 import cmd
 import time
 import serial
+import select
 import struct
 import threading
 import cPickle as pickle
@@ -152,8 +153,18 @@ default_cmdhandlers = {
 def loadCanBuffer(filename):
     return pickle.load(file(filename))
 
+def keystop(delay=0):
+    if os.name == 'posix':
+        return len(select.select([sys.stdin],[],[],delay)[0])
+    else:
+        return msvcrt.kbhit()
+
+class SPECIAL_CASE:
+    pass
+DONT_PRINT_THIS_MESSAGE = SPECIAL_CASE
+
 class CanInterface:
-    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
+    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
         '''
         CAN Analysis Workspace
         This can be subclassed by vendor to allow more vendor-specific code 
@@ -169,6 +180,7 @@ class CanInterface:
         self._messages = {}
         self._msg_events = {}
         self._queuelock = threading.Lock()
+        self._max_msgs = max_msgs
 
         self._shutdown = False
         self.verbose = verbose
@@ -613,10 +625,29 @@ class CanInterface:
 
     def CANsniff(self, start_msg=None, arbids=None, advfilters=[], maxmsgs=None):
         '''
-        set a handler for CMD_CAN_RECV messages that print them to stdout.
-        Messages are still stored in the CMD_CAN_RECV mailbox for analysis,
-        this simply allows you to see the as they are received... not always
-        advisable, as there are *MANY* almost all the time :)
+        Print messages in real time. 
+
+        start_msg - first message to print 
+                    (None: the next message captured, 0: first message since starting CanCat)
+        arbids - list of arbids to print (others will be ignored)
+        advfilters - list of python code to eval for each message (message context provided)
+                    eg. ['pf==0xeb', 'sa==0', 'ps & 0xf']  
+                        will print TP data message from source address 0 if the top 4 bits of PS 
+                        are set.
+
+                    Expressions are evaluated from left to right in a "and" like fashion.  If any
+                    expression evaluates to "False" and the message will be ignored.
+
+                    Variables mapped into default namespace: 
+                        'arbid'
+                        'id'
+                        'ts'
+                        'data'
+
+                    J1939 adds 'pgn', 'pf', 'ps', 'edp', 'dp', 'sa'
+
+                    (this description is true for all advfilters, not specifically CANsniff)
+
         '''
         count = 0
         msg_gen = self.reprCanMsgsLines(start_msg=start_msg, arbids=arbids, advfilters=advfilters, tail=True)
@@ -628,6 +659,8 @@ class CanInterface:
             print line
             
             count += 1
+            if keystop():
+                break
 
 
     def CANreplay(self, start_bkmk=None, stop_bkmk=None, start_msg=0, stop_msg=None, arbids=None, timing=TIMING_FAST):
@@ -1196,7 +1229,10 @@ class CanInterface:
                 if delta_ts >= .95:
                     yield ('')
 
-            yield (self._reprCanMsg(idx, ts, arbid, msg, comment='\t'.join(diff)))
+            msgrepr = self._reprCanMsg(idx, ts, arbid, msg, comment='\t'.join(diff))
+            # allow _reprCanMsg to return None to skip printing the message
+            if msgrepr != DONT_PRINT_THIS_MESSAGE:
+                yield msgrepr
 
             last_ts = ts
             last_msg = msg
