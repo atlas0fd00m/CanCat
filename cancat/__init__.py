@@ -406,6 +406,9 @@ class CanInterface:
             mbox.append((timestamp, message))
             self._msg_events[cmd].set()
 
+        except Exception, e:
+            self.log("_submitMessage: ERROR: %r" % e, -1)
+
         finally:
             self._queuelock.release()
         return len(mbox)-1, timestamp
