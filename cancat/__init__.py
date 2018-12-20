@@ -509,6 +509,8 @@ class CanInterface:
 
         if result == None:
             print "CANxmit:  Return is None!?"
+            return None
+
         resval = ord(result)
         if resval != 0:
             print "CANxmit() failed: %s" % CAN_RESPS.get(resval)
