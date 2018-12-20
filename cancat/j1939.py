@@ -51,14 +51,14 @@ def parseName(name):
 def reprExtMsgs(msgs):
     out = ['Ext Msg: %.2x->%.2x' % (msgs['sa'], msgs['da'])]
     for arbtup, msg in msgs.get('msgs'):
-        out.append(msg.encode('hex'))
+        out.append(msg[1:].encode('hex'))
 
     return ' '.join(out)
 
 def meldExtMsgs(msgs):
     out = []
     for arbtup, msg in msgs.get('msgs'):
-        out.append(msg)
+        out.append(msg[1:])
 
     return ''.join(out)
 
@@ -81,7 +81,7 @@ def pf_eb(arbtup, data, j1939):
     extmsgs = j1939.getExtMsgs(sa, da)
     extmsgs['msgs'].append((arbtup, data))
     if len(extmsgs['msgs']) >= extmsgs['length']:
-        if extmsgs['type'] == 'BAM':
+        if extmsgs['type'] == TP_BAM:
             j1939.clearExtMsgs(sa, da)
             msgdata = '\n\t%s\n' % reprExtMsgs(extmsgs)
             # FIXME: do both here??
@@ -120,9 +120,10 @@ def pf_ec(arbtup, data, j1939):
         extmsgs['pgn2'] = pgn2
         extmsgs['pgn1'] = pgn1
         extmsgs['pgn0'] = pgn0
+        extmsgs['maxct'] = maxct
         extmsgs['length'] = pktct
         extmsgs['totsize'] = totsize
-        extmsgs['type'] = 'direct'
+        extmsgs['type'] = TP_DIRECT
         extmsgs['adminmsgs'].append((arbtup, data))
 
         return prefix + 'TP.CM_RTS size:%.2x pktct:%.2x maxpkt:%.2x PGN: %.2x%.2x%.2x' % \
@@ -177,8 +178,13 @@ def pf_ec(arbtup, data, j1939):
         extmsgs = j1939.getExtMsgs(sa, da)
         extmsgs['sa'] = sa
         extmsgs['da'] = da
+        extmsgs['pgn2'] = pgn2
+        extmsgs['pgn1'] = pgn1
+        extmsgs['pgn0'] = pgn0
+        extmsgs['maxct'] = maxct
         extmsgs['length'] = pktct
-        extmsgs['type'] = 'BAM'
+        extmsgs['totsize'] = totsize
+        extmsgs['type'] = TP_BAM
         extmsgs['adminmsgs'].append((arbtup, data))
 
         return prefix + 'TP.CM_BAM-Broadcast size:%.2x pktct:%.2x PGN: %.2x%.2x%.2x' % \
@@ -269,7 +275,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         if len(extmsgs['msgs']):
             extmsgs['sa'] = sa
             extmsgs['da'] = da
-            j1939.saveRealExtMsg(idx, ts, sa, da, meldExtMsgs(extmsgs), TP_DIRECT_BROKEN)
+            j1939.saveRealExtMsg(idx-1, ts, sa, da, (0,0,0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN, idx-1)
 
         j1939.clearRealExtMsgs(sa, da)
 
@@ -277,13 +283,14 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         extmsgs = j1939.getRealExtMsgs(sa, da)
         extmsgs['sa'] = sa
         extmsgs['da'] = da
+        extmsgs['idx'] = idx
         extmsgs['pgn2'] = pgn2
         extmsgs['pgn1'] = pgn1
         extmsgs['pgn0'] = pgn0
         extmsgs['maxct'] = maxct
         extmsgs['length'] = pktct
         extmsgs['totsize'] = totsize
-        extmsgs['type'] = 'direct'
+        extmsgs['type'] = TP_DIRECT
         extmsgs['adminmsgs'].append((arbtup, data))
 
         # RESPOND!
@@ -328,7 +335,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         if len(extmsgs['msgs']):
             extmsgs['sa'] = sa
             extmsgs['da'] = da
-            j1939.saveRealExtMsg(idx, ts, sa, da, meldExtMsgs(extmsgs), TP_DIRECT_BROKEN)
+            j1939.saveRealExtMsg(idx-1, ts, sa, da, (0,0,0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN, idx-1)
 
         j1939.clearRealExtMsgs(sa, da)
 
@@ -336,8 +343,14 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         extmsgs = j1939.getRealExtMsgs(sa, da)
         extmsgs['sa'] = sa
         extmsgs['da'] = da
+        extmsgs['idx'] = idx
+        extmsgs['pgn2'] = pgn2
+        extmsgs['pgn1'] = pgn1
+        extmsgs['pgn0'] = pgn0
+        extmsgs['maxct'] = 0
         extmsgs['length'] = pktct
-        extmsgs['type'] = 'BAM'
+        extmsgs['totsize'] = totsize
+        extmsgs['type'] = TP_BAM
         extmsgs['adminmsgs'].append((arbtup, data))
 
     tp_cm_handlers = {
@@ -364,18 +377,24 @@ def eb_handler(j1939, idx, ts, arbtup, data):
         j1939.log('pf=0xeb: TP ERROR: NO DATA!')
         return
 
-    idx = ord(data[0])
+    #idx = ord(data[0])
 
     extmsgs = j1939.getRealExtMsgs(sa, da)
     extmsgs['msgs'].append((arbtup, data))
     if len(extmsgs['msgs']) >= extmsgs['length']:
         #print "eb_handler: saving: %r %r" % (len(extmsgs['msgs']) , extmsgs['length'])
-        j1939.saveRealExtMsg(idx, ts, sa, da, meldExtMsgs(extmsgs), TP_BAM)
+        tidx = extmsgs['idx']
+        pgn2 = extmsgs['pgn2']
+        pgn1 = extmsgs['pgn1']
+        pgn0 = extmsgs['pgn0']
+        mtype = extmsgs['type']
+
+        j1939.saveRealExtMsg(tidx, ts, sa, da, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), mtype, idx)
         j1939.clearRealExtMsgs(sa, da)
 
         # if this is the end of a message to *me*, reply accordingly
         if da in j1939.myIDs:
-            print "responding...  extmsgs: %r" % extmsgs
+            j1939.log("tp_stack: sending EOM  extmsgs: %r" % extmsgs, 1)
             pgn2 = extmsgs['pgn2']
             pgn1 = extmsgs['pgn1']
             pgn0 = extmsgs['pgn0']
@@ -393,6 +412,9 @@ TP_BAM = 20
 TP_DIRECT = 10
 TP_DIRECT_BROKEN=9
 
+class TimeoutException(Exception):
+    pass
+
 class J1939(cancat.CanInterface):
     def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         self.myIDs = []
@@ -400,6 +422,9 @@ class J1939(cancat.CanInterface):
         self._RealExtMsgs = {}
         self._RealExtMsgParts = {}
         self.skip_TPDT = False
+        self._last_recv_idx = -1
+
+        self._threads = []
 
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
 
@@ -481,6 +506,8 @@ class J1939(cancat.CanInterface):
                     'pgn1':None, 
                     'pgn2':None,   
                     'totsize':0,
+                    'idx': -1,
+                    'maxct':0xff,
                     }
             msglists[da] = mlist
 
@@ -513,7 +540,7 @@ class J1939(cancat.CanInterface):
         msglists[da] = {'length':0, 'msgs':[], 'type':None, 'adminmsgs':[]}
         return bool(mlist['length'])
 
-    def saveRealExtMsg(self, idx, ts, sa, da, msg, tptype):
+    def saveRealExtMsg(self, idx, ts, sa, da, pgn, msg, tptype, lastidx):
         '''
         # functions to support the J1939TP Stack (real stuff, not just repr)
         store a TP message.
@@ -524,7 +551,7 @@ class J1939(cancat.CanInterface):
             msglist = []
             self._RealExtMsgs[(sa,da)] = msglist
 
-        msglist.append((idx, ts, sa, da, msg, tptype))
+        msglist.append((idx, ts, sa, da, pgn, msg, tptype, lastidx))
 
     # This is for the pretty printing stuff...
     def getExtMsgs(self, sa, da):
@@ -583,28 +610,93 @@ class J1939(cancat.CanInterface):
         arbid = emitArbid(prio, edp, dp, pf, ps, sa)
         return self.CANxmit(arbid, data, extflag=1)
 
-    def J1939recv_tp(self, pgn, sa=0xfa, msgcount=1, timeout=1, advfilters=[]):
-        extct = 256*msgcount
-        out = []
-        ext_out = []
-        advfilters.append('pf in (0xeb, 0xec)')
+    def J1939xmit_tp(self, da, sa, pgn2, pgn1, pgn0, message, prio=6, edp=0, dp=0):
+
+        msgs = ['%c'%(x+1) + message[x*7:(x*7)+7] for x in range((len(message)+6)/7)]
+        if len(msgs) > 255:
+            raise Exception("J1939xmit_tp: attempt to send message that's too large")
+
+        cm_msg = struct.pack('<BHBBBBB', CM_RTS, len(message), len(msgs), 0xff, 
+                pgn2, pgn1, pgn0)
+        self.J1939xmit(PF_TP_CM, da, sa, cm_msg, prio=prio)
+        time.sleep(.01)  # hack: should watch for CM_CTS
+        for msg in msgs:
+            self.J1939xmit(PF_TP_DT, da, sa, msg, prio=prio)
+
+        # hack: should watch for CM_EOM
+
+
+    def recvRealExtMsg(self, sa, da, pgn2, pgn1, pgn0, start_msg=None, block=True, timeout=1):
+        '''
+        Find the first recv'd message from the J1939tp stack after start_msg, for PGN made up of pgn2,pgn1,pgn0
+        wait until timeout seconds have lapsed
+
+        if start_msg == None, returns the next message since last J1939recv/tp
+        '''
+        starttime = time.time()
+        if start_msg == None:
+            start_msg = self._last_recv_idx
+            print "resuming last recv'd index: %d" % start_msg
 
         count = 0
-        for msg in self.filterCanMsgs(start_msg=None, advfilters=advfilters, tail=True, maxsecs=timeout):
-            (idx, ts, arbid, msg) = msg
-            out.append(msg)
+        while (count==0 or (block and time.time()-starttime < timeout)):
+            #sys.stderr.write('.')
+            count += 1
+            msgs = self._RealExtMsgs.get((sa, da))
+            if msgs == None or not len(msgs):
+                #print "no message for %.2x -> %.2x" % (sa, da)
+                continue
 
-            if len(ext_out):
-                return ext_out
+            if msgs[-1][0] < start_msg:
+                self.log("last msg before start_msg %r  %r" % (msgs[-1][0],start_msg), 2)
+                #sys.stderr.write('.')
+                continue
 
+            for midx in range(len(msgs)):
+                msg = msgs[midx]
+                midx = msg[0]
+                mpgn = msg[4]
+                mlastidx = msg[7]
+                print "     %r ?>= %r" % (midx, start_msg)
+                print "     %r ?= %r" % (mpgn, (pgn2, pgn1, pgn0))
+                if midx < start_msg:
+                    continue
+                if mpgn != (pgn2, pgn1, pgn0):
+                    continue
+
+                print "success! %s" % repr(msg)
+                print "setting last recv'd index: %d" % mlastidx
+                self._last_recv_idx = mlastidx
+                ##FIXME:  make this threadsafe
+                #msgs.pop(midx)
+                return msg
+
+
+        raise TimeoutException('recvRealExtMsg: Timeout waiting for message from: 0x%.2x -> 0x%.2x PGN: %.2x%.2x%.2x' % \
+                (sa, da, pgn2,pgn1,pgn0))
+
+    def J1939recv_tp(self, pgn2, pgn1, pgn0, sa=0x0, da=0xf9, msgcount=1, timeout=1, advfilters=[], start_msg=None):
+        if start_msg == None:
+            start_msg = self._last_recv_idx
+
+        print "J1939recv_tp: Searching for response at or after msg idx: %d" % start_msg
+        msg = self.recvRealExtMsg(sa, da, pgn2, pgn1, pgn0, start_msg)
+        if msg == None:
+            return None
+
+        out = msg[5]
         return out
 
     def J1939recv(self, msgcount=1, timeout=1, advfilters=[], start_msg=None):
         out = []
 
+        if start_msg == None:
+            start_msg = self._last_recv_idx
+
         for msg in self.filterCanMsgs(start_msg=start_msg, advfilters=advfilters, tail=True, maxsecs=timeout):
             #(idx, ts, arbid, data) = msg
             out.append(msg)
+            self._last_recv_idx = msg[0]
 
             if len(out) >= msgcount:
                 return out
