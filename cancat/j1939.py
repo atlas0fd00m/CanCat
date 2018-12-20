@@ -1,3 +1,4 @@
+import queue
 import cancat
 import struct
 from J1939db import *
@@ -428,6 +429,13 @@ class J1939(cancat.CanInterface):
 
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
 
+        # setup the message handler event offload thread
+        self._mhe_queue = queue.Queue()
+        mhethread = threading.Thread(target=self._mhe_runner)
+        mhethread.setDaemon(True)
+        mhethread.start()
+        self._threads.append(mhethread)
+
         self.register_handler(CMD_CAN_RECV, self._j1939_can_handler)
 
     def _reprCanMsg(self, idx, ts, arbid, data, comment=None):
@@ -469,6 +477,10 @@ class J1939(cancat.CanInterface):
         return lcls
 
     def _j1939_can_handler(self, message, none):
+        '''
+        this function is run for *Every* received CAN message... and is executed from the 
+        XMIT/RECV thread.  it *must* be fast!
+        '''
         #print repr(self), repr(cmd), repr(message)
         arbid, data = self._splitCanMsg(message)
         idx, ts = self._submitMessage(CMD_CAN_RECV, message)
@@ -478,11 +490,33 @@ class J1939(cancat.CanInterface):
 
         pfhandler = pfhandlers.get(pf)
         if pfhandler != None:
-            pfhandler(self, idx, ts, arbtup, data)
+            self.queueMessageHandlerEvent(pfhandler, idx, ts, arbtup, data)
+            #pfhandler(self, idx, ts, arbtup, data)
 
         #print "submitted message: %r" % (message.encode('hex'))
 
 
+    def queueMessageHandlerEvent(self, pfhandler, idx, ts, arbtup, data):
+        self._mhe_queue.put((pfhandler, idx, ts, arbtup, data))
+
+    def _mhe_runner(self):
+        while self._go:
+            worktup = None
+            try:
+                worktup = self._mhe_queue.get(1)
+                if worktup == None:
+                    continue
+
+                pfhandler, idx, ts, arbtup, data = worktup
+                pfhandler(self, idx, ts, arbtup, data)
+
+            except Exception, e:
+                print "MsgHandler ERROR: %r (%r)" % (e, worktup)
+                if self.verbose:
+                    sys.excepthook(*sys.exc_info())
+
+
+        
     # functions to support the J1939TP Stack (real stuff, not just repr)
     def getRealExtMsgs(self, sa, da):
         '''
