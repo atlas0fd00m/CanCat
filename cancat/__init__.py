@@ -1255,7 +1255,7 @@ class CanInterface:
         return "\n".join(out)
 
     def _reprCanMsg(self, idx, ts, arbid, msg, comment=None):
-        return reprCanMsg(idx, ts, arbid, msg, comment='\t'.join(diff))
+        return reprCanMsg(idx, ts, arbid, msg, comment=comment)
 
     def printCanSessions(self, arbid_list=None, advfilters=[]):
         '''
