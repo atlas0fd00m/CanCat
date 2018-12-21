@@ -58,10 +58,18 @@ def reprExtMsgs(msgs):
 
 def meldExtMsgs(msgs):
     out = []
+    length = msgs.get('totsize')
     for arbtup, msg in msgs.get('msgs'):
         out.append(msg[1:])
 
-    return ''.join(out)
+    outval = ''.join(out)
+    if outval[length:] == '\xff'*(len(outval)-length):
+        #print "truncating %r to size %r" % (outval, length)
+        outval = outval[:length]
+    #else:
+        #print "NOT truncating %r to size %r" % (outval, length)
+
+    return outval
 
 ### renderers for specific PF numbers
 def pf_c9(arbtup, data, j1939):
@@ -182,7 +190,7 @@ def pf_ec(arbtup, data, j1939):
         extmsgs['pgn2'] = pgn2
         extmsgs['pgn1'] = pgn1
         extmsgs['pgn0'] = pgn0
-        extmsgs['maxct'] = maxct
+        extmsgs['maxct'] = reserved
         extmsgs['length'] = pktct
         extmsgs['totsize'] = totsize
         extmsgs['type'] = TP_BAM
@@ -378,8 +386,6 @@ def eb_handler(j1939, idx, ts, arbtup, data):
         j1939.log('pf=0xeb: TP ERROR: NO DATA!')
         return
 
-    #idx = ord(data[0])
-
     extmsgs = j1939.getRealExtMsgs(sa, da)
     extmsgs['msgs'].append((arbtup, data))
     if len(extmsgs['msgs']) >= extmsgs['length']:
@@ -395,6 +401,11 @@ def eb_handler(j1939, idx, ts, arbtup, data):
 
         # if this is the end of a message to *me*, reply accordingly
         if da in j1939.myIDs:
+            if extmsgs['idx'] == -1:
+                j1939.log("TP_DT_handler: missed beginning of message, not sending EOM: %r" % \
+                        repr(extmsgs), 1)
+                return
+
             j1939.log("tp_stack: sending EOM  extmsgs: %r" % extmsgs, 1)
             pgn2 = extmsgs['pgn2']
             pgn1 = extmsgs['pgn1']
@@ -402,6 +413,7 @@ def eb_handler(j1939, idx, ts, arbtup, data):
             totsize = extmsgs['totsize']
             maxct = extmsgs['maxct']
             pktct = extmsgs['length']
+
             data = struct.pack('<BHBBBBB', CM_EOM, totsize, pktct, maxct, pgn2, pgn1, pgn0)
             j1939.J1939xmit(PF_TP_CM, sa, da,  data, prio=prio)
 
@@ -472,7 +484,20 @@ class J1939(cancat.CanInterface):
     def _getLocals(self, idx, ts, arbid, data):
         prio, edp, dp, pf, ps, sa = parseArbid(arbid)
         pgn = (pf<<8) | ps
-        lcls = {'idx':idx, 'ts':ts, 'arbid':arbid, 'data':data, 'priority':prio, 'edp':edp, 'dp':dp, 'pf':pf, 'ps':ps, 'sa':sa, 'pgn':pgn}
+        lcls = {'idx':idx, 
+                'ts':ts, 
+                'arbid':arbid, 
+                'data':data, 
+                'priority':prio, 
+                'edp':edp, 
+                'dp':dp, 
+                'pf':pf, 
+                'ps':ps, 
+                'sa':sa, 
+                'pgn':pgn,
+                'da':ps,
+                'ge':ps,
+                }
 
         return lcls
 
@@ -670,7 +695,7 @@ class J1939(cancat.CanInterface):
         starttime = time.time()
         if start_msg == None:
             start_msg = self._last_recv_idx
-            print "resuming last recv'd index: %d" % start_msg
+            #print "resuming last recv'd index: %d" % start_msg
 
         count = 0
         while (count==0 or (block and time.time()-starttime < timeout)):
@@ -691,15 +716,15 @@ class J1939(cancat.CanInterface):
                 midx = msg[0]
                 mpgn = msg[4]
                 mlastidx = msg[7]
-                print "     %r ?>= %r" % (midx, start_msg)
-                print "     %r ?= %r" % (mpgn, (pgn2, pgn1, pgn0))
+                #print "     %r ?>= %r" % (midx, start_msg)
+                #print "     %r ?= %r" % (mpgn, (pgn2, pgn1, pgn0))
                 if midx < start_msg:
                     continue
                 if mpgn != (pgn2, pgn1, pgn0):
                     continue
 
-                print "success! %s" % repr(msg)
-                print "setting last recv'd index: %d" % mlastidx
+                #print "success! %s" % repr(msg)
+                #print "setting last recv'd index: %d" % mlastidx
                 self._last_recv_idx = mlastidx
                 ##FIXME:  make this threadsafe
                 #msgs.pop(midx)

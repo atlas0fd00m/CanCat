@@ -31,6 +31,7 @@ CMD_CAN_MODE_RESULT         = 0x37
 CMD_CAN_SEND_ISOTP_RESULT   = 0x38
 CMD_CAN_RECV_ISOTP_RESULT   = 0x39
 CMD_CAN_SENDRECV_ISOTP_RESULT = 0x3A
+CMD_SET_FILT_MASK_RESULT    = 0x3B
 
 CMD_PING                    = 0x41
 CMD_CHANGE_BAUD             = 0x42
@@ -317,7 +318,7 @@ class CanInterface:
                     self._rxtx_state = RXTX_SYNC
                     continue
 
-                # fill the queue
+                # fill the queue ##########################################
                 self._in_lock.acquire()
                 try:
                     char = self._io.read()
@@ -335,7 +336,12 @@ class CanInterface:
                         self._in_lock.release()
 
                 self._inbuf += char
-                self.log("RECV: %s" % repr(self._inbuf), 4)
+                #self.log("RECV: %s" % repr(self._inbuf), 4)
+                ##########################################################
+
+
+                # FIXME: should we make the rest of this a separate thread, so we're not keeping messages from flowing?
+                # ====== it would require more locking/synchronizing...
 
                 # make sure we're synced
                 if self._rxtx_state == RXTX_SYNC:
