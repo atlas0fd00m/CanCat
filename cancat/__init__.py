@@ -2,6 +2,7 @@ import os
 import sys
 import cmd
 import time
+import queue
 import serial
 import struct
 import threading
@@ -164,12 +165,15 @@ class CanInterface:
             return
 
         self._go = False
-        self._inbuf = ''
+        #self._inbuf = ''
+        self._inbuf = []
+        self._rx_message_queue = queue.Queue()
         self._trash = []
         self._messages = {}
         self._queuelock = threading.Lock()
         self._shutdown = False
         self.verbose = verbose
+        #self.verbose = 6
         self.port = port
         self._baud = baud
         self._io = None
@@ -200,14 +204,22 @@ class CanInterface:
             raise Exception("Cannot find device, and no filename specified.  Please try again.")
 
         if self.port != None:
+            # FIXME: make it so _reconnect is *only* ever called from the _rxtx thread
             self._reconnect()
             self._startRxThread()
 
     def _startRxThread(self):
         self._go = True
+
+        self.log("starting _rxtx thread")
         self._commsthread = threading.Thread(target=self._rxtx)
         self._commsthread.setDaemon(True)
         self._commsthread.start()
+
+        self.log("starting _rx_message_queue_handler thread")
+        self._msgthread = threading.Thread(target=self._rx_message_queue_handler)
+        self._msgthread.setDaemon(True)
+        self._msgthread.start()
 
     def register_handler(self, cmd, handler):
         self._cmdhandlers[cmd] = handler
@@ -226,6 +238,8 @@ class CanInterface:
     def _reconnect(self, port=None, baud=None):
         '''
         Attempt to connect/reconnect to the CanCat Transceiver
+
+        WARNING: ASIDE FROM __init__(), this should only ever be called from the _rxtx thread.
         '''
         if self.port == None and port == None:
             print "cannot connect to an unspecified port"
@@ -281,10 +295,12 @@ class CanInterface:
         into correct mailboxes and/or hands off to pre-configured handlers.
         '''
         self._rxtx_state = RXTX_SYNC
+        inbuf = self._inbuf
 
         while not self._shutdown:
             try:    
                 if not self._go:
+                    print "not go"
                     time.sleep(.04)
                     continue
 
@@ -302,8 +318,8 @@ class CanInterface:
                     self._rxtx_state = RXTX_SYNC
                     continue
 
-                # fill the queue
-                self._in_lock.acquire()
+                # fill the queue ##########################################
+                #self._in_lock.acquire()
                 try:
                     char = self._io.read()
 
@@ -315,64 +331,94 @@ class CanInterface:
                         self._rxtx_state = RXTX_DISCONN
                     continue
 
-                finally:
-                    if self._in_lock.locked_lock():
-                        self._in_lock.release()
+                #finally:
+                    #if self._in_lock.locked_lock():
+                    #    self._in_lock.release()
 
-                self._inbuf += char
-                self.log("RECV: %s" % repr(self._inbuf))
+                # _inbuf is only accessed from this thread...  we'd make it a local var 
+                # but would lose the inspection/troubleshooting capabilites.
+                inbuf += char
+
+                #self.log("RECV: %s" % repr(inbuf), 4)
+                ##########################################################
+
+
+                # FIXME: should we make the rest of this a separate thread, so we're not keeping messages from flowing?
+                # ====== it would require more locking/synchronizing...
 
                 # make sure we're synced
                 if self._rxtx_state == RXTX_SYNC:
-                    if self._inbuf[0] != "@":
-                        self._queuelock.acquire()
+                    if inbuf[0] != "@":
                         try:
-                            idx = self._inbuf.find('@')
-                            if idx == -1:
-                                self.log("sitting on garbage...", 3)
-                                continue
+                            idx = inbuf.index('@')
 
-                            trash = self._inbuf[:idx]
-                            self._trash.append(trash)
+                            if idx != 0:
+                                # @ isn't the first byte, so delete until we find the @
+                                trash = inbuf[:idx]
+                                self._trash.append(trash)
+                                inbuf.__delslice__(0,idx)
 
-                            self._inbuf = self._inbuf[idx:]
-                        finally:
-                            self._queuelock.release()
+                        except ValueError:
+                            # we couldn't find the "@" byte, keep waiting
+                            self.log("sitting on garbage...", 3)
+                            continue
 
                     self._rxtx_state = RXTX_GO
 
                 # handle buffer if we have anything in it
                 if self._rxtx_state == RXTX_GO:
-                    if len(self._inbuf) < 3: continue
-                    if self._inbuf[0] != '@': 
+                    if len(inbuf) < 3: continue
+                    if inbuf[0] != '@': 
                         self._rxtx_state = RXTX_SYNC
                         continue
 
-                    pktlen = ord(self._inbuf[1]) + 2        # <size>, doesn't include "@"
+                    pktlen = ord(inbuf[1]) + 2        # <size>, doesn't include "@"
 
-                    if len(self._inbuf) >= pktlen:
-                        self._queuelock.acquire()
-                        try:
-                            cmd = ord(self._inbuf[2])                # first bytes are @<size>
-                            message = self._inbuf[3:pktlen]  
-                            self._inbuf = self._inbuf[pktlen:]
-                        finally:
-                            self._queuelock.release()
+                    if len(inbuf) >= pktlen:
+                        cmd = ord(inbuf[2])                # first bytes are @<size>
+                        message = ''.join(inbuf[3:pktlen])  # here's where we make it a string!
+                        inbuf.__delslice__(0, pktlen)
+                        self._rx_message_queue.put((cmd, message))
 
-                        #if we have a handler, use it
-                        cmdhandler = self._cmdhandlers.get(cmd)
-                        if cmdhandler != None:
-                            cmdhandler(message, self)
-
-                        # otherwise, file it
-                        else:
-                            self._submitMessage(cmd, message)
                         self._rxtx_state = RXTX_SYNC
 
                 
             except:
                 if self.verbose:
                     sys.excepthook(*sys.exc_info())
+
+
+    def _rx_message_queue_handler(self):
+        '''
+        handler for the _rx_message_queue.  
+        this consumes messages created and queued from the _rxtx thread handler.
+        either call a message handler, or queue the message into the appropriate mailbox.
+        '''
+        while not self._shutdown:
+            try:
+                cmd, message = self._rx_message_queue.get()
+                self.log("_rx_msgq: %x: %r" % (cmd, message), 3)
+
+                #if we have a handler, use it
+                cmdhandler = self._cmdhandlers.get(cmd)
+                if cmdhandler != None:
+                    cmdhandler(message, self)
+
+                # otherwise, file it
+                else:
+                    self._submitMessage(cmd, message)
+                cmdhandler = self._cmdhandlers.get(cmd)
+                if cmdhandler != None:
+                    cmdhandler(message, self)
+
+                # otherwise, file it
+                else:
+                    self._submitMessage(cmd, message)
+
+            except:
+                if self.verbose:
+                    sys.excepthook(*sys.exc_info())
+
 
     def _submitMessage(self, cmd, message):
         '''
