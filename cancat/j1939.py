@@ -1,4 +1,4 @@
-import queue
+import Queue
 import cancat
 import struct
 from J1939db import *
@@ -442,7 +442,7 @@ class J1939(cancat.CanInterface):
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
 
         # setup the message handler event offload thread
-        self._mhe_queue = queue.Queue()
+        self._mhe_queue = Queue.Queue()
         mhethread = threading.Thread(target=self._mhe_runner)
         mhethread.setDaemon(True)
         mhethread.start()
