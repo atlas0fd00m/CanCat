@@ -89,6 +89,14 @@ TIMING_FAST         = 0
 TIMING_REAL         = 1
 TIMING_INTERACTIVE  = 2
 
+# constants for VIEW settings:
+VIEW_ASCII =        1<<0
+VIEW_COMPARE =      1<<1
+VIEW_BOOKMARKS =    1<<2
+VIEW_TS_DELTA =     1<<3    
+VIEW_ENDSUM =       1<<4
+VIEW_ALL = VIEW_ASCII | VIEW_COMPARE | VIEW_BOOKMARKS | VIEW_TS_DELTA | VIEW_ENDSUM
+
 # message id's and metadata (soon to be moved into modules)
 GM_messages = {
         }
@@ -759,6 +767,12 @@ class CanInterface:
 
         messages = self._messages.get(CMD_CAN_RECV, None)
 
+        # get the ts of the first received message
+        if messages != None and len(messages):
+            startts = messages[0][0]
+        else:
+            startts = time.time()
+
         if start == None:
             start = self.getCanMsgCount()
 
@@ -794,6 +808,9 @@ class CanInterface:
 
             # now actually handle messages
             ts, msg = messages[idx]
+
+            # make ts an offset instead of the real time.
+            ts -= startts
 
             arbid, data = self._splitCanMsg(msg)
 
@@ -1131,19 +1148,26 @@ class CanInterface:
 
         return self.reprCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters)
 
-    def printCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, paginate=None):
-        if paginate != None:
-            data = self.reprCanMsgs(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty).split('\n')
-            pidx = 0
-            while pidx <= len(data):
-                print '\n'.join(data[pidx: pidx + paginate])
-                pidx += paginate
-                inp = raw_input("PRESS ENTER TO CONTINUE")
+    def printCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, paginate=None, viewbits=VIEW_ALL):
 
-        else:
-            print self.reprCanMsgs(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty)
+        data = self.reprCanMsgsLines(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty, viewbits=viewbits)
 
-    def reprCanMsgsLines(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, tail=False):
+        pidx = 0
+        try:
+            while True:
+                line = data.next()
+                lines = line.split('\n')
+                for thing in lines:
+                    print thing
+                    pidx += 1
+
+                    if paginate != None and pidx % paginate == 0:
+                        inp = raw_input("PRESS ENTER TO CONTINUE")
+
+        except StopIteration:
+            pass
+
+    def reprCanMsgsLines(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, tail=False, viewbits=VIEW_ALL):
         # FIXME: make different stats selectable using a bitfield arg (eg. REPR_TIME_DELTA | REPR_ASCII)
         '''
         String representation of a set of CAN Messages.
@@ -1153,7 +1177,11 @@ class CanInterface:
         ignored arbids
 
         Many functions wrap this one.
+
+        viewbits is a bitfield made up of VIEW_* options OR'd together:
+            ... viewbits=VIEW_ASCII|VIEW_COMPARE)
         '''
+
         if start_bkmk != None:
             start_msg = self.getMsgIndexFromBookmark(start_bkmk)
 
@@ -1161,14 +1189,14 @@ class CanInterface:
             stop_msg = self.getMsgIndexFromBookmark(stop_bkmk)
 
 
-        if start_msg in self.bookmarks:
+        if (viewbits & VIEW_BOOKMARKS) and start_msg in self.bookmarks:
             bkmk = self.bookmarks.index(start_msg)
             yield ("starting from bookmark %d: '%s'" % 
                     (bkmk,
                     self.bookmark_info[bkmk].get('name'))
                     )
 
-        if stop_msg in self.bookmarks:
+        if (viewbits & VIEW_BOOKMARKS) and stop_msg in self.bookmarks:
             bkmk = self.bookmarks.index(stop_msg)
             yield ("stoppng at bookmark %d: '%s'" % 
                     (bkmk,
@@ -1201,7 +1229,7 @@ class CanInterface:
 
             # check data
             byte_cnt_diff = 0
-            if last_msg != None:
+            if (viewbits & VIEW_COMPARE) and last_msg != None:
                 if len(last_msg) == len(msg):
                     for bidx in range(len(msg)):
                         if last_msg[bidx] != msg[bidx]:
@@ -1216,7 +1244,7 @@ class CanInterface:
                     # FIXME: make some better heuristic to identify "out of norm"
 
             # look for ASCII data (4+ consecutive bytes)
-            if hasAscii(msg):
+            if (viewbits & VIEW_ASCII) and hasAscii(msg):
                 diff.append("ASCII: %s" % repr(msg))
 
             # calculate timestamp delta and comment if out of whack
@@ -1233,7 +1261,7 @@ class CanInterface:
             if abs(delta_ts - avg_delta_ts) <= delta_ts:
                 tot_delta_ts += delta_ts
                 counted_msgs += 1
-            else:
+            elif (viewbits & VIEW_TS_DELTA):
                 diff.append("TS_delta: %.3f" % delta_ts)
 
             if pretty:
@@ -1248,10 +1276,11 @@ class CanInterface:
             last_ts = ts
             last_msg = msg
 
-        yield ("Total Messages: %d  (repeat: %d / similar: %d)" % (msg_count, data_repeat, data_similar))
+        if viewbits & VIEW_ENDSUM:
+            yield ("Total Messages: %d  (repeat: %d / similar: %d)" % (msg_count, data_repeat, data_similar))
 
-    def reprCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, tail=False):
-        out = [x for x in self.reprCanMsgsLines(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty, tail)]
+    def reprCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, tail=False, viewbits=VIEW_ALL):
+        out = [x for x in self.reprCanMsgsLines(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty, tail, viewbits)]
         return "\n".join(out)
 
     def _reprCanMsg(self, idx, ts, arbid, msg, comment=None):
@@ -1367,6 +1396,41 @@ class CanControl(cmd.Cmd):
         cmd.Cmd.__init__(self)
         self.serialdev = serialdev
         self.canbuf = CanBuffer(self.serialdev, self._baud)
+
+def getAscii(msg, minbytes=3):
+    '''
+    if strict, every character has to be clean ASCII
+    otherwise, look for strings of at least minbytes in length
+    '''
+    strings = []
+    
+    ascii_match = 0
+    ascii_count = 0
+    startidx = None
+
+    for bidx in range(len(msg)):
+        byte = msg[bidx]
+        if 0x20 <= ord(byte) < 0x7f:
+            if startidx == None:
+                startidx = bidx
+
+            ascii_count +=1
+
+        else:
+            # non printable char
+            # if we reached the magic threshold, package it
+            if ascii_count >= minbytes:
+                strings.append(msg[startidx:bidx])
+
+            # reset counters
+            ascii_count = 0
+            startidx = None
+
+    # in case we have a string all the way to the end
+    if ascii_count >= minbytes:
+        strings.append(msg[startidx:])
+
+    return strings
 
 
 def hasAscii(msg, minbytes=3, strict=False):
