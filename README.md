@@ -35,6 +35,11 @@ github collab/pull requests should make this a good point of collaboration.
 
 * Python 2.7
 
+* vstructs From the Vivisect framework in the Python Path:
+    (required for J1939 module)
+    https://github.com/vivisect/vivisect
+
+
 ## Highly Recommended Software:
 * IPython
 

@@ -20,15 +20,15 @@ arduino: build/CAN_haz_bus.ino.bin
 
 build/%.ino.bin: M2_CAN_haz_bus/%.ino $(wildcard M2_CAN_haz_bus/*.cpp) $(wildcard M2_CAN_haz_bus/*.h)
 	mkdir -p build/
-	$(BUILDER_PATH)arduino-builder -build-path $(PWD)/build -tools $(ARDUINO_HOME)packages/arduino/tools/ -tools $(BUILDER_PATH)tools/ -hardware $(BUILDER_PATH)hardware/ -hardware $(ARDUINO_HOME)packages/ -libraries $(ARDUINO_LIB_HOME) -fqbn $(BOARD) $<
+	$(BUILDER_PATH)arduino-builder -build-path $(PWD)/build -tools $(ARDUINO_HOME)packages/arduino/tools/ -tools $(BUILDER_PATH)/tools-builder -tools $(BUILDER_PATH)/tools -hardware $(BUILDER_PATH)hardware/ -hardware $(ARDUINO_HOME)packages/ -libraries $(ARDUINO_LIB_HOME) -fqbn $(BOARD) $<
 
 build/%.ino.bin: CAN_in_the_middle/%.ino $(wildcard CAN_in_the_middle/*.cpp) $(wildcard CAN_in_the_middle/*.h)
 	mkdir -p build/
-	$(BUILDER_PATH)arduino-builder -build-path $(PWD)/build -tools $(ARDUINO_HOME)packages/arduino/tools/ -tools $(BUILDER_PATH)tools/ -hardware $(BUILDER_PATH)hardware/ -hardware $(ARDUINO_HOME)packages/ -libraries $(ARDUINO_LIB_HOME) -fqbn $(BOARD) $<
+	$(BUILDER_PATH)arduino-builder -build-path $(PWD)/build -tools $(ARDUINO_HOME)packages/arduino/tools/ -tools $(BUILDER_PATH)/tools-builder -tools $(BUILDER_PATH)/tools -hardware $(BUILDER_PATH)hardware/ -hardware $(ARDUINO_HOME)packages/ -libraries $(ARDUINO_LIB_HOME) -fqbn $(BOARD) $<
 
 build/%.ino.bin: CAN_haz_bus/%.ino $(wildcard CAN_haz_bus/*.cpp) $(wildcard CAN_haz_bus/*.h)
 	mkdir -p build/
-	$(BUILDER_PATH)arduino-builder -build-path $(PWD)/build -tools $(ARDUINO_HOME)packages/arduino/tools/ -tools $(BUILDER_PATH)tools/ -hardware $(BUILDER_PATH)hardware/ -hardware $(ARDUINO_HOME)packages/ -libraries $(ARDUINO_LIB_HOME) -fqbn $(BOARD) $<
+	$(BUILDER_PATH)arduino-builder -build-path $(PWD)/build -tools $(ARDUINO_HOME)packages/arduino/tools/ -tools $(BUILDER_PATH)/tools-builder -tools $(BUILDER_PATH)/tools -hardware $(BUILDER_PATH)hardware/ -hardware $(ARDUINO_HOME)packages/ -libraries $(ARDUINO_LIB_HOME) -fqbn $(BOARD) $<
 
 bootloader:
 	stty -F $(SERIAL_PORT) 1200 cs8 cread clocal
