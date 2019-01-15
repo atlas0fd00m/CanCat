@@ -431,13 +431,6 @@ class CanInterface:
                 # otherwise, file it
                 else:
                     self._submitMessage(cmd, message)
-                cmdhandler = self._cmdhandlers.get(cmd)
-                if cmdhandler != None:
-                    cmdhandler(message, self)
-
-                # otherwise, file it
-                else:
-                    self._submitMessage(cmd, message)
 
             except:
                 if self.verbose:
