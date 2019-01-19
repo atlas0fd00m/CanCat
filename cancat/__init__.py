@@ -33,6 +33,8 @@ CMD_CAN_SEND_ISOTP_RESULT   = 0x38
 CMD_CAN_RECV_ISOTP_RESULT   = 0x39
 CMD_CAN_SENDRECV_ISOTP_RESULT = 0x3A
 CMD_SET_FILT_MASK_RESULT    = 0x3B
+CMD_GET_CAN_QUEUE_STATS     = 0x3C
+
 
 CMD_PING                    = 0x41
 CMD_CHANGE_BAUD             = 0x42
@@ -324,8 +326,8 @@ class CanInterface:
         while not self._shutdown:
             try:    
                 if not self._go:
-                    print "not go"
-                    time.sleep(.04)
+                    self.log("not go", 3)
+                    time.sleep(.4)
                     continue
 
                 if self.verbose > 4:
@@ -564,6 +566,10 @@ class CanInterface:
             print "CANxmit() failed: %s" % CAN_RESPS.get(resval)
 
         return resval
+
+    def getCANQueueStats(self):
+        self._send(CMD_GET_CAN_QUEUE_STATS, '@@@@')
+        return self.recv(CMD_GET_CAN_QUEUE_STATS)
 
     def ISOTPxmit(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1):
         '''
@@ -1018,6 +1024,10 @@ class CanInterface:
         This function is called by saveSessionToFile() to get the data
         to save to the file.
         '''
+        savegame = self._getSessionData()
+        return savegame
+
+    def _getSessionData(self):
         savegame = { 'messages' : self._messages,
                 'bookmarks' : self.bookmarks,
                 'bookmark_info' : self.bookmark_info,

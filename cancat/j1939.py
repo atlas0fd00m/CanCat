@@ -48,16 +48,19 @@ def parseName(name):
     return namebits
 
 def reprExtMsgs(msgs):
-    out = ['Ext Msg: %.2x->%.2x (%.2x%.2x%.2x) (len: 0x%x)' % (msgs['sa'], msgs['da'], msgs['pgn2'], msgs['pgn1'], msgs['pgn0'], msgs['totsize'])]
-    for arbtup, msg in msgs.get('msgs'):
-        out.append(msg[1:].encode('hex'))
+    try:
+        out = ['Ext Msg: %.2x->%.2x (%.2x%.2x%.2x) (len: 0x%x)' % (msgs['sa'], msgs['da'], msgs['pgn2'], msgs['pgn1'], msgs['pgn0'], msgs['totsize'])]
+        for arbtup, msg in msgs.get('msgs'):
+            out.append(msg[1:].encode('hex'))
 
-    data = ''.join(out[1:]).decode('hex')
-    strings = getAscii(data)
+        data = ''.join(out[1:]).decode('hex')
+        strings = getAscii(data)
 
-    if len(strings):
-        return ' '.join(out) + "  %r" % (strings)
-    return ' '.join(out)
+        if len(strings):
+            return ' '.join(out) + "  %r" % (strings)
+        return ' '.join(out)
+    except Exception, e:
+        return ' Exception: %r' % e
 
 def meldExtMsgs(msgs):
     out = []
@@ -76,6 +79,7 @@ def meldExtMsgs(msgs):
 
 ### renderers for specific PF numbers
 def pf_c9(idx, ts, arbtup, data, j1939):
+    ''' repr handler for c9 '''
     b4 = data[3]
     req = "%.2x %.2x %.2x" % ([ord(d) for d in data[:3]])
     usexferpfn = ('', 'Use_Transfer_PGN', 'undef', 'NA')[b4 & 3]
@@ -83,9 +87,11 @@ def pf_c9(idx, ts, arbtup, data, j1939):
     return "Request2: %s %s" % (req,  usexferpgn)
 
 def pf_ea(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+    ''' repr handler for ea '''
     return "Request: %s" % (data[:3].encode('hex'))
 
 def pf_eb(idx, ts, arbtup, data, j1939):
+    ''' repr handler for eb '''
     (prio, edp, dp, pf, da, sa) = arbtup
     if len(data) < 1:
         return 'TP ERROR: NO DATA!'
@@ -99,7 +105,8 @@ def pf_eb(idx, ts, arbtup, data, j1939):
 
     if len(extmsgs['msgs']) >= extmsgs['length']:
         j1939.clearExtMsgs(sa, da)
-        nextline = '  %3.3f: %s' % (extmsgs['ts'], reprExtMsgs(extmsgs))
+        ts = extmsgs.get('ts', 0.0)
+        nextline = '  %3.3f: %s' % (ts, reprExtMsgs(extmsgs))
 
     if j1939.skip_TPDT:
         if not len(nextline):
@@ -118,6 +125,7 @@ def pf_eb(idx, ts, arbtup, data, j1939):
     return msgdata
 
 def pf_ec(idx, ts, arbtup, data, j1939):
+    ''' repr handler for ec '''
     def tp_cm_10(idx, ts, arbtup, data, j1939):
         (prio, edp, dp, pf, da, sa) = arbtup
 
@@ -128,6 +136,7 @@ def pf_ec(idx, ts, arbtup, data, j1939):
         prefix = ''
         extmsgs = j1939.getExtMsgs(sa, da)
         if len(extmsgs['msgs']):
+            extmsgs['ts'] = 0.0
             extmsgs['sa'] = sa
             extmsgs['da'] = da
             prefix = " new TP message, without closure...: \n\t%r\n" % reprExtMsgs(extmsgs)
@@ -189,6 +198,7 @@ def pf_ec(idx, ts, arbtup, data, j1939):
         prefix=''
         extmsgs = j1939.getExtMsgs(sa, da)
         if len(extmsgs['msgs']):
+            extmsgs['ts'] = 0.0
             extmsgs['sa'] = sa
             extmsgs['da'] = da
             prefix = " new TP message, without closure...: \n\t%r\n" % reprExtMsgs(extmsgs)
@@ -246,6 +256,7 @@ def pf_ec(idx, ts, arbtup, data, j1939):
     return 'TP.CM_%.2x' % cb
 
 def pf_ee(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+    ''' repr handler for ee '''
     if ps == 255 and sa == 254:
         return 'CANNOT CLAIM ADDRESS'
     
@@ -253,15 +264,18 @@ def pf_ee(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
     return "Address Claim: %s" % addrinfo
 
 def pf_ef(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+    ''' repr handler for ef '''
     if dp:
         return 'Proprietary A2'
 
     return 'Proprietary A1'
     
 def pf_ff(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+    ''' repr handler for ff '''
     pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, data.encode('hex'))
     return "Proprietary B %s" % pgn
 
+# for repr only
 pgn_pfs = {
         0x93:   ("Name Management", None),
         0xc9:   ("Request2",        pf_c9),
@@ -293,6 +307,7 @@ def emitArbid(prio, edp, dp, pf, ps, sa):
     return struct.unpack(">I", struct.pack('BBBB', prioPlus, pf, ps, sa))[0]
 
 
+############  J1939 Extended Message Stack  #############
 def ec_handler(j1939, idx, ts, arbtup, data):
     def tp_cm_10(arbtup, data, j1939, idx, ts):
         (prio, edp, dp, pf, da, sa) = arbtup
@@ -301,8 +316,8 @@ def ec_handler(j1939, idx, ts, arbtup, data):
                 pgn2, pgn1, pgn0) = struct.unpack('<BHBBBBB', data)
         
         # check for old stuff
-        extmsgs = j1939.getRealExtMsgs(sa, da)  # HAVE TO MAKE THIS SEPARATE FROM reprCanMsgs!
-        if len(extmsgs['msgs']):
+        extmsgs = j1939.getRealExtMsgs(sa, da)
+        if extmsgs != None and len(extmsgs['msgs']):
             extmsgs['sa'] = sa
             extmsgs['da'] = da
             j1939.saveRealExtMsg(idx-1, ts, sa, da, (0,0,0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN, idx-1)
@@ -310,7 +325,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         j1939.clearRealExtMsgs(sa, da)
 
         # store extended message information for other stuff...
-        extmsgs = j1939.getRealExtMsgs(sa, da)
+        extmsgs = j1939.getRealExtMsgs(sa, da, create=True)
         extmsgs['sa'] = sa
         extmsgs['da'] = da
         extmsgs['ts'] = ts
@@ -337,7 +352,8 @@ def ec_handler(j1939, idx, ts, arbtup, data):
 
         # store extended message information for other stuff...
         extmsgs = j1939.getRealExtMsgs(sa, da)
-        extmsgs['adminmsgs'].append((arbtup, data))
+        if extmsgs != None:
+            extmsgs['adminmsgs'].append((arbtup, data))
 
         # SOMEHOW WE TRIGGER THE CONTINUAITON OF TRANSMISSION
 
@@ -349,7 +365,8 @@ def ec_handler(j1939, idx, ts, arbtup, data):
 
         # print out extended message and clear the buffers.
         extmsgs = j1939.getRealExtMsgs(sa, da)
-        extmsgs['adminmsgs'].append((arbtup, data))
+        if extmsgs != None:
+            extmsgs['adminmsgs'].append((arbtup, data))
 
         j1939.clearRealExtMsgs(sa, da)
         # Coolio, they just confirmed receipt, we're done!
@@ -363,7 +380,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
 
         # check for old stuff
         extmsgs = j1939.getRealExtMsgs(sa, da)
-        if len(extmsgs['msgs']):
+        if extmsgs != None and len(extmsgs['msgs']):
             extmsgs['sa'] = sa
             extmsgs['da'] = da
             j1939.saveRealExtMsg(idx-1, ts, sa, da, (0,0,0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN, idx-1)
@@ -371,7 +388,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         j1939.clearRealExtMsgs(sa, da)
 
         # store extended message information for other stuff...
-        extmsgs = j1939.getRealExtMsgs(sa, da)
+        extmsgs = j1939.getRealExtMsgs(sa, da, create=True)
         extmsgs['sa'] = sa
         extmsgs['da'] = da
         extmsgs['ts'] = ts
@@ -410,6 +427,10 @@ def eb_handler(j1939, idx, ts, arbtup, data):
         return
 
     extmsgs = j1939.getRealExtMsgs(sa, da)
+    if extmsgs == None:
+        j1939.log('eb without ec: %r' % data.encode('hex'))
+        return
+
     extmsgs['msgs'].append((arbtup, data))
     if len(extmsgs['msgs']) >= extmsgs['length']:
         #print "eb_handler: saving: %r %r" % (len(extmsgs['msgs']) , extmsgs['length'])
@@ -454,7 +475,7 @@ class TimeoutException(Exception):
 class J1939(cancat.CanInterface):
     def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         self.myIDs = []
-        self.extMsgs = {}
+        self._reprExtMsgs = {}
         self._RealExtMsgs = {}
         self._RealExtMsgParts = {}
         self.skip_TPDT = False
@@ -472,6 +493,14 @@ class J1939(cancat.CanInterface):
         self._threads.append(mhethread)
 
         self.register_handler(CMD_CAN_RECV, self._j1939_can_handler)
+
+    def _getSessionData(self):
+        savegame = CanCat._getSessionData()
+        savegame['RealExtMsgs'] = self._RealExtMsgs
+        savegame['RealExtMsgParts'] = self._RealExtMsgParts
+        savegame['J1939_IDs'] = self.myIDs
+        savegame['J1939_LastRecvIdx'] = self._last_recv_idx
+        return savegame
 
     def _reprCanMsg(self, idx, ts, arbid, data, comment=None):
         if comment == None:
@@ -579,7 +608,7 @@ class J1939(cancat.CanInterface):
 
         
     # functions to support the J1939TP Stack (real stuff, not just repr)
-    def getRealExtMsgs(self, sa, da):
+    def getRealExtMsgs(self, sa, da, create=False):
         '''
         # functions to support the J1939TP Stack (real stuff, not just repr)
         returns a message list for a given source and destination (sa, da)
@@ -593,18 +622,22 @@ class J1939(cancat.CanInterface):
 
         mlist = msglists.get(da)
         if mlist == None:
-            mlist = {'length':0, 
-                    'msgs':[], 
-                    'type':None, 
-                    'adminmsgs':[], 
-                    'pgn0':None, 
-                    'pgn1':None, 
-                    'pgn2':None,   
-                    'totsize':0,
-                    'idx': -1,
-                    'maxct':0xff,
-                    }
-            msglists[da] = mlist
+            if create:
+
+                mlist = {
+                        'ts':0.0,
+                        'idx': -1,
+                        'pgn2':None,   
+                        'pgn1':None, 
+                        'pgn0':None, 
+                        'maxct':0xff,
+                        'length':0, 
+                        'totsize':0,
+                        'type':None, 
+                        'msgs':[], 
+                        'adminmsgs':[], 
+                        }
+                msglists[da] = mlist
 
         return mlist
 
@@ -655,10 +688,10 @@ class J1939(cancat.CanInterface):
 
         if no list exists for this pairing, one is created and an empty list is returned
         '''
-        msglists = self.extMsgs.get(sa)
+        msglists = self._reprExtMsgs.get(sa)
         if msglists == None:
             msglists = {}
-            self.extMsgs[sa] = msglists
+            self._reprExtMsgs[sa] = msglists
 
         mlist = msglists.get(da)
         if mlist == None:
@@ -679,15 +712,15 @@ class J1939(cancat.CanInterface):
         '''
         exists = False
         if da != None:
-            msglists = self.extMsgs.get(sa)
+            msglists = self._reprExtMsgs.get(sa)
             exists = bool(msglists != None and len(msglists))
-            self.extMsgs[sa] = {}
+            self._reprExtMsgs[sa] = {}
             return exists
 
-        msglists = self.extMsgs.get(sa)
+        msglists = self._reprExtMsgs.get(sa)
         if msglists == None:
             msglists = {}
-            self.extMsgs[sa] = msglists
+            self._reprExtMsgs[sa] = msglists
 
         mlist = msglists.get(da, {'length':0})
         msglists[da] = {'length':0, 'msgs':[], 'type':None, 'adminmsgs':[]}
@@ -703,6 +736,7 @@ class J1939(cancat.CanInterface):
 
     def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
         arbid = emitArbid(prio, edp, dp, pf, ps, sa)
+        # FIXME: make this choose _tp if len(data) > 8
         return self.CANxmit(arbid, data, extflag=1)
 
     def J1939xmit_tp(self, da, sa, pgn2, pgn1, pgn0, message, prio=6, edp=0, dp=0):
@@ -730,8 +764,8 @@ class J1939(cancat.CanInterface):
         '''
         starttime = time.time()
         if start_msg == None:
-            start_msg = self._last_recv_idx
-            #print "resuming last recv'd index: %d" % start_msg
+            start_msg = self._last_recv_idx + 1
+            self.log( "resuming last recv'd index: %d" % start_msg)
 
         count = 0
         while (count==0 or (block and time.time()-starttime < timeout)):
@@ -772,10 +806,10 @@ class J1939(cancat.CanInterface):
 
     def J1939recv_tp(self, pgn2, pgn1, pgn0, sa=0x0, da=0xf9, msgcount=1, timeout=1, advfilters=[], start_msg=None):
         if start_msg == None:
-            start_msg = self._last_recv_idx
+            start_msg = self._last_recv_idx + 1
 
-        print "J1939recv_tp: Searching for response at or after msg idx: %d" % start_msg
-        msg = self.recvRealExtMsg(sa, da, pgn2, pgn1, pgn0, start_msg)
+        self.log("J1939recv_tp: Searching for response at or after msg idx: %d" % start_msg)
+        msg = self.recvRealExtMsg(sa, da, pgn2, pgn1, pgn0, start_msg, timeout=timeout)
         if msg == None:
             return None
 
@@ -786,7 +820,8 @@ class J1939(cancat.CanInterface):
         out = []
 
         if start_msg == None:
-            start_msg = self._last_recv_idx
+            start_msg = self._last_recv_idx + 1
+            self.log('start_msg: %d' % start_msg)
 
         for msg in self.filterCanMsgs(start_msg=start_msg, advfilters=advfilters, tail=True, maxsecs=timeout):
             #(idx, ts, arbid, data) = msg
@@ -814,6 +849,9 @@ class J1939(cancat.CanInterface):
 
         if not len(advfilters):
             advfilters = 'pf in (0x%x, 0xeb, 0xec)' % rpf
+
+        if recv_count == 0:
+            return
 
         # FIXME: this is only good for short requests... anything directed is likely to send back a TP message
         msgs = self.J1939xmit_recv(PF_RQST, da, sa, data, recv_count=recv_count, prio=prio, timeout=timeout, advfilters=advfilters)
