@@ -52,7 +52,7 @@ $ pip install --user pyserial
 ```
 $ pip install --user ipython
 ```
-3) Install the [Arduino IDE](https://github.com/arduino/arduino-builder).  If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
+3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software).  If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
 
 4) (Optional) Install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform.  The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE.  NOTE: It has only been tested in Linux so far.
 
