@@ -288,6 +288,6 @@ $ citm.printCanMsgs() # Prints all CAN messages
 $ citm.printCanMsgsIso() # prints all CAN messages received on the Isolation network
 ```
 
-Placing a bookmark places a bookmark simultaneously on both the isolation information and the aggregate information.
+Placing a bookmark places a bookmark simultaneously on both the Isolation information and the aggregate information.
 
 Happy Hacking!
