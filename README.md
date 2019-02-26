@@ -12,9 +12,10 @@ CanCat is a lot like the architecture for RfCat, and we may make it moreso. Curr
 The currently supported CAN-transceiver combinations:
 * Arduino with SeeedStudio's CANBUS Shield
 * Arduino DUE with Togglebit.net's CAN shield
+* [Macchina M2 (Under-the-Hood)](https://www.macchina.cc/catalog) 
+* [Macchina M2 (Under-the-Dash)](https://www.macchina.cc/catalog)
 
 Possible future options:
-* "Macchina" from RechargeCar.com (they have included cool other toys for talking to other buses)
 * Arduino with CANBUS Shield from LinkSprite.com (may already work, just haven't had time to test)
 
 
