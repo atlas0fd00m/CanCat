@@ -101,7 +101,7 @@ class NegativeResponseException(Exception):
             (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg.encode('hex'))
 
 
-class UDS:
+class UDS(object):
     def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
         self.c = c
         self.verbose = verbose

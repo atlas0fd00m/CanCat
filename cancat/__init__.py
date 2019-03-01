@@ -168,11 +168,11 @@ def keystop(delay=0):
     else:
         return msvcrt.kbhit()
 
-class SPECIAL_CASE:
+class SPECIAL_CASE(object):
     pass
 DONT_PRINT_THIS_MESSAGE = SPECIAL_CASE
 
-class CanInterface:
+class CanInterface(object):
     def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
         '''
         CAN Analysis Workspace
