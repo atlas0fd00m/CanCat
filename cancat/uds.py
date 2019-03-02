@@ -101,7 +101,7 @@ class NegativeResponseException(Exception):
             (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg.encode('hex'))
 
 
-class UDS:
+class UDS(object):
     def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
         self.c = c
         self.verbose = verbose
@@ -362,7 +362,11 @@ class UDS:
         return success
 
 
-    def SecurityAccess(self, level, key):
+    def SecurityAccess(self, level, key = ""):
+        """Send and receive the UDS messages to switch SecurityAccess levels.
+            @level = the SecurityAccess level to switch to
+            @key = a SecurityAccess algorithm specific key
+        """
         msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service = 0x67)
         if msg is None:
             return msg
@@ -370,7 +374,7 @@ class UDS:
             print "Error getting seed:", msg.encode('hex')
 
         else:
-            seed = msg[2:5]
+            seed = msg[2:]
             hexified_seed = " ".join(x.encode('hex') for x in seed)
             key = str(bytearray(self._key_from_seed(hexified_seed, key)))
 
@@ -379,6 +383,12 @@ class UDS:
 
 
     def _key_from_seed(self, seed, secret):
+        """Generates the key for a specific SecurityAccess seed request.
+            @seed = the SecurityAccess seed received from the ECU.  Formatted
+                    as a hex string with spaces between each seed byte.
+            @secret = a SecurityAccess algorithm specific key
+           Returns the key, as a string of key bytes.
+        """
         print "Not implemented in this class"
         return 0
 
