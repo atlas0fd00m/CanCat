@@ -48,7 +48,7 @@ $ pip install --user pyserial
 $ pip install --user ipython
 ```
 
-  (NOTE): ipython is required for interactive use.)
+    (NOTE): ipython is required for interactive use.)
 
 3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software) on your computer.  
 
@@ -56,11 +56,11 @@ $ pip install --user ipython
 
 5) (OPTIONAL) Install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform. The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE. 
 
-  (NOTE: It has only been tested in Linux so far.)
+    (NOTE: It has only been tested in Linux so far.)
 
 6) Clone CanCat and build the desired firmware. If not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device. 
 
-  (NOTE: You may need to modify the paths in the makefile to suit your environment.)
+    (NOTE: You may need to modify the paths in the makefile to suit your environment.)
 
 ```
 $ git clone https://github.com/atlas0fd00m/CanCat
@@ -74,7 +74,7 @@ $ make flash
 
 8) Start CanCat and do a connectivity check. \\ `c.ping()` confirms that the CanCat python script is communicating properly with the CAN device. \\ `c.getCanMsgCount()` shows that CAN messages are being received by CanCat.
 
-  Example:
+    Example:
 
 ```
 $ cd CanCat
