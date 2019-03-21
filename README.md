@@ -48,7 +48,7 @@ $ pip install --user pyserial
 $ pip install --user ipython
 ```
 
-    *(NOTE): ipython is required for interactive use.)*
+*(NOTE): ipython is required for interactive use.)*
 
 3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software) on your computer.  
 
@@ -56,11 +56,11 @@ $ pip install --user ipython
 
 5) (OPTIONAL) Install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform. The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE. 
 
-    *(NOTE: It has only been tested in Linux so far.)*
+*(NOTE: It has only been tested in Linux so far.)*
 
 6) Clone CanCat and build the desired firmware. If not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device. 
-
-    *(NOTE: You may need to modify the paths in the makefile to suit your environment.)*
+  
+*(NOTE: You may need to modify the paths in the makefile to suit your environment.)*
 
 ```
 $ git clone https://github.com/atlas0fd00m/CanCat
@@ -76,8 +76,6 @@ $ make flash
 
     `c.ping()` confirms that the CanCat python script is communicating properly with the CAN device.  
     `c.getCanMsgCount()` shows that CAN messages are being received by CanCat.
-
-    Example:
 
 ```
 $ cd CanCat
@@ -98,11 +96,11 @@ In [4]:
 
 
 ## Getting Started:
-Once you have the required software installed, your CanCat device flashed, the interface is yours to choose. Currently, we use ipython to interact with the CAN bus and do analysis.
+Once you have the required software installed and your device is flashed, you can begin to use CanCat. Currently, we use CanCat with ipython to interact with the CAN bus and do analysis.
 
-CanCat is currently centered around the class CanInterface (or some subclass of it, like FordInterface, GMInterface, etc...)
+CanCat is currently centered around the class CanInterface (or some subclass of it, like FordInterface, GMInterface, etc.)
 
-Connect to the device (old way):
+### Connect to the device (old way):
 
 ```python
 >>> import cancat
@@ -120,25 +118,26 @@ Set the can bus interface baud rate (500kbps is most common, others are often sl
 
 Once you connect to the device and set the device, you will automatically capture any messages the CanCat device sees on the CAN bus it is attached to. It will store these messages for analysis.
 
-Save your analysis/capture session periodically (only when you say save will it save).
+Save your analysis/capture session periodically. 
+*(NOTE: CanCat will only save when you tell it to save.)*
 
 ```python
 >>> CANalysis.saveSessionToFile('filename_for_this_session')
 ```
 
-Once you save for the first time, the name will be cached so you can simply save it again to the same file by typing:
+Once you save for the first time, the file name will be cached so you can simply save it again to the same file by typing:
 
 ```python
 >>> CANalysis.saveSessionToFile()
 ```
 
-Other than that, "help" is your friend :)
+If you need help, use the help command:
 
 ```python
 >>> help(cancat)
 ```
 
-Connect to the device(new way - Linux):
+### Connect to the device(new way [Linux]):
 
 ```bash
 $ ./CanCat.py -h
@@ -167,9 +166,9 @@ you interact with the CanCat tool:
     >>> help(c)
 ```
 
-(Note: The following two are used interchangeably in our notes:)
+*(Note: The following two are used interchangeably in our notes:)*
 (`>>>` is the default interactive python prompt.)
-(`In [#]:` is the IPython prompt)
+(`In [#]:` is the ipython prompt)
 
 See if the CanCat is communicating correctly with your computer (only if you have a device connected).
 
