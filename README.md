@@ -1,11 +1,11 @@
 # CanCat
-CanCat is a multi-purpose tool for interacting with Controller Area Networks (CAN), such as those that are often used in cars, building automation, etc. This project is made possible through collaboration with researchers at GRIMM (SMFS, Inc.), most notably Matt Carpenter and Tim Brom.
+CanCat is an open source  multi-purpose tool for interacting and experimenting with Controller Area Networks (CAN), such as those that are often used in cars, building automation, etc. 
 
-CanCat has two parts:  
+## Description
+
+CanCat has two main parts:  
 1) Firmware for a compatible CAN-transceiver,  
 2) Python client to talk to the tool,  
-
-and has architecture like that of RfCat.  
 
 The currently supported CAN-transceiver combinations:
 * Arduino with SeeedStudio's CANBUS Shield
@@ -15,7 +15,7 @@ The currently supported CAN-transceiver combinations:
 
 The goals of CanCat are to provide:
 * a way to capture and transmit messages on an arbitrary CAN bus (whatever the speed, as supported by hardware)
-* an architecture for analyzing messages and identifying what is what
+* an architecture for analyzing and identifying messages on a CAN bus
 * a manner for data to be shared (Ford sends different messages from GM, Saab, Toyota, Honda, Hyundai, Kia, etc.) (either in the form of lookup tables or in the form of accessor codes.)
 
 
@@ -252,12 +252,9 @@ c.printSessionStatsByBookmark
 c.saveSession
 ```
 
-(Start with the functions that start with "print" to get familiar with the toolset.)
 
-Hack fun!
 
 ## CAN-in-the-Middle
-
 CAN-in-the-Middle is another way to utilize your CanCat. It requires two CAN shields 
 on one arduino. One of the CAN shields needs to be modified so that the CS pin of the 
 MCP2515 CAN controller is on D10, rather than D9. This is accomplished by cutting a 
@@ -300,3 +297,8 @@ $ citm.printCanMsgsIso() # prints all CAN messages received on the Isolation net
 Placing a bookmark places a bookmark simultaneously on both the Isolation information (Iso interface messages) and the aggregate information (standard CAN interface messages).
 
 Happy Hacking!
+
+
+
+## Acknowledgments
+This project is made possible through collaboration with researchers at GRIMM (SMFS, Inc.), most notably Matt Carpenter and Tim Brom.
