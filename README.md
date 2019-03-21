@@ -1,13 +1,10 @@
 # CanCat
-CanCat is the swiss army knife of Controller Area Networks (CAN) often used in cars and building automation, etc.
+CanCat is a multi-purpose tool for interacting with Controller Area Networks (CAN), such as those that are often used in cars, building automation, etc. This project is made possible through collaboration with researchers at GRIMM (SMFS, Inc.), most notably Matt Carpenter and Tim Brom.
 
-CanCat is made possible through collaboration with my friends at GRIMM (SMFS), most notably Matt Carpenter and Tim Brom.
-
-CanCat is made up of two parts:
-1) Firmware for a compatible CAN-transceiver
-2) Python client to talk to the tool
-
-CanCat is a lot like the architecture for RfCat, and we may make it moreso. Currently we're sticking with the original design by Matt and team.
+CanCat has two parts:  
+1) Firmware for a compatible CAN-transceiver,  
+2) Python client to talk to the tool,  
+and has architecture like that of RfCat.  
 
 The currently supported CAN-transceiver combinations:
 * Arduino with SeeedStudio's CANBUS Shield
@@ -15,22 +12,16 @@ The currently supported CAN-transceiver combinations:
 * [Macchina M2 (Under-the-Hood)](https://www.macchina.cc/catalog) 
 * [Macchina M2 (Under-the-Dash)](https://www.macchina.cc/catalog)
 
-Possible future options:
-* Arduino with CANBUS Shield from LinkSprite.com (may already work, just haven't had time to test)
-
-
 The goals of CanCat are to provide:
 * a way to capture and transmit messages on an arbitrary CAN bus (whatever the speed, as supported by hardware)
 * an architecture for analyzing messages and identifying what is what
-* a manner for data to be shared (Ford sends different messages from GM, Saab, Toyota, Honda, Hyundai, Kia, etc...)
-    this may be in the form of lookup tables
-    this may be in the form of accessor code
-
-Github collab/pull requests should make this a good point of collaboration.
+* a manner for data to be shared (Ford sends different messages from GM, Saab, Toyota, Honda, Hyundai, Kia, etc...) in the form of lookup tables or in the form of accessor codes.
 
 
-## Required Software:
-* CANBUS_Shield from SeeedStudio  (for Firmware compilation)
+
+## Software:
+### Required:
+* CANBUS_Shield from SeeedStudio (for Firmware compilation)
     http://www.seeedstudio.com/wiki/CAN-BUS_Shield
     https://github.com/Seeed-Studio/CAN_BUS_Shield
 
@@ -41,8 +32,10 @@ Github collab/pull requests should make this a good point of collaboration.
     https://github.com/vivisect/vivisect
 
 
-## Highly Recommended Software:
+### Recommended:
 * IPython
+
+
 
 ## Installation
 1) Install pyserial:
@@ -53,11 +46,13 @@ $ pip install --user pyserial
 ```
 $ pip install --user ipython
 ```
-3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software).  If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
+3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software) on your computer.  
 
-4) (Optional) Install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform.  The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE.  NOTE: It has only been tested in Linux so far.
+4) (optional) If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
 
-5) Clone CanCat and build the desired firmware.  If not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device.  NOTE: You may need to modify the paths in the makefile to suit your environment.
+5) (optional) Install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform. The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE. (NOTE: It has only been tested in Linux so far.)
+
+6) Clone CanCat and build the desired firmware. If not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device. (NOTE: You may need to modify the paths in the makefile to suit your environment.)
 ```
 $ git clone https://github.com/atlas0fd00m/CanCat
 $ cd CanCat/sketches
@@ -65,9 +60,9 @@ $ make m2
 $ make bootloader
 $ make flash
 ```
-6) Unplug and replug in the USB connector to your CAN device (to remove it from bootloader mode)
+7) Unplug and replug in the USB connector to your CAN device (to remove it from bootloader mode)
 
-7) Start CanCat and do a connectivity check.  `c.ping()` confirms that the CanCat python script is communicating properly with the CAN device, `c.getCanMsgCount()` shows that CAN messages are being received by CanCat.
+8) Start CanCat and do a connectivity check. `c.ping()` confirms that the CanCat python script is communicating properly with the CAN device, `c.getCanMsgCount()` shows that CAN messages are being received by CanCat.
 ```
 $ cd CanCat
 $ ./CanCat.py -p /dev/ttyACM0 
@@ -84,8 +79,11 @@ Out[3]: 2127
 In [4]: 
 ```
 
+
+
 ## Getting Started:
-Once you have the required software installed, your CanCat device flashed, the interface is yours to choose.  currently, we simply enjoy using ipython to interact with the CAN bus and do analysis.
+Once you have the required software installed, your CanCat device flashed, the interface is yours to choose. Currently, we simply enjoy using ipython to interact with the CAN bus and do analysis.
+
 CanCat is currently centered around the class CanInterface (or some subclass of it, like FordInterface, GMInterface, etc...)
 
 Connect to the device (old way):
@@ -247,9 +245,9 @@ c.saveSession
 
 Hack fun!
 
-# CAN-In-The-Middle
+## CAN-in-the-Middle
 
-CAN-In-The-Middle is another way to utilize your CanCat. It requires two CAN shields 
+CAN-in-the-Middle is another way to utilize your CanCat. It requires two CAN shields 
 on one arduino. One of the CAN shields needs to be modified so that the CS pin of the 
 MCP2515 CAN controller is on D10, rather than D9. This is accomplished by cutting a 
 trace on the CAN shield PCB and bridging (solder bridge or 0-ohm resistor) the pads
