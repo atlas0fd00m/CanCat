@@ -4,6 +4,7 @@ CanCat is a multi-purpose tool for interacting with Controller Area Networks (CA
 CanCat has two parts:  
 1) Firmware for a compatible CAN-transceiver,  
 2) Python client to talk to the tool,  
+
 and has architecture like that of RfCat.  
 
 The currently supported CAN-transceiver combinations:
@@ -15,25 +16,24 @@ The currently supported CAN-transceiver combinations:
 The goals of CanCat are to provide:
 * a way to capture and transmit messages on an arbitrary CAN bus (whatever the speed, as supported by hardware)
 * an architecture for analyzing messages and identifying what is what
-* a manner for data to be shared (Ford sends different messages from GM, Saab, Toyota, Honda, Hyundai, Kia, etc...) in the form of lookup tables or in the form of accessor codes.
+* a manner for data to be shared (Ford sends different messages from GM, Saab, Toyota, Honda, Hyundai, Kia, etc.) (either in the form of lookup tables or in the form of accessor codes.)
 
 
 
 ## Software:
 ### Required:
-* CANBUS_Shield from SeeedStudio (for Firmware compilation)
-    http://www.seeedstudio.com/wiki/CAN-BUS_Shield
+* CANBUS_Shield from SeeedStudio (for Firmware compilation)  
     https://github.com/Seeed-Studio/CAN_BUS_Shield
 
 * Python 2.7
 
-* vstructs From the Vivisect framework in the Python Path:
-    (required for J1939 module)
+* vstructs From the Vivisect framework in the Python Path:  
+    (required for J1939 module)  
     https://github.com/vivisect/vivisect
 
 
 ### Recommended:
-* IPython
+* ipython
 
 
 
@@ -42,17 +42,26 @@ The goals of CanCat are to provide:
 ```
 $ pip install --user pyserial
 ```
-2) Install ipython (optional, but required for interactive use):
+
+2) (OPTIONAL) Install ipython
 ```
 $ pip install --user ipython
 ```
+
+(Note: ipython is required for interactive use.)
+
 3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software) on your computer.  
 
-4) (optional) If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
+4) (OPTIONAL) If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
 
-5) (optional) Install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform. The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE. (NOTE: It has only been tested in Linux so far.)
+5) (OPTIONAL) Install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform. The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE. 
 
-6) Clone CanCat and build the desired firmware. If not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device. (NOTE: You may need to modify the paths in the makefile to suit your environment.)
+(NOTE: It has only been tested in Linux so far.)
+
+6) Clone CanCat and build the desired firmware. If not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device. 
+
+(NOTE: You may need to modify the paths in the makefile to suit your environment.)
+
 ```
 $ git clone https://github.com/atlas0fd00m/CanCat
 $ cd CanCat/sketches
@@ -60,9 +69,11 @@ $ make m2
 $ make bootloader
 $ make flash
 ```
+
 7) Unplug and replug in the USB connector to your CAN device (to remove it from bootloader mode)
 
 8) Start CanCat and do a connectivity check. `c.ping()` confirms that the CanCat python script is communicating properly with the CAN device, `c.getCanMsgCount()` shows that CAN messages are being received by CanCat.
+
 ```
 $ cd CanCat
 $ ./CanCat.py -p /dev/ttyACM0 
@@ -82,7 +93,7 @@ In [4]:
 
 
 ## Getting Started:
-Once you have the required software installed, your CanCat device flashed, the interface is yours to choose. Currently, we simply enjoy using ipython to interact with the CAN bus and do analysis.
+Once you have the required software installed, your CanCat device flashed, the interface is yours to choose. Currently, we use ipython to interact with the CAN bus and do analysis.
 
 CanCat is currently centered around the class CanInterface (or some subclass of it, like FordInterface, GMInterface, etc...)
 
