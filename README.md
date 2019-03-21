@@ -43,24 +43,18 @@ The goals of CanCat are to provide:
 $ pip install --user pyserial
 ```
 
-2) (OPTIONAL) Install ipython
+2) (OPTIONAL) Install ipython *(NOTE): ipython is required for interactive use.)*
 ```
 $ pip install --user ipython
 ```
-
-*(NOTE): ipython is required for interactive use.)*
 
 3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software) on your computer.  
 
 4) (OPTIONAL) If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
 
-5) (OPTIONAL) Install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform. The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE. 
-
-*(NOTE: It has only been tested in Linux so far.)*
+5) (OPTIONAL) If you are on a Linux system, you may choose to install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform. The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE. 
 
 6) Clone CanCat and build the desired firmware. If not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device. 
-  
-*(NOTE: You may need to modify the paths in the makefile to suit your environment.)*
 
 ```
 $ git clone https://github.com/atlas0fd00m/CanCat
@@ -118,8 +112,7 @@ Set the can bus interface baud rate (500kbps is most common, others are often sl
 
 Once you connect to the device and set the device, you will automatically capture any messages the CanCat device sees on the CAN bus it is attached to. It will store these messages for analysis.
 
-Save your analysis/capture session periodically. 
-*(NOTE: CanCat will only save when you tell it to save.)*
+Save your analysis/capture session periodically. *(NOTE: CanCat will only save when you tell it to save.)*
 
 ```python
 >>> CANalysis.saveSessionToFile('filename_for_this_session')
