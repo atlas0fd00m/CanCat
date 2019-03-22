@@ -62,6 +62,18 @@ void send(unsigned char *data, unsigned char cmd, unsigned char len)
     Serial.write(data, len);
 }
 
+void sendHdr(unsigned char cmd, unsigned char len)
+{
+    Serial.write("@");
+    Serial.write(len + 1);    // 1 for @
+    Serial.write(cmd);
+}
+
+void sendPart(unsigned char *data, unsigned char len)
+{
+      Serial.write(data, len);
+}
+
 void log(const char* msg, uint8_t len)
 {
     send((unsigned char*)msg, CMD_LOG, len);
@@ -118,10 +130,14 @@ void loop()
         buf[2] = (frame.id >> 8) & 0xff;
         buf[3] = frame.id & 0xff;
         // FIXME: grab extflags and put in here.
-        for(uint8_t i = 0; i < frame.length; i++)
-            buf[i+4] = frame.data.bytes[i];
+        // FIXME: can we streamline this processing?
+        sendHdr(CMD_CAN_RECV, frame.length + 4);
+        sendPart(buf, 4);
+        sendPart(frame.data.bytes, frame.length);
+        //for(uint8_t i = 0; i < frame.length; i++)
+        //    buf[i+4] = frame.data.bytes[i];
         
-        send(buf, CMD_CAN_RECV, frame.length + 4);
+        //send(buf, CMD_CAN_RECV, frame.length + 4);
     }
     if(!can_rx_frames1.isEmpty())
     {
@@ -132,10 +148,13 @@ void loop()
         buf[2] = (frame.id >> 8) & 0xff;
         buf[3] = frame.id & 0xff;
         // FIXME: grab extflags and put in here.
-        for(uint8_t i = 0; i < frame.length; i++)
-            buf[i+4] = frame.data.bytes[i];
+        //for(uint8_t i = 0; i < frame.length; i++)
+        //    buf[i+4] = frame.data.bytes[i];
         
-        send(buf, CMD_CAN_RECV, frame.length + 4);
+        //send(buf, CMD_CAN_RECV, frame.length + 4);
+        sendHdr(CMD_CAN_RECV, frame.length + 4);
+        sendPart(buf, 4);
+        sendPart(frame.data.bytes, frame.length);
         if(mode == CMD_CAN_MODE_CITM)
             send(buf, CMD_ISO_RECV, frame.length + 4);
     }
@@ -249,6 +268,20 @@ void loop()
                 results = RecvIsoTPFrame(serial_buffer);
                 results |= SendIsoTPFrame(serial_buffer, serial_buf_count);
                 send(&results, CMD_CAN_SENDRECV_ISOTP_RESULT, 1);
+                break;
+
+            case CMD_GET_CAN_QUEUE_STATS:
+                log("GET_QUEUE_STATS", 16);
+                sendHdr(CMD_GET_CAN_QUEUE_STATS, 16);
+                results = can_rx_frames0.itemCount();
+                sendPart(&results, 4);
+                results = can_rx_frames1.itemCount();
+                sendPart(&results, 4);
+                results = can_tx_frames0.itemCount();
+                sendPart(&results, 4);
+                results = can_tx_frames1.itemCount();
+                sendPart(&results, 4);                
+                log("GET_QUEUE_STATS done", 20);
                 break;
 
             default:

@@ -3,8 +3,6 @@
 
 #include "queue.h"
 
-#define CAN_RX_BUF_SIZE 32
-#define CAN_TX_BUF_SIZE 16
 #define ISOTP_BUF_SIZE 4095 // ISO-TP max length is 4095 bytes
 #define SERIAL_BUF_SIZE ISOTP_BUF_SIZE + 12 // + 12 bytes of overhead for serial
 
@@ -23,6 +21,7 @@
 #define CMD_CAN_SEND_ISOTP_RESULT       0x38
 #define CMD_CAN_RECV_ISOTP_RESULT       0x39
 #define CMD_CAN_SENDRECV_ISOTP_RESULT   0x3A
+#define CMD_GET_CAN_QUEUE_STATS         0x3C
 
 #define CMD_PING                 0x41
 #define CMD_CHANGE_BAUD          0x42
@@ -41,7 +40,8 @@
 extern uint32_t baud_rates_table[NUM_BAUD_RATES];
 
 /* circular buffers for receiving and sending CAN frames */
-#define CAN_BUFFER_LEN 128
+// #define CAN_BUFFER_LEN 128
+#define CAN_BUFFER_LEN 1024
 extern Queue<CAN_FRAME> can_rx_frames0;
 extern Queue<CAN_FRAME> can_rx_frames1;
 extern Queue<CAN_FRAME> can_tx_frames0;

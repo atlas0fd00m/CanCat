@@ -60,7 +60,7 @@ def reprExtMsgs(msgs):
             return ' '.join(out) + "  %r" % (strings)
         return ' '.join(out)
     except Exception, e:
-        return ' Exception: %r' % e
+        return ' Exception: %r (%r)' % (e, msgs)
 
 def meldExtMsgs(msgs):
     out = []

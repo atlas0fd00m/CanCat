@@ -14,6 +14,7 @@ class Queue {
    public:
       ~Queue() { delete items; }
       bool isEmpty() { return head == tail; }
+      uint32_t itemCount() { return (tail>head ? tail : tail+num_items) - head; }
 
       Queue(uint32_t num);
       bool enqueue(T const*);
