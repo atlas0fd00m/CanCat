@@ -3,8 +3,8 @@ CanCat is an open source multi-purpose tool for interacting and experimenting wi
 
 ## Description
 CanCat has two main parts:  
-1) Firmware for a compatible CAN-transceiver,  
-2) Python client to talk to the tool,  
+1) Firmware for compatible CAN-transceivers,  
+2) Python client to talk to CanCat,  
 
 The CAN-transceiver combinations that are currently supported by CanCat are:
 * Arduino with SeeedStudio's CANBUS Shield
@@ -65,11 +65,13 @@ $ make flash
 
 7) Ensure that your CAN-transceiver is not in bootloader mode by unplugging its USB connector and then plugging it back in again.
 
-8) Use CanCat with your CAN-transceiver.
+8) Connect to your CAN-transceiver with CanCat
+
+9) Use CanCat.
 
 
 
-## Connecting to your CAN-transceiver with CanCat.
+## Connecting to your CAN-transceiver with CanCat
 Once you have the required software installed and your device is flashed, you can use CanCat with your CAN-transceiver.
 
 ### Connect to the CAN-transceiver with CanCat [Linux]:
@@ -106,15 +108,18 @@ you interact with the CanCat tool:
 ```
 
 `>>>` and `In [#]:` are used interchangeably in this instruction guide.  
-`>>>` is the default interactive python prompt, and commands using this prompt will use the `CANalysis` object.  
+
+`>>>` is the default interactive python prompt, and commands using this prompt will use the `CANalysis` object. 
+
 `In [#]:` is the ipython prompt, and commands using this prompt will begin with the `c` object.  
-Otherwise, the commands for CanCat will look the same.
+
+Other than the different in prompt type, the commands for CanCat will look the same.
 
 
 
 ## Getting Started
 ### Pinging your CAN-transceiver
-To see if CanCat is communicating correctly with your computer and the connected CAN-transceiver, you can use the `ping()` command.
+To see if CanCat is communicating correctly with your computer and the connected CAN-transceiver, use the `ping()` command.
 
 ```python
 In [1]: c.ping()
@@ -122,13 +127,13 @@ In [1]: c.ping()
 
 
 ### Setting the Baud Rate
-Once you connect to your CAN-transceiver, you will want to use CanCat to set the CAN bus interface baud rate on the device. *(Note: 500kbps is the most likely baud rate for most devices you will interact with.)*
+Once you connect to your CAN-transceiver, you will want to use CanCat to set the CAN bus interface baud rate on the device. *(Note: 500kbps is the most likely baud rate for devices that you will interact with.)*
 
 ```python
 >>> CANalysis.setCanBaud(cancat.CAN_125KBPS)
 ```
 
-Once you connect to the CAN-transceiver and set the CAN-transceiver, CanCat will automatically capture any messages it sees on the CAN bus it is attached to. CanCat will store these messages in the current session for analysis. Unless you save the CanCat capture, the messages you have captured will no longer be stored once you end your cancat session.
+After you have set the baud rate on your CAN-transceiver, CanCat will automatically capture any messages it sees on the CAN bus it is attached to. CanCat will store these messages in the current session for analysis. *Note: Unless you save the CanCat capture, the messages you have captured will no longer be stored once you end your CanCat session.*
 
 ### Saving CanCat captures
 CanCat will only save what it has captured when you tell it to save, so make sure to save your capture session / analysis periodically. 
@@ -144,10 +149,12 @@ Once you save for the first time, the file name will be cached so you can simply
 ```
 
 ### CanCat help and tips
-To access the help function in CanCat:
-```>>> help(cancat)```
+To access the help function in CanCat:  
+```python
+>>> help(cancat)
+```
 
-If help doesn't provide you with what you are looking for, you can do a tab-complete search to bring up each of the possible commands.
+If help doesn't provide you with what you are looking for, you can do a tab-complete search to bring up each of the possible CanCat commands.
 ```python
 In [6]: c.<PRESS_TAB_KEY>
 c.CANrecv
@@ -203,7 +210,7 @@ c.saveSession
 
 ## Other CanCat Uses
 ### Using CanCat to Analyze Previous Captures
-If all you want to do is analyze a previous CanCat capture you can skip the hardware set up steps, clone the CanCat repository, add the file you wish to analyze to the CanCat folder and run the command:
+If all you want to do is analyze a previous CanCat capture you can skip the hardware set up steps mentioned in the Installation section, clone the CanCat repository, add the file you wish to analyze to the CanCat folder, and run the command:
 
 ```bash
 $ ./CanCat.py -f filename_of_previous_capture  # no CanCat device required
@@ -234,9 +241,9 @@ Start CAN_in_the_middle with the following command:
 
 `./CanCat.py -I CanInTheMiddle -p /dev/tty.usbmodem1411 -S 500K`
 
-where the -p option is your port and -S is the CAN Baud rate
+( where the -p option is your port and -S is the CAN Baud rate.)
 
-Most of the commands for CanInTheMiddle are the same as the normal CanCat interface. 
+Most of the commands for Can-in-the-Middle are the same as the normal CanCat interface. 
 Functions that report only what has been received on the Isolation side have Iso appended 
 to the end of the function name. For example:
 
