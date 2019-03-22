@@ -68,13 +68,14 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
         ctrl = ord(msg[0])
         ftype = (ctrl >> 4)
         if ftype == 0:
+            data_len = ctrl # Number of bytes in message
             if len(output):
                 msg = ''.join(output)
                 print "Failed to reach length %d:  only got %d" % (length, len(msg))
                 return arbid, msg, count
 
-            # Single packet message
-            data = msg[1:]
+            # Single packet message, return only the relevant data
+            data = msg[1:data_len+1]
             if verbose: print "0: %r" % data.encode('hex')
 
             return narbid, data, count+1
@@ -84,9 +85,6 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
             arbid = narbid
 
             if verbose: print "length: %r" % length
-
-            idx = ctrl & 0xf
-            if verbose: print "\t\t\t%x" % idx
 
             msg = msg[2:]
             output.append(msg)
@@ -103,7 +101,7 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
                 #raise Exception("Indexing Bug: idx: %x != nextidx: %x" % (idx, nextidx))
                 print("Indexing Bug: idx: %x != nextidx: %x" % (idx, nextidx))
 
-            msg = msg[1:]
+            msg = msg[1:length+1]
             output.append(msg)
             if verbose: print "2: %r" % msg.encode('hex')
             length -= len(msg)
