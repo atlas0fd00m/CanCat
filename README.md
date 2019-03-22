@@ -1,13 +1,12 @@
 # CanCat
-CanCat is an open source  multi-purpose tool for interacting and experimenting with Controller Area Networks (CAN), such as those that are often used in cars, building automation, etc. 
+CanCat is an open source multi-purpose tool for interacting and experimenting with Controller Area Networks (CAN), such as those that are often used in cars, building automation, etc. 
 
 ## Description
-
 CanCat has two main parts:  
 1) Firmware for a compatible CAN-transceiver,  
 2) Python client to talk to the tool,  
 
-The currently supported CAN-transceiver combinations:
+The CAN-transceiver combinations that are currently supported by CanCat are:
 * Arduino with SeeedStudio's CANBUS Shield
 * Arduino DUE with Togglebit.net's CAN shield
 * [Macchina M2 (Under-the-Hood)](https://www.macchina.cc/catalog) 
@@ -20,19 +19,19 @@ The goals of CanCat are to provide:
 
 
 
-## Software
+## Software 
 ### Required:
+* Python 2.7
+
+
+### Recommended:
 * CANBUS_Shield from SeeedStudio (for Firmware compilation)  
     https://github.com/Seeed-Studio/CAN_BUS_Shield
-
-* Python 2.7
 
 * vstructs From the Vivisect framework in the Python Path:  
     (required for J1939 module)  
     https://github.com/vivisect/vivisect
 
-
-### Recommended:
 * ipython
 
 
@@ -43,18 +42,18 @@ The goals of CanCat are to provide:
 $ pip install --user pyserial
 ```
 
-2) (OPTIONAL) Install ipython *(NOTE): ipython is required for interactive use.)*
+2) (OPTIONAL) Install ipython if you want to use CanCat interactively.
 ```
 $ pip install --user ipython
 ```
 
-3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software) on your computer.  
+3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software).  
 
 4) (OPTIONAL) If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
 
 5) (OPTIONAL) If you are on a Linux system, you may choose to install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform. The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE. 
 
-6) Clone CanCat and build the desired firmware. If not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device. 
+6) Clone CanCat and build the desired firmware. If you are not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device. 
 
 ```
 $ git clone https://github.com/atlas0fd00m/CanCat
@@ -64,80 +63,18 @@ $ make bootloader
 $ make flash
 ```
 
-7) Unplug and replug in the USB connector to your CAN device (to remove it from bootloader mode)
+7) Ensure that your CAN-transceiver is not in bootloader mode by unplugging its USB connector and then plugging it back in again.
 
-8) Start CanCat and do a connectivity check.  
-
-    `c.ping()` confirms that the CanCat python script is communicating properly with the CAN device.  
-    `c.getCanMsgCount()` shows that CAN messages are being received by CanCat.
-
-```
-$ cd CanCat
-$ ./CanCat.py -p /dev/ttyACM0 
-
-In [1]: c.ping()
-Out[1]: (1521577490.792667, 'ABCDEFGHIJKL')
-
-In [2]: c.getCanMsgCount()
-Out[2]: 1900
-
-In [3]: c.getCanMsgCount()
-Out[3]: 2127
-
-In [4]: 
-```
+8) Use CanCat with your CAN-transceiver.
 
 
 
-## Getting Started:
-Once you have the required software installed and your device is flashed, you can begin to use CanCat. Currently, we use CanCat with ipython to interact with the CAN bus and do analysis.
+## Connecting to your CAN-transceiver with CanCat.
+Once you have the required software installed and your device is flashed, you can use CanCat with your CAN-transceiver.
 
-CanCat is currently centered around the class CanInterface (or some subclass of it, like FordInterface, GMInterface, etc.)
-
-### Connect to the device (old way):
-
-```python
->>> import cancat
-
->>> CANalysis = cancat.CanInterface('/dev/ttyACM0', 115200) # your device may vary
-
->>> CANalysis.ping()
-```
-
-Set the can bus interface baud rate (500kbps is most common, others are often slower, depending on your car):
-
-```python
->>> CANalysis.setCanBaud(cancat.CAN_125KBPS)    # medium speed CAN baudrate for Fords
-```
-
-Once you connect to the device and set the device, you will automatically capture any messages the CanCat device sees on the CAN bus it is attached to. It will store these messages for analysis.
-
-Save your analysis/capture session periodically. *(NOTE: CanCat will only save when you tell it to save.)*
-
-```python
->>> CANalysis.saveSessionToFile('filename_for_this_session')
-```
-
-Once you save for the first time, the file name will be cached so you can simply save it again to the same file by typing:
-
-```python
->>> CANalysis.saveSessionToFile()
-```
-
-If you need help, use the help command:
-
-```python
->>> help(cancat)
-```
-
-### Connect to the device(new way [Linux]):
-
+### Connect to the CAN-transceiver with CanCat [Linux]:
 ```bash
-$ ./CanCat.py -h
-
 $ ./CanCat.py -p /dev/ttyACM0  # if CanCat device is /dev/ttyACM0
-
-$ ./CanCat.py -f filename_of_previous_capture  # no CanCat device required
 ```
 
 ```
@@ -159,44 +96,58 @@ you interact with the CanCat tool:
     >>> help(c)
 ```
 
-*(Note: The following two are used interchangeably in our notes:)*
-(`>>>` is the default interactive python prompt.)
-(`In [#]:` is the ipython prompt)
+### Connect to the CAN-transceiver with CanCat [Linux and other systems]:
+```python
+>>> import cancat
 
-See if the CanCat is communicating correctly with your computer (only if you have a device connected).
+>>> CANalysis = cancat.CanInterface('/dev/ttyACM0', 115200) # your device may vary
+
+>>> CANalysis.ping()
+```
+
+`>>>` and `In [#]:` are used interchangeably in this instruction guide.  
+`>>>` is the default interactive python prompt, and commands using this prompt will use the `CANalysis` object.  
+`In [#]:` is the ipython prompt, and commands using this prompt will begin with the `c` object.  
+Otherwise, the commands for CanCat will look the same.
+
+
+
+## Getting Started
+### Pinging your CAN-transceiver
+To see if CanCat is communicating correctly with your computer and the connected CAN-transceiver, you can use the `ping()` command.
 
 ```python
 In [1]: c.ping()
 ```
 
-Set the can bus interface baud rate (500kbps is most common, others are often slower, depending on your car):
+
+### Setting the Baud Rate
+Once you connect to your CAN-transceiver, you will want to use CanCat to set the CAN bus interface baud rate on the device. *(Note: 500kbps is the most likely baud rate for most devices you will interact with.)*
 
 ```python
-In [2]: c.setCanBaud(cancat.CAN_125KBPS)  # medium speed CAN baudrate for Fords
+>>> CANalysis.setCanBaud(cancat.CAN_125KBPS)
 ```
 
-Once you connect to the device and set the device, you will automatically capture any messages the CanCat device sees on the CAN bus it is attached to. It will store these messages for analysis.
+Once you connect to the CAN-transceiver and set the CAN-transceiver, CanCat will automatically capture any messages it sees on the CAN bus it is attached to. CanCat will store these messages in the current session for analysis. Unless you save the CanCat capture, the messages you have captured will no longer be stored once you end your cancat session.
 
-Save your analysis/capture session periodically. (CanCat only saves when when you tell it to).
+### Saving CanCat captures
+CanCat will only save what it has captured when you tell it to save, so make sure to save your capture session / analysis periodically. 
 
 ```python
-In [3]: c.saveSessionToFile('filename_for_this_session')
+>>> CANalysis.saveSessionToFile('filename_for_this_session')
 ```
 
-Once you save it once, the name will be cached so you can simply save it again to the same file by typing:
+Once you save for the first time, the file name will be cached so you can simply save your capture to the same file again by typing:
 
 ```python
-In [4]: c.saveSessionToFile()
+>>> CANalysis.saveSessionToFile()
 ```
 
-Other than that, "help" is your friend. :)
+### CanCat help and tips
+To access the help function in CanCat:
+```>>> help(cancat)```
 
-```python
-In [5]: help(cancat)
-```
-
-or tab-completion
-
+If help doesn't provide you with what you are looking for, you can do a tab-complete search to bring up each of the possible commands.
 ```python
 In [6]: c.<PRESS_TAB_KEY>
 c.CANrecv
@@ -250,8 +201,16 @@ c.saveSession
 ```
 
 
+## Other CanCat Uses
+### Using CanCat to Analyze Previous Captures
+If all you want to do is analyze a previous CanCat capture you can skip the hardware set up steps, clone the CanCat repository, add the file you wish to analyze to the CanCat folder and run the command:
 
-## CAN-in-the-Middle
+```bash
+$ ./CanCat.py -f filename_of_previous_capture  # no CanCat device required
+```
+
+
+### CAN-in-the-Middle
 CAN-in-the-Middle is another way to utilize your CanCat. It requires two CAN shields 
 on one arduino. One of the CAN shields needs to be modified so that the CS pin of the 
 MCP2515 CAN controller is on D10, rather than D9. This is accomplished by cutting a 
@@ -293,9 +252,10 @@ $ citm.printCanMsgsIso() # prints all CAN messages received on the Isolation net
 
 Placing a bookmark places a bookmark simultaneously on both the Isolation information (Iso interface messages) and the aggregate information (standard CAN interface messages).
 
-Happy Hacking!
-
-
-
 ## Acknowledgments
 This project is made possible through collaboration with researchers at GRIMM (SMFS, Inc.), most notably Matt Carpenter and Tim Brom.
+
+## Happy Hacking!
+
+
+
