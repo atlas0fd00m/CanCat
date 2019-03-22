@@ -89,6 +89,8 @@ void setup()
 void loop()
 {
     uint8_t results = 0;
+    uint32_t mask;
+    uint32_t filter;
     CAN_FRAME frame = {0};
     /* Send enqueued frames */
     if(!can_tx_frames0.isEmpty())
@@ -232,7 +234,12 @@ void loop()
                 break;
 
             case CMD_SET_FILT_MASK:
-                log("Not Implemented", 15);
+                mask   = serial_buffer[6]  | (serial_buffer[5] << 8)  | (serial_buffer[4] << 16)  | (serial_buffer[3] << 24);
+                filter = serial_buffer[14] | (serial_buffer[13] << 8) | (serial_buffer[12] << 16) | (serial_buffer[11] << 24);
+                if (mask <= 0x7FF) // If it's an 11-bit identifier
+                    device->setRXFilter(5, filter, mask, false);
+                else
+                    device->setRXFilter(6, filter, mask, true);
                 break;
 
             case CMD_CAN_SEND_ISOTP:
@@ -337,5 +344,3 @@ uint8_t SendFrame(CAN_FRAME frame)
 /*********************************************************************************************************
   END FILE
 *********************************************************************************************************/
-
-
