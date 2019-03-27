@@ -461,6 +461,7 @@ class J1939(cancat.CanInterface):
         self._last_recv_idx = -1
 
         self._threads = []
+        self.mquelock = threading.Lock()
 
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
 
@@ -586,28 +587,37 @@ class J1939(cancat.CanInterface):
 
         if no list exists for this pairing, one is created and an empty list is returned
         '''
-        msglists = self._RealExtMsgParts.get(sa)
-        if msglists == None:
-            msglists = {}
-            self._RealExtMsgParts[sa] = msglists
+        #if self.verbose: print 'getRealExtMsgs: %r' % (threading.current_thread())
+        self.mquelock.acquire()
+        try:
+            msglists = self._RealExtMsgParts.get(sa)
+            if msglists == None:
+                if self.verbose: print ".get(sa) returned None.  creating msglists"
+                msglists = {}
+                self._RealExtMsgParts[sa] = msglists
 
-        mlist = msglists.get(da)
-        if mlist == None:
-            mlist = {'msgs':[], 
-                    'type' : -1, 
-                    'adminmsgs' : [],
-                    'sa': -1,
-                    'da': -1,
-                    'ts': -1,
-                    'idx': -1,
-                    'pgn2': -1,
-                    'pgn1': -1,
-                    'pgn0': -1,
-                    'maxct': -1,
-                    'length': 0,
-                    'totsize': 0,
-            }
-            msglists[da] = mlist
+            mlist = msglists.get(da)
+            if mlist == None:
+                if self.verbose: print "--mlist == None, creating for sa:%x da:%x" % (sa, da)
+                mlist = {'msgs':[], 
+                        'type' : -1, 
+                        'adminmsgs' : [],
+                        'sa': -1,
+                        'da': -1,
+                        'ts': -1,
+                        'idx': -1,
+                        'pgn2': -1,
+                        'pgn1': -1,
+                        'pgn0': -1,
+                        'maxct': -1,
+                        'length': 0,
+                        'totsize': 0,
+                }
+                msglists[da] = mlist
+        except Exception, e:
+            print "getRealExtMsgs: ERROR: %r" % e
+        finally:
+            self.mquelock.release()
 
         return mlist
 
@@ -753,34 +763,43 @@ class J1939(cancat.CanInterface):
         while (count==0 or (block and time.time()-starttime < timeout)):
             #sys.stderr.write('.')
             count += 1
-            msgs = self._RealExtMsgs.get((sa, da))
-            if msgs == None or not len(msgs):
-                #print "no message for %.2x -> %.2x" % (sa, da)
-                continue
-
-            if msgs[-1][0] < start_msg:
-                self.log("last msg before start_msg %r  %r" % (msgs[-1][0],start_msg), 2)
-                #sys.stderr.write('.')
-                continue
-
-            for midx in range(len(msgs)):
-                msg = msgs[midx]
-                midx = msg[0]
-                mpgn = msg[4]
-                mlastidx = msg[7]
-                #print "     %r ?>= %r" % (midx, start_msg)
-                #print "     %r ?= %r" % (mpgn, (pgn2, pgn1, pgn0))
-                if mlastidx < start_msg:
-                    continue
-                if mpgn != (pgn2, pgn1, pgn0):
+            self.mquelock.acquire()
+            try:
+                msgs = self._RealExtMsgs.get((sa, da))
+                if msgs == None or not len(msgs):
+                    #print "no message for %.2x -> %.2x" % (sa, da)
                     continue
 
-                #print "success! %s" % repr(msg)
-                #print "setting last recv'd index: %d" % mlastidx
-                self._last_recv_idx = mlastidx
-                ##FIXME:  make this threadsafe
-                #msgs.pop(midx)
-                return msg
+                if msgs[-1][0] < start_msg:
+                    self.log("last msg before start_msg %r  %r" % (msgs[-1][0],start_msg), 2)
+                    #sys.stderr.write('.')
+                    continue
+
+                # if we have messages, check each for the last idx.
+                for midx in range(len(msgs)):
+                    msg = msgs[midx]
+                    midx = msg[0]
+                    mpgn = msg[4]
+                    mlastidx = msg[7]
+                    #print "     %r ?>= %r" % (midx, start_msg)
+                    #print "     %r ?= %r" % (mpgn, (pgn2, pgn1, pgn0))
+                    if mlastidx < start_msg:
+                        continue
+                    if mpgn != (pgn2, pgn1, pgn0):
+                        continue
+
+                    #print "success! %s" % repr(msg)
+                    #print "setting last recv'd index: %d" % mlastidx
+                    self._last_recv_idx = mlastidx
+                    ##FIXME:  make this threadsafe
+                    #msgs.pop(midx)
+                    return msg
+
+            except Exception, e:
+                print "recvRealExtMsg: ERROR: %r" % e
+            finally:
+                self.mquelock.release()
+
             time.sleep(.001)
 
 
