@@ -303,6 +303,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         # check for old stuff
         extmsgs = j1939.getRealExtMsgs(sa, da)
         if len(extmsgs['msgs']):
+            if j1939.verbose: print "clearing out old extmsgs: %r" % extmsgs
             extmsgs['sa'] = sa
             extmsgs['da'] = da
             j1939.saveRealExtMsg(idx-1, ts, sa, da, (0,0,0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN, idx-1)
@@ -323,6 +324,9 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         extmsgs['totsize'] = totsize
         extmsgs['type'] = TP_DIRECT
         extmsgs['adminmsgs'].append((arbtup, data))
+        if j1939.verbose: 
+            print "new TP_CM message: %r, %r\t\t%r" % (arbtup, data.encode('hex'), extmsgs)
+            print '==1  %x %x->%x' % (pf, sa, da), extmsgs
 
         # RESPOND!
         if da in j1939.myIDs:
@@ -335,6 +339,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         (cb, maxpkts, nextpkt, reserved,
                 pgn2, pgn1, pgn0) = struct.unpack('<BBBHBBB', data)
 
+        if j1939.verbose: print '==3  %x %x->%x' % (pf, sa, da), j1939.getRealExtMsgs(sa, da)
         # store extended message information for other stuff...
         extmsgs = j1939.getRealExtMsgs(sa, da)
         extmsgs['adminmsgs'].append((arbtup, data))
@@ -402,6 +407,8 @@ def ec_handler(j1939, idx, ts, arbtup, data):
 
         if cb_handler != None:
             cb_handler(arbtup, data, j1939, idx, ts)
+            da, sa = arbtup[-2:]
+            if j1939.verbose: print '==2  ', j1939.getRealExtMsgs(sa, da)
 
 def eb_handler(j1939, idx, ts, arbtup, data):
     (prio, edp, dp, pf, da, sa) = arbtup
@@ -412,7 +419,7 @@ def eb_handler(j1939, idx, ts, arbtup, data):
     extmsgs = j1939.getRealExtMsgs(sa, da)
     extmsgs['msgs'].append((arbtup, data))
     if len(extmsgs['msgs']) >= extmsgs['length']:
-        #print "eb_handler: saving: %r %r" % (len(extmsgs['msgs']) , extmsgs['length'])
+        if j1939.verbose: print "eb_handler: saving: %r->%r  %r %r" % (sa, da, len(extmsgs['msgs']) , extmsgs['length'])
         tidx = extmsgs['idx']
         pgn2 = extmsgs['pgn2']
         pgn1 = extmsgs['pgn1']
@@ -570,14 +577,13 @@ class J1939(cancat.CanInterface):
                     continue
 
                 pfhandler, idx, ts, arbtup, data = worktup
+                #if self.verbose: print "_mhe_runner: %r %r %r %r %r" % (worktup)
                 pfhandler(self, idx, ts, arbtup, data)
 
             except Exception, e:
                 print "MsgHandler ERROR: %r (%r)" % (e, worktup)
                 if self.verbose:
                     sys.excepthook(*sys.exc_info())
-
-
         
     # functions to support the J1939TP Stack (real stuff, not just repr)
     def getRealExtMsgs(self, sa, da):
@@ -632,13 +638,16 @@ class J1939(cancat.CanInterface):
         * if da == None, returns whether the sa had anything previously
         * otherwise, if the list 
         '''
+        #if self.verbose: print 'clearRealExtMsgs: %r' % (threading.current_thread())
         exists = False
         if da != None:
+            if self.verbose: print "++clearing sa:%x da:%x" % (sa, da)
             msglists = self._RealExtMsgParts.get(sa)
             exists = bool(msglists != None and len(msglists))
             self._RealExtMsgParts[sa] = {}
             return exists
 
+        if self.verbose: print "++clearing sa:%x COMPLETELY!" % (sa)
         msglists = self._RealExtMsgParts.get(sa)
         if msglists == None:
             msglists = {}
@@ -660,6 +669,7 @@ class J1939(cancat.CanInterface):
             self._RealExtMsgs[(sa,da)] = msglist
 
         msglist.append((idx, ts, sa, da, pgn, msg, tptype, lastidx))
+        if self.verbose: print "-=-= saving sa:%x da:%x" % (sa,da)
 
     # This is for the pretty printing stuff...
     def getExtMsgs(self, sa, da):
