@@ -410,13 +410,14 @@ class CanInterface(object):
         '''
         timestamp = time.time()
 
-        self._queuelock.acquire()
+        mbox = self._messages.get(cmd)
+        if mbox == None:
+            mbox = []
+            self._messages[cmd] = mbox
+            self._msg_events[cmd] = threading.Event()
+
         try:
-            mbox = self._messages.get(cmd)
-            if mbox == None:
-                mbox = []
-                self._messages[cmd] = mbox
-                self._msg_events[cmd] = threading.Event()
+            self._queuelock.acquire()
             mbox.append((timestamp, message))
             self._msg_events[cmd].set()
 
