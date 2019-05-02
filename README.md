@@ -207,6 +207,86 @@ c.printSessionStatsByBookmark
 c.saveSession
 ```
 
+## UDS Module
+CanCat has a UDS module for doing UDS diagnostics. Basic usage is as follows:
+
+```python
+In [1]: import uds
+
+In [2]: u = uds.UDS(c, 0x760, 0x768) # 11-bit IDs
+
+In [3]: u = uds.UDS(c, 0x18da98f1, 0x18daf198, extflag=1) # 29-bit IDs
+```
+
+When initializing the module, pass in the CanCat object you are using (c, in
+our case), then the arbitration IDs that you will be transmitting and receiving
+on. Also set extflag to 1 if using 29-bit identifiers.
+
+Now that our UDS module is initialized, we can use it to perform UDS diagnostics
+on a vehicle. Let's start with something simple:
+
+```python
+In [4]: u.ReadDID(0xF190)
+```
+
+This will read Data Identifier (DID) 0xF190, which should contain the VIN for the
+vehicle. If the read succeeds then the requested data is returned by the ReadDID
+function. If the read fails, then a NegativeResponseException will be thrown, which
+will print out the UDS error message that was received.
+
+Since CanCat can be scripted easily, scanning for UDS servers on CAN is easily
+accomplished. The following loop will send a ReadDID request to every
+arbitration ID from 0x700 to 0x7F7 and print out which servers respond, and which 
+time out.
+
+```python
+for i in range(0x700, 0x7f8):  
+    u = uds.UDS(c, i, i+8)
+    print "Trying ", hex(i)
+    try:
+        u.ReadDID(0xf190)
+    except:
+        print "Error reading DID 0xF190, server exists at this address"
+```
+
+If a timeout is received then no UDS server responded on the address.
+If a positive response or negative respons is received, then you have
+discovered a UDS server. Other functionality can be scripted as well, 
+such as scanning DIDs to see which are implemented. This code will
+scan all the DIDs in the range from 0xF180 to 0xF19F, which contains 
+useful information such as hardware and software part numbers, VINs, and
+other identifying information for this UDS server.
+
+```python
+for i in range(0xf180, 0xf1a0):
+    try:                  
+        print u.ReadDID(i)
+    except:          
+        print hex(i), " Returned error"
+```
+
+Other UDS functionality includes:
+
+* xmit\_recv - Transmit and receive any data
+* SendTesterPresent - Sends the tester present message one time
+* StartTesterPresent - Starts sending the tester present message periodically
+* StopTesterPresent - Stop sending the tester present message periodically
+* DiagnosticSessionControl - Change the diagnostic session
+* ReadMemoryByAddress - Read a memory address
+* ReadDID - Read a DID
+* WriteDID - Write a DID
+* RequestDownload - Start a data download
+* writeMemoryByAddress - Write a memory address
+* RequestUpload - Start a data upload
+* EcuReset - Reset an ECU
+* ScanDIDs - A built-in function for scannin DIDs
+* SecurityAccess - Starts a security access request
+* \_key\_from\_seed - This method can be overloaded to provide the algorithm for turning a seed into a key. Unimplemented by default.
+
+An additional function provided is `printUDSSession`, which takes a CanCat
+variable, and the RX and TX arbitration IDs and parses UDS traffic from the
+CAN traffic captured by CanCat.
+
 
 ## Other CanCat Uses
 ### Using CanCat to Analyze Previous Captures
