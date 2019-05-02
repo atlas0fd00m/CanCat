@@ -9,7 +9,7 @@ scripts = ['CanCat.py']
 
 setup  (name        = 'cancat',
         version     = '1.0',
-        description = "Swiss army knife of Controller Area Networks (CAN) often used in cars and building automation, etc...",
+        description = "Multi-purpose tool for interacting with Controller Area Networks (CAN)",
         author = 'atlas of d00m',
         author_email = 'atlas@r4780y.com',
         #include_dirs = [],
