@@ -237,9 +237,9 @@ void loop()
                 mask   = serial_buffer[6]  | (serial_buffer[5] << 8)  | (serial_buffer[4] << 16)  | (serial_buffer[3] << 24);
                 filter = serial_buffer[14] | (serial_buffer[13] << 8) | (serial_buffer[12] << 16) | (serial_buffer[11] << 24);
                 if (mask <= 0x7FF) // If it's an 11-bit identifier
-                    device->setRXFilter(5, filter, mask, false);
+                    device->setRXFilter(5, filter, mask, true);
                 else
-                    device->setRXFilter(6, filter, mask, true);
+                    device->setRXFilter(6, filter, mask, false);
                 break;
 
             case CMD_CAN_SEND_ISOTP:
