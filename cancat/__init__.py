@@ -1392,6 +1392,96 @@ class CanInterface(object):
         msg = struct.pack('>IIIIIIII', 0, 0, 0, 0, 0, 0, 0, 0)
         return self._send(CMD_SET_FILT_MASK, msg)
 
+    def _test_throughput(self):
+        '''
+        Use in conjuction with the M2_TEST_FW to test throughput
+
+        Connect one CanCat up to another M2 or Arduino DUE device runing the M2_TEST_FW firmware
+        and run this function to perform a throughput test. No other device should be connected
+        to allow the test to run unimpeded by other CAN traffic.
+        '''
+        self.clearCanMsgs()
+        self.CANxmit(0x0010, "TEST")
+        for i in range(6, 3, -1):
+            print "Time remaining: ", i*10, " seconds"
+            time.sleep(10)
+        self.CANxmit(0x810, "TEST", extflag=True)
+        for i in range(3, 0, -1):
+            print "Time remaining: ", i*10, " seconds"
+            time.sleep(10)
+                
+        out_of_order_count = 0
+        msg_count = 0
+        prev_val = 0xFF
+        for foo in self.genCanMsgs(arbids=[0x00]):
+            msg_count += 1
+            prev_val += 1
+            if prev_val > 0xff:
+                prev_val = 0
+            if prev_val != ord(foo[3]):
+                out_of_order_count += 1
+                prev_val = ord(foo[3])
+        if (out_of_order_count > 0):
+            print "ERROR: 11 bit IDs, 1 byte messages, ", out_of_order_count, " Messages received out of order"
+        elif (msg_count != 181810):
+            print "ERROR: Received ", msg_count, " out of expected 181810 message"
+        else:
+            print "PASS: 11 bit IDs, 1 byte messages"
+        
+        out_of_order_count = 0
+        msg_count = 0
+        prev_val = 0xFF
+        for foo in self.genCanMsgs(arbids=[0x01]):
+            msg_count += 1
+            prev_val += 1
+            if prev_val > 0xff:
+                prev_val = 0
+            if prev_val != ord(foo[3][0]):
+                out_of_order_count += 1
+                prev_val = ord(foo[3][0])
+        if (out_of_order_count > 0):
+            print "ERROR: 11 bit IDs, 8 byte messages, ", out_of_order_count, " Messages received out of order"
+        elif (msg_count != 90090):
+            print "ERROR: Received ", msg_count, " out of expected 90090 message"
+        else:
+            print "PASS: 11 bit IDs, 8 byte messages"
+        
+        out_of_order_count = 0
+        msg_count = 0
+        prev_val = 0xFF
+        for foo in self.genCanMsgs(arbids=[0x800]):
+            msg_count += 1
+            prev_val += 1
+            if prev_val > 0xff:
+                prev_val = 0
+            if prev_val != ord(foo[3]):
+                out_of_order_count += 1
+                prev_val = ord(foo[3])
+        if (out_of_order_count > 0):
+            print "ERROR: 29 bit IDs, 1 byte messages, ", out_of_order_count, " Messages received out of order"
+        elif (msg_count != 133330):
+            print "ERROR: Received ", msg_count, " out of expected 133330 message"
+        else:
+            print "PASS: 29 bit IDs, 1 byte messages"
+        
+        out_of_order_count = 0
+        msg_count = 0
+        prev_val = 0xFF
+        for foo in self.genCanMsgs(arbids=[0x801]):
+            msg_count += 1
+            prev_val += 1
+            if prev_val > 0xff:
+                prev_val = 0
+            if prev_val != ord(foo[3][0]):
+                out_of_order_count += 1
+                prev_val = ord(foo[3][0])
+        if (out_of_order_count > 0):
+            print "ERROR: 29 bit IDs, 8 byte messages, ", out_of_order_count, " Messages received out of order"
+        elif (msg_count != 76330):
+            print "ERROR: Received ", msg_count, " out of expected 76330 message"
+        else:
+            print "PASS: 29 bit IDs, 8 byte messages"
+
 
 class CanControl(cmd.Cmd):
     '''

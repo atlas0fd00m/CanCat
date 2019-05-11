@@ -39,10 +39,21 @@ uint8_t Init_CITM(uint8_t baud)
     Can1.init(baud_rates_table[baud]);
     Can0.setNumTXBoxes(2);
     Can1.setNumTXBoxes(2);
-    Can0.setRXFilter(4, 0, 0, false);
-    Can0.setRXFilter(5, 0, 0, true);
-    Can1.setRXFilter(4, 0, 0, false);
-    Can1.setRXFilter(5, 0, 0, true);
+
+    // Disable unused mailboxes
+    Can0.mailbox_set_mode(0, 0);
+    Can0.mailbox_set_mode(1, 0);
+    Can0.mailbox_set_mode(2, 0);
+    Can0.mailbox_set_mode(3, 0);
+    Can1.mailbox_set_mode(0, 0);
+    Can1.mailbox_set_mode(1, 0);
+    Can1.mailbox_set_mode(2, 0);
+    Can1.mailbox_set_mode(3, 0);
+    
+    Can0.setRXFilter(4, 0, 0, true);
+    Can0.setRXFilter(5, 0, 0, false);
+    Can1.setRXFilter(4, 0, 0, true);
+    Can1.setRXFilter(5, 0, 0, false);
     Can0.setCallback(4, CITM_Can0_cb);
     Can0.setCallback(5, CITM_Can0_cb);
     Can1.setCallback(4, CITM_Can1_cb);
@@ -50,4 +61,3 @@ uint8_t Init_CITM(uint8_t baud)
     initialized = 1;
     return 1; //TODO: Error Checking
 }
-

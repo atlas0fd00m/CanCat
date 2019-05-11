@@ -37,9 +37,17 @@ uint8_t Init_Sniff(uint8_t baud)
         autobaud(device);
     else
         device->init(baud_rates_table[baud]);
-    
-    device->setRXFilter(5, 0, 0, false);
-    device->setRXFilter(6, 0, 0, true);
+
+    // Disable unused mailboxes
+    device->mailbox_set_mode(0, 0);
+    device->mailbox_set_mode(1, 0);
+    device->mailbox_set_mode(2, 0);
+    device->mailbox_set_mode(3, 0);
+    device->mailbox_set_mode(4, 0);
+
+    // Set up mailbox 5 to receive basic and mailbox 6 to receive extended messages
+    device->setRXFilter(5, 0, 0, true);
+    device->setRXFilter(6, 0, 0, false);
     
     if(device == &Can0)
     {
@@ -54,4 +62,3 @@ uint8_t Init_Sniff(uint8_t baud)
     initialized = 1;
     return 1; //TODO: Error Checking
 }
-
