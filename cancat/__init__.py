@@ -781,7 +781,9 @@ class CanInterface(object):
         if start == None:
             start = self.getCanMsgCount()
 
-        if stop == None or tail:
+        if messages == None:
+            stop = 0
+        elif stop == None or tail:
             stop = len(messages)
         else:
             stop = stop + 1 # This makes the stop index inclusive if specified
@@ -794,38 +796,46 @@ class CanInterface(object):
             # placed here to ensure checking whether we're receiving messages or not
             if maxsecs != None and time.time() > maxsecs+starttime:
                 return
+
+            # If we start sniffing before we receive any messages, 
+            # messages will be "None". In this case, each time through
+            # this loop, check to see if we have messages, and if so,
+            # re-create the messages handle
+            if messages == None:
+                messages = self._messages.get(CMD_CAN_RECV, None)
         
             # if we're off the end of the original request, and "tailing"
-            if tail and idx >= stop:
-                msglen = len(messages) 
-                self.log("stop=%d  len=%d" % (stop, msglen), 3)
+            if messages != None:
+                if tail and idx >= stop:
+                    msglen = len(messages) 
+                    self.log("stop=%d  len=%d" % (stop, msglen), 3)
 
-                if stop == msglen:
-                    self.log("waiting for messages", 3)
-                    # wait for trigger event so we're not constantly polling
-                    self._msg_events[CMD_CAN_RECV].wait(1)
-                    self._msg_events[CMD_CAN_RECV].clear()
-                    self.log("received 'new messages' event trigger", 3)
+                    if stop == msglen:
+                        self.log("waiting for messages", 3)
+                        # wait for trigger event so we're not constantly polling
+                        self._msg_events[CMD_CAN_RECV].wait(1)
+                        self._msg_events[CMD_CAN_RECV].clear()
+                        self.log("received 'new messages' event trigger", 3)
 
-                # we've gained some messages since last check...
-                stop = len(messages)
-                continue    # to the big message loop.
+                    # we've gained some messages since last check...
+                    stop = len(messages)
+                    continue    # to the big message loop.
 
-            # now actually handle messages
-            ts, msg = messages[idx]
+                # now actually handle messages
+                ts, msg = messages[idx]
 
-            # make ts an offset instead of the real time.
-            ts -= startts
+                # make ts an offset instead of the real time.
+                ts -= startts
 
-            arbid, data = self._splitCanMsg(msg)
+                arbid, data = self._splitCanMsg(msg)
 
-            if arbids != None and arbid not in arbids:
-                # allow filtering of arbids
+                if arbids != None and arbid not in arbids:
+                    # allow filtering of arbids
+                    idx += 1
+                    continue
+
+                yield((idx, ts, arbid, data))
                 idx += 1
-                continue
-
-            yield((idx, ts, arbid, data))
-            idx += 1
 
 
     def _splitCanMsg(self, msg):
