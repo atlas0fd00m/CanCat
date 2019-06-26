@@ -692,7 +692,7 @@ class CanInterface(object):
                     were received
         timing = TIMING_INTERACTIVE: wait for the user to press Enter between each
                     message being transmitted
-        timing = TIMING_SEARCH: wait for the user to search for signal (binary search) 
+        timing = TIMING_SEARCH: wait for the user to respond (binary search) 
         '''
         if start_bkmk != None:
             start_msg = self.getMsgIndexFromBookmark(start_bkmk)
