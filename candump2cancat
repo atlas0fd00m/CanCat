@@ -1,0 +1,4 @@
+#!/usr/bin/env python2
+
+from cancat.utils.log import candump2cancat
+candump2cancat()
