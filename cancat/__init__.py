@@ -6,6 +6,7 @@ import serial
 import select
 import struct
 import threading
+import math   
 import cPickle as pickle
 
 from cancat import iso_tp
@@ -88,6 +89,7 @@ RXTX_GO         = 1
 TIMING_FAST         = 0
 TIMING_REAL         = 1
 TIMING_INTERACTIVE  = 2
+TIMING_SEARCH       = 3 
 
 # constants for VIEW settings:
 VIEW_ASCII =        1<<0
@@ -690,12 +692,23 @@ class CanInterface(object):
                     were received
         timing = TIMING_INTERACTIVE: wait for the user to press Enter between each
                     message being transmitted
+        timing = TIMING_SEARCH: wait for the user to respond (binary search) 
         '''
         if start_bkmk != None:
             start_msg = self.getMsgIndexFromBookmark(start_bkmk)
 
         if stop_bkmk != None:
             stop_msg = self.getMsgIndexFromBookmark(stop_bkmk)
+
+        if timing == TIMING_SEARCH: 
+                diff = stop_msg - start_msg
+                if diff == 1:
+                    mid_msg = stop_msg
+                    start_tmp = start_msg 
+                else:
+                    mid_msg = int(start_msg + math.floor((stop_msg - start_msg) / 2))
+                    start_tmp = start_msg
+                    start_msg = mid_msg
 
         last_time = -1
         newstamp = time.time()
@@ -709,6 +722,24 @@ class CanInterface(object):
 
                 if char is not None and len(char) > 0 and char[0] == 'n':
                     return
+
+            elif timing == TIMING_SEARCH:    
+                self.CANreplay(start_msg=mid_msg, stop_msg=stop_msg)   
+                char = raw_input("Expected outcome?  start_msg = %s, stop_msg = %s (Y/n/q)" % (mid_msg, stop_msg))
+                if char is not None and len(char) > 0 and char[0] == 'q':
+                    return 
+                if diff > 1:
+                    if char is not None and len(char) > 0 and char[0] == 'y':
+                        return self.CANreplay(start_msg=mid_msg, stop_msg=stop_msg, timing=TIMING_SEARCH) 
+                    elif char is not None and len(char) > 0 and char[0] == 'n': 
+                        return self.CANreplay(start_msg=start_tmp, stop_msg=mid_msg, timing=TIMING_SEARCH)
+                else: 
+                    if char is not None and len(char) > 0 and char[0] == 'y':
+                        print "Target message: %s" % (stop_msg)
+                        return 
+                    elif char is not None and len(char) > 0 and char[0] == 'n':  
+                        print "Target message: %s" % (start_tmp)
+                        return  
 
             elif timing == TIMING_REAL:
                 if last_time != -1:
@@ -1315,7 +1346,7 @@ class CanInterface(object):
 
         for datalen,arbid,msgs in arbids:
             print self.reprCanMsgs(arbids=[arbid], advfilters=advfilters)
-            cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, Q)uit: ").upper()
+            cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, S)earchReplay, Q)uit: ").upper()
             while len(cmd) and cmd != 'N':
                 if cmd == 'R':
                     self.CANreplay(arbids=[arbid], timing=TIMING_REAL)
@@ -1326,10 +1357,13 @@ class CanInterface(object):
                 elif cmd == 'I':
                     self.CANreplay(arbids=[arbid], timing=TIMING_INTERACTIVE)
 
+                elif cmd == 'S':
+                    self.CANreplay(arbids=[arbid], timing=TIMING_SEARCH)
+                
                 elif cmd == 'Q':
                     return
 
-                cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, Q)uit: ").upper()
+                cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, S)earchReplay, Q)uit: ").upper()
             print 
 
     def printBookmarks(self):
