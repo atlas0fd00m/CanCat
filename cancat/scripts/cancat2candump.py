@@ -15,4 +15,4 @@ def main():
     parser.add_argument('output', help='output candump file')
     args = parser.parse_args(argv)
 
-    cancat.util.parse.cancat2candump(args.session, args.output)
+    cancat.utils.parse.cancat2candump(args.session, args.output)

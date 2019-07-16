@@ -1,4 +1,4 @@
 #!/usr/bin/env python2
 
-from cancat.scripts import cancat2pcap
-cancat2pcap()
+from cancat.scripts.cancat2pcap import main
+main()
