@@ -1,30 +1,16 @@
 # Utility functions for CanCat
 
-import argparse
-import sys
-import os
 import pickle
 import cancat
 import struct
 import re
 
 
-def cancat2candump(args=None, argv=None):
-    if args is None:
-        if argv is None:
-            argv = sys.argv[1:]
-
-        parser = argparse.ArgumentParser(
-                prog='cancat2candump',
-                description='Utility to convert a CanCat session into a candump log')
-        parser.add_argument('session', help='input CanCat session')
-        parser.add_argument('output', help='output candump file')
-        args = parser.parse_args(argv)
-
-    with open(args.session, 'rb') as f:
+def cancat2candump(session, output):
+    with open(session, 'rb') as f:
         sess = pickle.load(f)
 
-    with open(args.output, 'w') as f:
+    with open(output, 'w') as f:
         for msg_time, msg in sess['messages'].get(cancat.CMD_CAN_RECV, None):
             line = '({:.6f}) vcan0 {}#{}\n'.format(
                 msg_time,
@@ -34,25 +20,12 @@ def cancat2candump(args=None, argv=None):
             f.write(line)
 
 
-def cancat2pcap(args=None, argv=None):
+def cancat2pcap(session, output):
     import scapy.layers.l2
     import scapy.packet
     import scapy.utils
-    if args is None:
-        if argv is None:
-            argv = sys.argv[1:]
 
-        parser = argparse.ArgumentParser(
-                prog='cancat2pcap',
-                description='Utility to convert a CanCat session into a pcap')
-        parser.add_argument('session', type=argparse.FileType('rb'),
-                help='input CanCat session')
-        parser.add_argument('output', type=str,
-                help='output pcap file')
-        args = parser.parse_args(argv)
-
-
-    sess = pickle.load(args.session)
+    sess = pickle.load(session)
 
     msgs = []
     for msg_time, msg in sess['messages'].get(cancat.CMD_CAN_RECV, None):
@@ -74,7 +47,7 @@ def cancat2pcap(args=None, argv=None):
 
         msgs.append(pkt)
 
-    scapy.utils.wrpcap(args.output, msgs)
+    scapy.utils.wrpcap(output, msgs)
 
 
 def _import_candump(filename):
@@ -133,32 +106,11 @@ def _import_pcap(filename):
     return sess
 
 
-def candump2cancat(args=None, argv=None):
-    if args is None:
-        if argv is None:
-            argv = sys.argv[1:]
+def candump2cancat(candumplog, output):
+    with open(output, 'w') as f:
+        pickle.dump(_import_candump(candumplog), f)
 
-        parser = argparse.ArgumentParser(
-                prog='candump2cancat',
-                description='Utility to convert a candump log into a CanCat session')
-        parser.add_argument('log', help='input candump log')
-        parser.add_argument('output', help='output cancat session')
-        args = parser.parse_args(argv)
 
-        with open(args.output, 'w') as f:
-            pickle.dump(_import_candump(args.log), f)
-
-def pcap2cancat(args=None, argv=None):
-    if args is None:
-        if argv is None:
-            argv = sys.argv[1:]
-
-        parser = argparse.ArgumentParser(
-                prog='pcap2cancat',
-                description='Utility to convert a pcap with CAN messages into a CanCat session')
-        parser.add_argument('log', help='input pcap')
-        parser.add_argument('output', help='output cancat session')
-        args = parser.parse_args(argv)
-
-        with open(args.output, 'w') as f:
-            pickle.dump(_import_pcap(args.log), f)
+def pcap2cancat(pcapfile, output):
+    with open(output, 'w') as f:
+        pickle.dump(_import_pcap(pcapfile), f)
