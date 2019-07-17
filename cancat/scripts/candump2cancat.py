@@ -2,7 +2,7 @@
 
 import sys
 import argparse
-import cancat.utils.parse
+import cancat.utils.convert
 
 
 def main():
@@ -15,4 +15,4 @@ def main():
     parser.add_argument('output', help='output cancat session')
     args = parser.parse_args(argv)
 
-    cancat.utils.parse.candump2cancat(args.log, args.output)
+    cancat.utils.convert.candump2cancat(args.log, args.output)

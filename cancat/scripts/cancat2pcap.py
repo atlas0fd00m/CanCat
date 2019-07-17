@@ -3,7 +3,7 @@
 
 import sys
 import argparse
-import cancat.utils.parse
+import cancat.utils.convert
 
 
 def main():
@@ -18,4 +18,4 @@ def main():
             help='output pcap file')
     args = parser.parse_args(argv)
 
-    cancat.utils.parse.cancat2pcap(args.session, args.output)
+    cancat.utils.convert.cancat2pcap(args.session, args.output)
