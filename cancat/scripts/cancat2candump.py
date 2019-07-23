@@ -2,7 +2,7 @@
 
 import sys
 import argparse
-import cancat.utils.convert
+from cancat.utils import convert
 
 
 def main():
@@ -15,4 +15,4 @@ def main():
     parser.add_argument('output', help='output candump file')
     args = parser.parse_args(argv)
 
-    cancat.utils.convert.cancat2candump(args.session, args.output)
+    convert.cancat2candump(args.session, args.output)
