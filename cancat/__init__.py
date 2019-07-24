@@ -639,7 +639,8 @@ class CanInterface(object):
             lasttime = time.time()
             #print "_isotp_get_msg: status: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
 
-        print "_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
+        if self.verbose:
+            print "_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
         return None
 
     def CANsniff(self, start_msg=None, arbids=None, advfilters=[], maxmsgs=None):
