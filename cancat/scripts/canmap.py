@@ -58,8 +58,6 @@ class SecurityAccessKeyRange(cancat.utils.types.SparseHexRange):
             raise ValueError('range %s exceeds max Security Access Key of 0x7D' % val)
 
         # The auth levels alternate
-        # TODO: it would help avoid confusion if we ensured that the values are 
-        # all odd right?
         return super(cancat.utils.types.SparseRange, cls).__new__(cls, (cancat.utils.types._hex_range(v, 2) for v in val.split(',')))
 
 
@@ -81,8 +79,10 @@ def udsmap_parse_args():
             prog='udsmap',
             description='CAN bus network mapping tool')
     parser.add_argument('-s', '--scan', nargs='?', action='append',
-            choices='EDWSAL', required=True,
-            help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (W) write DIDs, (S) diagnostic Sessions, (A) seed/key Authentication levels, (L) authentication key Length')
+            #choices='EDWSAL', required=True,
+            #help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (W) write DIDs, (S) diagnostic Sessions, (A) seed/key Authentication levels, (L) authentication key Length')
+            choices='EDSAL', required=True,
+            help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (S) diagnostic Sessions, (A) seed/key Authentication levels, (L) authentication key Length')
     parser.add_argument('-p', '--port', default='/dev/ttyACM0',
             help='System device to use to communicate to the CanCat hardware (/dev/ttyACM0)') 
     parser.add_argument('-b', '--baud',
@@ -101,8 +101,8 @@ def udsmap_parse_args():
             type=DIDRange, default='F180-F1FF',
             help='DID range to search, by default restricted to the ISO14229 specified DIDs, large DID ranges may take a long time')
     parser.add_argument('-S', metavar='<Diagnostic Session Range>',
-            type=DiagnosticSessionRange, default='01-7F',
-            help='Diagnostic Sessions to search')
+            type=DiagnosticSessionRange, default='02-7F',
+            help='Diagnostic Sessions to search for')
     parser.add_argument('-A', metavar='<Security Access Key Range>',
             type=SecurityAccessKeyRange, default='01-41,61-7D',
             help='Security Access Key range to test, by default Security Sessions 43-60 are not tested, those values are used for end-of-life airbag deployment and may cause damage.')
@@ -120,19 +120,19 @@ def udsmap_parse_args():
     # TODO: Add support to attempt block data transfer from ECU?
     # TODO: Add support to attempt block data transfer to ECU?
 
-    #parser.add_argument('-r', '--rescan', action='store_true',
-    #        help='Full rescan of specified DID range in each diagnostic session')
+    parser.add_argument('-r', '--rescan', action='store_true',
+            help='Run a full rescan and merge new results with any existing data')
 
     parser.add_argument('-f', '--force', action='store_true',
             help='Force udsmap to scan with potentially harmful options')
     parser.add_argument('-y', '--yes', action='store_true',
             help='Automatically answer "yes" to any questions the tool asks')
-    parser.add_argument('-v', '--verbose', action='store_true',
-            help='Verbose logging')
+    parser.add_argument('-v', '--verbose', action='count',
+            help='Verbose logging, use -vv for extra verbosity')
     parser.add_argument('-l', '--log-file',
-            help='Log filename to write to, log filename can contain "time.strftime" formatting like "udsscan_%Y%m%d-%H%M%S.log"')
-    parser.add_argument('-o', '--output-file', default='udsscan_%Y%m%d-%H%M%S.yml',
-            help='Scan results output filename')
+            help='Log filename to write to, log filename can contain "time.strftime" formatting like "udsscan_%%Y%%m%%d-%%H%%M%%S.log"')
+    parser.add_argument('-o', '--output-file', default='udsscan.yml',
+            help='Scan results output filename, can contain "time.strftime" formatting like "udsscan_%%Y%%m%%d-%%H%%M%%S.yml"')
     parser.add_argument('-c', '--can-session-file',
             help='Filename for saving raw cancat session')
     parser.add_argument('-i', '--input-file',
@@ -142,6 +142,10 @@ def udsmap_parse_args():
 
     return parser.parse_args()
 
+
+def log_and_save(results, note):
+    log.msg(note)
+    results['notes'][results['start_time']] += '\n' + note
 
 
 def import_results(filename=None):
@@ -159,23 +163,33 @@ def import_results(filename=None):
 
 def save_results(results, filename=None):
     if filename is not None:
-        # XXX: pickle our results first just in case something goes wrong
-        import pickle
-        pickle.dump(results, open('canmap_debug_pickle.obj', 'w'))
-
         # TODO: support multiple in/out file types?
         import yaml
 
         class literal_unicode(unicode): pass
+
         def literal_unicode_representer(dumper, data):
             return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
         yaml.add_representer(literal_unicode, literal_unicode_representer)
 
+        def hexint_presenter(dumper, data):
+            return dumper.represent_int(hex(data))
+        yaml.add_representer(int, hexint_presenter)
+
+        # TODO: It'd be more esthetically pleasing in the output files if 
+        #       response data could be represented as a simple ascii string with 
+        #       escaped bytes in it rather than the standard yaml "!!binary 
+        #       + base64 string" method.
+
         # TODO: I should probably make the config a class of it's own also, with 
         #       .add_ecu(), .add_note(), .export(), .import()
         output_data = {}
-        output_data['notes'] = [literal_unicode('\n'.join(n)) for n in results['notes']]
-        output_data['ECUs'] = [(k, v.export()) for k, v in results['ECUs'].items()]
+        output_data['notes'] = dict([(k, literal_unicode(v)) for k, v in results['notes'].items()])
+        output_data['ECUs'] = []
+        for addr, ecu in results['ECUs'].items():
+            data = dict(addr)
+            data.update(ecu.export())
+            output_data['ECUs'].append(data)
 
         with open(filename, 'w') as f:
             f.write(yaml.dump(output_data))
@@ -192,10 +206,8 @@ def save_and_exit(retval):
 
 
 def sigint_handler(signum, frame):
-    log.msg('Aborting scan - saving partial results')
-    global _config, _output_filename, _can_session_filename
-
-    _config['notes'][-1].append('scan aborted @ {}'.format(now()))
+    global _config
+    log_and_save(_config, 'scan aborted @ {}'.format(now()))
     save_and_exit(1)
 
 
@@ -206,8 +218,10 @@ def main():
     #       data thing will be better handled that way
     #cancat.utils.canmap(args)
 
-    if args.verbose:
+    if args.verbose == 1:
         loglevel = log.DEBUG
+    elif args.verbose >= 2:
+        loglevel = log.DETAIL
     else:
         loglevel = log.WARNING
 
@@ -258,11 +272,9 @@ def main():
         _config = import_results(args.input_file)
     else:
         _config = {
-            'notes': [[]],
+            'notes': {},
             'ECUs': {},
         }
-
-    _config['notes'][-1].append('command: {}'.format(' '.join(sys.argv)))
 
     global _output_filename, _can_session_filename
     _output_filename = time.strftime(args.output_file)
@@ -273,11 +285,15 @@ def main():
 
     # wait a short delay and check how many can messages have been received
     time.sleep(1.0)
+
+    start_time = now()
+    _config['notes'][start_time] = []
+    _config['start_time'] = start_time
+    _config['notes'][start_time] = 'command: {}'.format(' '.join(sys.argv))
+
     count2 = c.getCanMsgCount()
     if count2 <= count1:
-        log_msg = 'ERROR: No CAN traffic detected on {} @ {}'.format(args.port, args.baud)
-        log.msg(log_msg)
-        _config['notes'][-1].append(log_msg)
+        log_and_save(_config, 'ERROR: No CAN traffic detected on {} @ {}'.format(args.port, args.baud))
 
         save_and_exit(2)
     
@@ -292,86 +308,67 @@ def main():
             scan_types.append(scan)
 
     if 'E' in scan_types:
-        log_msg = 'ECU scan started\t\t\t@ {}'.format(now())
-        log.msg(log_msg)
-        _config['notes'][-1].append(log_msg)
+        log_and_save(_config, 'ECU scan started @ {}'.format(start_time))
 
-        ecus = []
-        # TODO: make sure not to re-scan for ECUs unless the rescan flag is set
-        if args.discovery_type == 'did':
-            c.placeCanBookmark("Start_ECU_DID_Scan", str(args.E))
-            if args.bus_mode in ['std', 'both']:
-                ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=False))
-            if args.bus_mode in ['ext', 'both']:
-                ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=True))
-            c.placeCanBookmark("Stop_ECU_DID_Scan", None)
-        else:
-            c.placeCanBookmark("Start_ECU_Session_Scan", str(args.E))
-            if args.bus_mode in ['std', 'both']:
-                ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=False))
-            if args.bus_mode in ['ext', 'both']:
-                ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=True))
-            c.placeCanBookmark("Stop_ECU_Session_Scan", None)
+        if not _config['ECUs'] or args.rescan:
+            ecus = []
+            if args.discovery_type == 'did':
+                c.placeCanBookmark("Start_ECU_DID_Scan", str(args.E))
+                if args.bus_mode in ['std', 'both']:
+                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=False))
+                if args.bus_mode in ['ext', 'both']:
+                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=True))
+                c.placeCanBookmark("Stop_ECU_DID_Scan", None)
+            else:
+                c.placeCanBookmark("Start_ECU_Session_Scan", str(args.E))
+                if args.bus_mode in ['std', 'both']:
+                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=False))
+                if args.bus_mode in ['ext', 'both']:
+                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=True))
+                c.placeCanBookmark("Stop_ECU_Session_Scan", None)
 
-        for addr in ecus:
-            # Don't overwrite any existing ECU configuration data
-            if addr not in _config['ECUs']: 
-                # TODO: Scan each ECU+Session for invalid DIDs, possibly add
-                #       a true/false rescan param to the ECU constructor?
+            for addr in ecus:
                 _config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr, uds_class=scancls)
 
     if 'D' in scan_types:
-        log_msg = 'DID read scan started\t\t\t@ {}'.format(now())
-        log.msg(log_msg)
-        _config['notes'][-1].append(log_msg)
+        log_and_save(_config, 'DID read scan started @ {}'.format(now()))
 
         c.placeCanBookmark("Start_DID_Read_Scan", str(args.D))
         for ecu in _config['ECUs'].values():
-            ecu.did_read_scan(args.D)
+            ecu.did_read_scan(args.D, args.rescan)
         c.placeCanBookmark("Stop_DID_Read_Scan", None)
 
-    if 'W' in scan_types:
-        log_msg = 'DID write scan started\t\t\t@ {}'.format(now())
-        log.msg(log_msg)
-        _config['notes'][-1].append(log_msg)
-
-        c.placeCanBookmark("Start_DID_Write_Scan", str(args.D))
-        for ecu in _config['ECUs'].values():
-            ecu.did_write_scan(args.D)
-        c.placeCanBookmark("Stop_DID_Write_Scan", None)
+    #if 'W' in scan_types:
+    #    log_and_save(_config, 'DID write scan started @ {}'.format(now()))
+    #
+    #    c.placeCanBookmark("Start_DID_Write_Scan", str(args.D))
+    #    for ecu in _config['ECUs'].values():
+    #        ecu.did_write_scan(args.D, args.rescan)
+    #    c.placeCanBookmark("Stop_DID_Write_Scan", None)
 
     if 'S' in scan_types:
-        log_msg = 'Session scan started\t\t\t@ {}'.format(now())
-        log.msg(log_msg)
-        _config['notes'][-1].append(log_msg)
+        log_and_save(_config, 'Session scan started @ {}'.format(now()))
 
         c.placeCanBookmark("Start_Session_Scan", str(args.S))
         for ecu in _config['ECUs'].values():
-            ecu.session_scan(args.S)
+            ecu.session_scan(args.S, args.rescan)
         c.placeCanBookmark("Stop_Session_Scan", None)
 
     if 'A' in scan_types:
-        log_msg = 'Auth scan started\t\t\t@ {}'.format(now())
-        log.msg(log_msg)
-        _config['notes'][-1].append(log_msg)
+        log_and_save(_config, 'Auth scan started @ {}'.format(now()))
 
         c.placeCanBookmark("Start_Auth_Level_Scan", str(args.A))
         for ecu in _config['ECUs'].values():
-            ecu.auth_scan(args.S)
+            ecu.auth_scan(args.A, args.rescan)
         c.placeCanBookmark("Stop_Auth_Level_Scan", None)
 
     if 'L' in scan_types:
-        log_msg = 'Key Length scan started\t\t\t@ {}'.format(now())
-        log.msg(log_msg)
-        _config['notes'][-1].append(log_msg)
+        log_and_save(_config, 'Key Length scan started @ {}'.format(now()))
 
         c.placeCanBookmark("Start_Key_Length_Scan", str(args.L))
         for ecu in _config['ECUs'].values():
-            ecu.key_length_scan(args.L)
+            ecu.key_length_scan(args.L, args.rescan)
         c.placeCanBookmark("Stop_Key_Length_Scan", None)
 
-    log_msg = 'scans completed\t\t\t\t@ {}'.format(now())
-    log.msg(log_msg)
-    _config['notes'][-1].append(log_msg)
-
+    log_and_save(_config, 'scans completed @ {}'.format(now()))
     save_and_exit(0)

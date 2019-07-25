@@ -1,8 +1,4 @@
 # ECU class
-#
-# TODO: Make sure new results do not overwrite old results
-# TODO: Don't automatically scan for new results if old results already exist 
-#       (add a "force" param to enable re-scanning? Something like that)
 
 import time
 import cancat.uds
@@ -50,67 +46,59 @@ class ECU(object):
             # TODO: probably need to validate/massage this object instead of 
             #       assuming it'll be correctly formatted?
             self._sessions = init_data
-            self._dids = self._sessions[1]['dids']
         else:
-            self._dids = {}
-            self._sessions = {1: {'dids': self._dids}}
+            self._sessions = {1: {'dids': {}}}
 
     def export(self):
-        return self._sessions
+        return {'sessions': self._sessions}
 
-    def did_read_scan(self, did_range):
-        arb, resp, ext = self._addr
-        u = self._uds(self.c, arb, resp, extflag=ext, verbose=False)
-        self._dids = cancat.uds.utils.did_read_scan(u, did_range)
+    def did_read_scan(self, did_range, rescan=False):
+        # Only do a scan if we don't already have data, unless rescan is set
+        if not self._sessions[1]['dids'] or rescan:
+            arb, resp, ext = self._addr
+            u = self._uds(self.c, arb, resp, extflag=ext, verbose=False)
+            self._sessions[1]['dids'].update(cancat.uds.utils.did_read_scan(u, did_range))
 
-        # Most DIDs should be readable in the default session, loop through 
-        # the DIDs now and mark any that was able to be successfully read as 
-        # belonging to session 1
-        for did in self._dids:
-            if 'resp' in self._dids[did]:
-                self._dids[did]['sessions'] = [1]
-            else:
-                self._dids[did]['sessions'] = []
+    def did_write_scan(self, did_range, rescan=False):
+        # Only do a scan if we don't already have data, unless rescan is set
+        if not self._sessions[1]['write_dids'] or rescan:
+            # Attempt to write an empty array, which probably won't succeed?  
+            # but if it does we're pretty screwed.
+            arb, resp, ext = self._addr
+            u = self._uds(self.c, arb, resp, extflag=ext, verbose=False)
+            self._write_dids.update(cancat.uds.utils.did_write_scan(u, did_range, b''))
 
+    def session_scan(self, session_range, rescan=False):
+        # Only do a scan if this ECU only has info for session 1 (the default 
+        # sssion)
+        if len(self._sessions[1]) == 1 or rescan:
+            arb, resp, ext = self._addr
+            u = self._uds(self.c, arb, resp, extflag=ext, verbose=False)
+            self._sessions[sess].update(cancat.uds.utils.session_scan(u, session_range))
 
-    def did_write_scan(self, did_range):
-        # I've got to figure out how stupid of an idea this function is before 
-        # I enable it
-        raise NotImplementedError('did_write_scan not yet implemented')
+            # For each session that was found, go through the list of DIDs and 
+            # identify which DIDs can be read in this session
+            #
+            # TODO: generalize this part of this function so it can be called 
+            #   from others?
+            for sess in new_sessions:
+                if 'resp' in self._sessions[sess]:
+                    u.DiagnosticSessionControl(sess)
+                    u.StartTesterPresent(request_response=False)
+                    log.debug('ECU {} session {} retrying DIDs with errors'.format(self._addr, sess))
 
-        # Attempt to write an empty array, which probably won't succeed?  but if 
-        # it does we're pretty screwed.
-        arb, resp, ext = self._addr
-        u = self._uds(self.c, arb, resp, extflag=ext, verbose=False)
-        self._write_dids = cancat.uds.utils.did_write_scan(u, did_range, b'')
+                    self._sessions[sess]['dids'] = {}
+                    for did in self._dids:
+                        log.detail('Trying DID {}'.format(hex(did)))
+                        resp = try_read_did(u, did)
+                        if resp is not None:
+                            log.msg('DID {}: {}'.format(hex(did), resp))
+                            self._sessions[sess]['dids'][did] = resp
+                    
+                    u.StopTesterPresent()
 
-    def session_scan(self, session_range):
-        arb, resp, ext = self._addr
-        u = self._uds(self.c, arb, resp, extflag=ext, verbose=False)
-        new_sessions = cancat.uds.utils.session_scan(u, session_range)
-
-        # For each session that was found, go through the list of DIDs and 
-        # identify which DIDs can be read in this session
-        #
-        # TODO: generalize this part of this function so it can be called 
-        #       from others?
-        for sess in new_sessions:
-            if sess != 1:
-                self._sessions[sess] = new_sessions[sess]
-
-                u.DiagnosticSessionControl(sess)
-                u.StartTesterPresent(request_response=False)
-
-                self._sessions[sess]['dids'] = {}
-                for did in self._dids:
-                    resp = try_read_did(u, did)
-                    if resp is not None:
-                        self._sessions[sess]['dids'][did] = resp
-                        self._dids[did]['sessions'].append(sess)
-            
-                u.StopTesterPresent()
-
-    def auth_scan(self, auth_range):
+    def auth_scan(self, auth_range, rescan=False):
+        # TODO: add rescan check and review debug msgs
         arb, resp, ext = self._addr
         u = self._uds(self.c, arb, resp, extflag=ext, verbose=False)
         for sess in self._sessions:
@@ -148,14 +136,13 @@ class ECU(object):
                 log.debug('resp: {}'.format(resp))
                 if resp is not None and 'err' in resp:
                     # Attempt to handle a few errors
-                    # TODO: Some sort of args/config method for handling errors?
                     if 'err' in resp and resp['err'].neg_code == 0x36:
                         # 0x36:'ExceedNumberOfAttempts'
                         log.debug('Retrying session {}, auth {}, length {}'.format(sess, lvl, keylen))
                         resp = cancat.uds.utils.try_auth(u, level, key)
                         log.debug('resp: {}'.format(resp))
 
-                    if 'err' in resp and resp['err'].neg_code == 0x37:
+                    elif 'err' in resp and resp['err'].neg_code == 0x37:
                         # 0x37:'RequiredTimeDelayNotExpired'
                         time.sleep(1.0)
                         log.debug('Retrying session {}, auth {}, length {}'.format(sess, lvl, keylen))
@@ -169,7 +156,8 @@ class ECU(object):
                     else:
                         level['err'] = resp['err']
 
-    def key_length_scan(self, len_range):
+    def key_length_scan(self, len_range, rescan=False):
+        # TODO: add rescan check and review debug msgs
         arb, resp, ext = self._addr
         log.debug('Starting key/seed length scan for range: {}'.format(len_range))
         u = self._uds(self.c, arb, resp, extflag=ext, verbose=False)

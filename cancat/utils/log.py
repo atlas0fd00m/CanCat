@@ -3,14 +3,45 @@ import sys
 
 
 class bcolors:
-    RED    = '\033[91m'
-    ORANGE = '\033[33m'
-    YELLOW = '\033[93m'
-    GREEN  = '\033[92m'
-    CYAN   = '\033[36m'
-    BLUE   = '\033[94m'
-    PURPLE = '\033[35m'
-    ENDC   = '\033[0m'
+    ENDC        = '\033[0m'
+    BLACK       = '\033[30m'
+    RED         = '\033[31m'
+    GREEN       = '\033[32m'
+    YELLOW      = '\033[33m'
+    BLUE        = '\033[34m'
+    MAGENTA     = '\033[35m'
+    CYAN        = '\033[36m'
+    LGT_GRAY    = '\033[37m'
+    DEFAULT     = '\033[39m'
+    DRK_GRAY    = '\033[90m'
+    LGT_RED     = '\033[91m'
+    LGT_GREEN   = '\033[92m'
+    LGT_YELLOW  = '\033[93m'
+    LGT_BLUE    = '\033[94m'
+    LGT_MAGENTA = '\033[95m'
+    LGT_CYAN    = '\033[96m'
+
+def _color_test():
+    colors = [
+        bcolors.BLACK,
+        bcolors.RED,
+        bcolors.GREEN,
+        bcolors.YELLOW,
+        bcolors.BLUE,
+        bcolors.MAGENTA,
+        bcolors.CYAN,
+        bcolors.LGT_GRAY,
+        bcolors.DEFAULT,
+        bcolors.DRK_GRAY,
+        bcolors.LGT_RED,
+        bcolors.LGT_GREEN,
+        bcolors.LGT_YELLOW,
+        bcolors.LGT_BLUE,
+        bcolors.LGT_MAGENTA,
+        bcolors.LGT_CYAN,
+    ]
+    for color in colors:
+        print('{}{}{}'.format(color, 'TEST', bcolors.ENDC))
 
 
 class LogLevel(object):
@@ -50,13 +81,14 @@ class LogLevel(object):
         return self.val <= other
 
 
-MSG      = LogLevel('',           None,           0)
-CRITICAL = LogLevel('CRITICAL: ', bcolors.RED,    1)
-ERROR    = LogLevel('ERROR: ',    bcolors.ORANGE, 2)
-WARNING  = LogLevel('WARNING: ',  bcolors.YELLOW, 3)
-INFO     = LogLevel('INFO: ',     bcolors.GREEN,  4)
-FIXME    = LogLevel('FIXME: ',    bcolors.BLUE ,  5)
-DEBUG    = LogLevel('DEBUG: ',    bcolors.CYAN,   6)
+MSG         = LogLevel('',           None,                0)
+CRITICAL    = LogLevel('CRITICAL: ', bcolors.LGT_MAGENTA, 1)
+ERROR       = LogLevel('ERROR: ',    bcolors.LGT_RED,     2)
+WARNING     = LogLevel('WARNING: ',  bcolors.LGT_YELLOW,  3)
+INFO        = LogLevel('INFO: ',     bcolors.LGT_GREEN,   4)
+FIXME       = LogLevel('FIXME: ',    bcolors.DRK_GRAY,    5)
+DEBUG       = LogLevel('DEBUG: ',    bcolors.LGT_BLUE,    6)
+DETAIL      = LogLevel('DETAIL: ',   bcolors.LGT_CYAN,    7)
 
 
 # TODO: make this thread/process safe?
@@ -132,3 +164,6 @@ def info(*args):
 
 def debug(*args):
     log(DEBUG, *args)
+
+def detail(*args):
+    log(DETAIL, *args)

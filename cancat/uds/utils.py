@@ -16,7 +16,18 @@ def ecu_did_scan(c, arb_id_range, ext=False, did=0xf190, verbose_flag=False):
     log.debug('Starting{} ECU scan for range: {}'.format(scan_type, arb_id_range))
     ecus = []
     for i in arb_id_range:  
-        if ext:
+        if ext and i == 0xF1:
+            # Skip i == 0xF1 because in that case the sender and receiver IDs 
+            # are the same
+            log.detail('Skipping 0xF1 on ext ECU scan: invalid ECU address')
+            continue
+        elif ext == False and i >= 0xF8:
+            # For non-extended scans the valid range goes from 0x00 to 0xFF, but 
+            # stop the scan at 0xF7 because at that time the response is the 
+            # largest possible valid value
+            log.detail('Stopping std ECU scan at 0xF7: last valid ECU address')
+            break
+        elif ext:
             arb_id = 0x18db00f1 + (i << 8)
             resp_id = 0x18dbf100 + i
         else:
@@ -27,7 +38,7 @@ def ecu_did_scan(c, arb_id_range, ext=False, did=0xf190, verbose_flag=False):
 
         global _UDS_CLASS 
         u = _UDS_CLASS(c, verbose=verbose_flag, **addr)
-        log.debug('Trying ECU {}'.format(addr))
+        log.detail('Trying ECU {}'.format(addr))
         try:
             msg = u.ReadDID(did)
             if msg is not None:
@@ -36,7 +47,7 @@ def ecu_did_scan(c, arb_id_range, ext=False, did=0xf190, verbose_flag=False):
 
                 ecus.append(addr)
         except cancat.uds.NegativeResponseException as e:
-            log.debug('ECU {} DID {}: error\n\t{}'.format(addr, hex(did), e))
+            log.debug('ECU {} DID {}: {}'.format(addr, hex(did), e))
             log.msg('found ECU: {}'.format(addr))
 
             # If a negative response happened, that means an ECU is present 
@@ -49,7 +60,18 @@ def ecu_did_scan(c, arb_id_range, ext=False, did=0xf190, verbose_flag=False):
 def ecu_session_scan(c, arb_id_range, ext=False, session=1, verbose_flag=False):
     ecus = []
     for i in arb_id_range:  
-        if ext:
+        if ext and i == 0xF1:
+            # Skip i == 0xF1 because in that case the sender and receiver IDs 
+            # are the same
+            print 'continue!'
+            continue
+        elif ext == False and i >= 0xF8:
+            # For non-extended scans the valid range goes from 0x00 to 0xFF, but 
+            # stop the scan at 0xF7 because at that time the response is the 
+            # largest possible valid value
+            print 'break!'
+            break
+        elif ext:
             arb_id = 0x18db00f1 + (i << 8)
             resp_id = 0x18dbf100 + i
         else:
@@ -59,7 +81,7 @@ def ecu_session_scan(c, arb_id_range, ext=False, session=1, verbose_flag=False):
         addr = ECUAddress(arb_id, resp_id, ext)
         global _UDS_CLASS 
         u = _UDS_CLASS(c, verbose=verbose_flag, **addr)
-        log.debug('Trying ECU {}'.format(addr))
+        log.detail('Trying ECU {}'.format(addr))
         try:
             msg = u.DiagnosticSessionControl(did)
             if msg is not None:
@@ -68,7 +90,7 @@ def ecu_session_scan(c, arb_id_range, ext=False, session=1, verbose_flag=False):
 
                 ecus.append(addr)
         except cancat.uds.NegativeResponseException as e:
-            log.debug('ECU {} session {}: error\n\t{}'.format(addr, session, e))
+            log.debug('ECU {} session {}: {}'.format(addr, session, e))
             log.msg('found ECU: {}'.format(addr))
 
             # If a negative response happened, that means an ECU is present 
@@ -91,15 +113,15 @@ def try_read_did(u, did):
     return data
 
 
-# TODO NEXT: add printouts here like we have in ECU scanning
 def did_read_scan(u, did_range):
     log.debug('Starting DID read scan for range: {}'.format(did_range))
     dids = {}
     for i in did_range:  
+        log.detail('Trying DID {}'.format(hex(i)))
         resp = try_read_did(u, i)
         if resp is not None:
             dids[i] = resp
-            log.debug('DID {}: {}'.format(hex(i), resp))
+            log.msg('DID {}: {}'.format(hex(i), resp))
     return dids
 
 
@@ -120,10 +142,11 @@ def did_write_scan(u, did_range, write_data):
     log.debug('Starting DID write scan for range: {}'.format(did_range))
     dids = {}
     for i in did_range:  
+        log.detail('Trying DID {}'.format(hex(i)))
         resp = try_write_did(u, i, write_data)
         if resp is not None:
             dids[i] = resp
-            log.debug('DID {}: {}'.format(hex(i), resp))
+            log.msg('DID {}: {}'.format(hex(i), resp))
     return dids
 
 
@@ -144,10 +167,11 @@ def session_scan(u, session_range):
     log.debug('Starting session scan for range: {}'.format(session_range))
     sessions = {}
     for i in session_range:  
+        log.detail('Trying session {}'.format(i))
         resp = try_session(u, i)
         if resp is not None:
             sessions[i] = resp
-            log.debug('session {}: {}'.format(hex(i), resp))
+            log.msg('session {}: {}'.format(hex(i), resp))
     return sessions
 
 
@@ -168,8 +192,9 @@ def auth_scan(u, auth_range):
     log.debug('Starting auth scan for range: {}'.format(auth_range))
     auth_levels = {}
     for i in auth_range:  
+        log.detail('Trying auth level {}'.format(i))
         resp = try_auth(u, i, b'')
         if resp is not None:
             auth_levels[i] = resp
-            log.debug('auth {}: {}'.format(hex(i), resp))
+            log.msg('auth {}: {}'.format(hex(i), resp))
     return auth_levels
