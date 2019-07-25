@@ -8,7 +8,7 @@ from cancat.utils import log
 _UDS_CLASS = cancat.uds.UDS
 
 
-def ecu_did_scan(c, arb_id_range, ext=False, did=0xf190, verbose_flag=False):
+def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, verbose_flag=False):
     scan_type = ''
     if ext:
         scan_type = ' ext'
@@ -37,6 +37,7 @@ def ecu_did_scan(c, arb_id_range, ext=False, did=0xf190, verbose_flag=False):
         addr = ECUAddress(arb_id, resp_id, ext)
 
         global _UDS_CLASS 
+        log.debug(c, dict(verbose=verbose_flag, **addr))
         u = _UDS_CLASS(c, verbose=verbose_flag, **addr)
         log.detail('Trying ECU {}'.format(addr))
         try:
@@ -57,7 +58,7 @@ def ecu_did_scan(c, arb_id_range, ext=False, did=0xf190, verbose_flag=False):
     return ecus
 
 
-def ecu_session_scan(c, arb_id_range, ext=False, session=1, verbose_flag=False):
+def ecu_session_scan(c, arb_id_range, ext=0, session=1, verbose_flag=False):
     ecus = []
     for i in arb_id_range:  
         if ext and i == 0xF1:
@@ -80,6 +81,7 @@ def ecu_session_scan(c, arb_id_range, ext=False, session=1, verbose_flag=False):
 
         addr = ECUAddress(arb_id, resp_id, ext)
         global _UDS_CLASS 
+        log.debug(c, dict(verbose=verbose_flag, **addr))
         u = _UDS_CLASS(c, verbose=verbose_flag, **addr)
         log.detail('Trying ECU {}'.format(addr))
         try:

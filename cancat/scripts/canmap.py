@@ -317,16 +317,16 @@ def main():
             if args.discovery_type == 'did':
                 c.placeCanBookmark("Start_ECU_DID_Scan", str(args.E))
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=False))
+                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=0))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=True))
+                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=1))
                 c.placeCanBookmark("Stop_ECU_DID_Scan", None)
             else:
                 c.placeCanBookmark("Start_ECU_Session_Scan", str(args.E))
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=False))
+                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=0))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=True))
+                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=1))
                 c.placeCanBookmark("Stop_ECU_Session_Scan", None)
 
             for addr in ecus:
