@@ -73,6 +73,10 @@ def _get_baud_options():
     bauds = [b[4:-3] for b in dir(cancat) if b.startswith('CAN_') and b.endswith('BPS')]
     return bauds
 
+def _get_baud_value(baud):
+    ret = getattr(cancat, "CAN_{}BPS".format(baud))
+    return ret
+
 
 def udsmap_parse_args():
     parser = argparse.ArgumentParser(
@@ -258,9 +262,7 @@ def main():
     else:
         c = cancat.CanInterface(port=args.port)
 
-    # TODO: fix baud rate translation
-    #c.setCanBaud(args.baud)
-    c.setCanBaud(cancat.CAN_500KBPS)
+    c.setCanBaud(_get_baud_value(args.baud))
 
     # Listen for messages to ensure that the bus is working right
     count1 = c.getCanMsgCount()
