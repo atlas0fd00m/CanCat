@@ -7,8 +7,8 @@ from cancat.utils import log
 
 
 class ScanClass(cancat.uds.UDS):
-    def __init__(self, c, *args, **kwargs):
-        super(ScanClass, self).__init__(*args, **kwargs)
+    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
+        super(ScanClass, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag)
         # Collect all the seeds!
         self.clear_saved_seeds()
 
