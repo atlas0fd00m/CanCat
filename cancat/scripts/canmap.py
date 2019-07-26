@@ -124,6 +124,8 @@ def udsmap_parse_args():
     # TODO: Add support to attempt block data transfer from ECU?
     # TODO: Add support to attempt block data transfer to ECU?
 
+    parser.add_argument('-w', '--wait', action='store_true',
+            help='Wait to receive CAN messages before starting the scan')
     parser.add_argument('-r', '--rescan', action='store_true',
             help='Run a full rescan and merge new results with any existing data')
 
@@ -264,9 +266,6 @@ def main():
 
     c.setCanBaud(_get_baud_value(args.baud))
 
-    # Listen for messages to ensure that the bus is working right
-    count1 = c.getCanMsgCount()
-
     global _config
     if args.input_file is not None:
         # TODO: test reading input config to make sure valid data is not 
@@ -293,11 +292,13 @@ def main():
     _config['start_time'] = start_time
     _config['notes'][start_time] = 'command: {}'.format(' '.join(sys.argv))
 
-    count2 = c.getCanMsgCount()
-    if count2 <= count1:
-        log_and_save(_config, 'ERROR: No CAN traffic detected on {} @ {}'.format(args.port, args.baud))
-
-        save_and_exit(2)
+    if args.wait:
+        # Listen for messages to ensure that the bus is working right
+        count1 = c.getCanMsgCount()
+        count2 = c.getCanMsgCount()
+        if count2 <= count1:
+            log_and_save(_config, 'ERROR: No CAN traffic detected on {} @ {}'.format(args.port, args.baud))
+            save_and_exit(2)
     
     signal.signal(signal.SIGINT, sigint_handler)
 
