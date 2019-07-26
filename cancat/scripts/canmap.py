@@ -124,8 +124,8 @@ def udsmap_parse_args():
     # TODO: Add support to attempt block data transfer from ECU?
     # TODO: Add support to attempt block data transfer to ECU?
 
-    parser.add_argument('-T', '--timeout', type=float, default=3.0,
-            help='UDS Timeout, 3 seconds is standard')
+    parser.add_argument('-T', '--timeout', type=float, default=0.1,
+            help='UDS Timeout, 3 seconds is the ISO14229 standard, standard for this tool is 100 msec (0.1)')
     parser.add_argument('-w', '--wait', action='store_true',
             help='Wait to receive CAN messages before starting the scan')
     parser.add_argument('-r', '--rescan', action='store_true',
