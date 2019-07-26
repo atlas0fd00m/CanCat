@@ -1,5 +1,4 @@
 import cancat.uds
-import cancat.uds
 
 class CanInterface(object):
     """
@@ -38,8 +37,8 @@ class TestUDS(cancat.uds.UDS):
         },
     }
 
-    def __init__(self, *args, **kwargs):
-        super(TestUDS, self).__init__(*args, **kwargs)
+    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
+        super(TestUDS, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag)
         if self.tx_arbid in TestUDS.DIDs:
             self.dids = TestUDS.DIDs[self.tx_arbid]
         else:

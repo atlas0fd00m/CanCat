@@ -38,7 +38,7 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, verbose_flag=False):
 
         global _UDS_CLASS 
         log.log(log.FIXME, (c, dict(verbose=verbose_flag, **addr)))
-        u = _UDS_CLASS(c, verbose=verbose_flag, **addr)
+        u = _UDS_CLASS(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag, verbose=verbose_flag)
         log.detail('Trying ECU {}'.format(addr))
         try:
             msg = u.ReadDID(did)
@@ -82,7 +82,7 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, verbose_flag=False):
         addr = ECUAddress(arb_id, resp_id, ext)
         global _UDS_CLASS 
         log.log(log.FIXME, (c, dict(verbose=verbose_flag, **addr)))
-        u = _UDS_CLASS(c, verbose=verbose_flag, **addr)
+        u = _UDS_CLASS(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag, verbose=verbose_flag)
         log.detail('Trying ECU {}'.format(addr))
         try:
             msg = u.DiagnosticSessionControl(did)
