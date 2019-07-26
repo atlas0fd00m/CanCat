@@ -102,10 +102,11 @@ class NegativeResponseException(Exception):
 
 
 class UDS(object):
-    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
+    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0, timeout=3.0):
         self.c = c
         self.verbose = verbose
         self.extflag = extflag
+        self.timeout = timeout
 
         if rx_arbid == None:
             rx_arbid = tx_arbid + 8 # by UDS spec
@@ -113,8 +114,8 @@ class UDS(object):
         self.tx_arbid = tx_arbid
         self.rx_arbid = rx_arbid
 
-    def xmit_recv(self, data, extflag=0, timeout=3, count=1, service=None):
-        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, extflag, timeout, count, service)
+    def xmit_recv(self, data, extflag=0, count=1, service=None):
+        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, extflag, self.timeout, count, service)
 
         # check if the response is something we know about and can help out
         if msg != None and len(msg):
