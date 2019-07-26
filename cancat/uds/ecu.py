@@ -7,8 +7,8 @@ from cancat.utils import log
 
 
 class ScanClass(cancat.uds.UDS):
-    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
-        super(ScanClass, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag)
+    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0, timeout=3.0):
+        super(ScanClass, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag, timeout=3.0)
         # Collect all the seeds!
         self.clear_saved_seeds()
 
@@ -35,11 +35,12 @@ class ScanClass(cancat.uds.UDS):
 
 
 class ECU(object):
-    def __init__(self, c, addr, uds_class=ScanClass, init_data=None):
+    def __init__(self, c, addr, uds_class=ScanClass, timeout=3.0, init_data=None):
         # TODO: turn addr into it's own class/object/type
         #       make sure the str/repr is shown in hex
         self._addr = addr # (arb_id, resp_id, extflag)
         self._uds = uds_class
+        self._timeout = timeout
         self.c = c
 
         if init_data is not None:
@@ -56,7 +57,7 @@ class ECU(object):
         # Only do a scan if we don't already have data, unless rescan is set
         if not self._sessions[1]['dids'] or rescan:
             arb, resp, ext = self._addr
-            u = self._uds(self.c, arb, resp, extflag=ext, verbose=False)
+            u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
             self._sessions[1]['dids'].update(cancat.uds.utils.did_read_scan(u, did_range))
 
     def did_write_scan(self, did_range, rescan=False):

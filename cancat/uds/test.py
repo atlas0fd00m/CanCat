@@ -37,8 +37,8 @@ class TestUDS(cancat.uds.UDS):
         },
     }
 
-    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
-        super(TestUDS, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag)
+    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0, timeout=3.0):
+        super(TestUDS, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag, timeout=3.0)
         if self.tx_arbid in TestUDS.DIDs:
             self.dids = TestUDS.DIDs[self.tx_arbid]
         else:

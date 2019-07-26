@@ -320,20 +320,20 @@ def main():
             if args.discovery_type == 'did':
                 c.placeCanBookmark("Start_ECU_DID_Scan", str(args.E))
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=0))
+                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=0, timeout=args.timeout))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=1))
+                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=1, timeout=args.timeout))
                 c.placeCanBookmark("Stop_ECU_DID_Scan", None)
             else:
                 c.placeCanBookmark("Start_ECU_Session_Scan", str(args.E))
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=0))
+                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=0, timeout=args.timeout))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=1))
+                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=1, timeout=args.timeout))
                 c.placeCanBookmark("Stop_ECU_Session_Scan", None)
 
             for addr in ecus:
-                _config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr, uds_class=scancls)
+                _config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr, uds_class=scancls, timeout=args.timeout)
 
     if 'D' in scan_types:
         log_and_save(_config, 'DID read scan started @ {}'.format(now()))
