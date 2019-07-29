@@ -38,17 +38,17 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, verbose_flag=False, timeout
 
         global _UDS_CLASS 
         u = _UDS_CLASS(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag, verbose=verbose_flag, timeout=timeout)
-        log.detail('Trying ECU {}'.format(addr))
+        log.detail('Trying {}'.format(addr))
         try:
             msg = u.ReadDID(did)
             if msg is not None:
-                log.debug('ECU {} DID {}: {}'.format(addr, hex(did), msg))
-                log.msg('found ECU: {}'.format(addr))
+                log.debug('{} DID {}: {}'.format(addr, hex(did), msg))
+                log.msg('found {}'.format(addr))
 
                 ecus.append(addr)
         except cancat.uds.NegativeResponseException as e:
-            log.debug('ECU {} DID {}: {}'.format(addr, hex(did), e))
-            log.msg('found ECU: {}'.format(addr))
+            log.debug('{} DID {}: {}'.format(addr, hex(did), e))
+            log.msg('found {}'.format(addr))
 
             # If a negative response happened, that means an ECU is present 
             # to respond at this address.
@@ -63,13 +63,11 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, verbose_flag=False, time
         if ext and i == 0xF1:
             # Skip i == 0xF1 because in that case the sender and receiver IDs 
             # are the same
-            print 'continue!'
             continue
         elif ext == False and i >= 0xF8:
             # For non-extended scans the valid range goes from 0x00 to 0xFF, but 
             # stop the scan at 0xF7 because at that time the response is the 
             # largest possible valid value
-            print 'break!'
             break
         elif ext:
             arb_id = 0x18db00f1 + (i << 8)
@@ -81,17 +79,17 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, verbose_flag=False, time
         addr = ECUAddress(arb_id, resp_id, ext)
         global _UDS_CLASS 
         u = _UDS_CLASS(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag, verbose=verbose_flag, timeout=timeout)
-        log.detail('Trying ECU {}'.format(addr))
+        log.detail('Trying {}'.format(addr))
         try:
             msg = u.DiagnosticSessionControl(did)
             if msg is not None:
-                log.debug('ECU {} session {}: {}'.format(addr, session, msg))
-                log.msg('found ECU: {}'.format(addr))
+                log.debug('{} session {}: {}'.format(addr, session, msg))
+                log.msg('found {}'.format(addr))
 
                 ecus.append(addr)
         except cancat.uds.NegativeResponseException as e:
-            log.debug('ECU {} session {}: {}'.format(addr, session, e))
-            log.msg('found ECU: {}'.format(addr))
+            log.debug('{} session {}: {}'.format(addr, session, e))
+            log.msg('found {}'.format(addr))
 
             # If a negative response happened, that means an ECU is present 
             # to respond at this address.
@@ -109,7 +107,7 @@ def try_read_did(u, did):
     except cancat.uds.NegativeResponseException as e:
         # 0x31:'RequestOutOfRange' usually means the DID is not valid
         if e.neg_code != 0x31:
-            data = { 'err':e }
+            data = { 'err':e.neg_code }
     return data
 
 
@@ -134,7 +132,7 @@ def try_write_did(u, did, datg):
     except cancat.uds.NegativeResponseException as e:
         # 0x31:'RequestOutOfRange' usually means the DID is not valid
         if e.neg_code != 0x31:
-            did = { 'err':e }
+            did = { 'err':e.neg_code }
     return did
 
 
@@ -159,7 +157,7 @@ def try_session(u, sess_num):
     except cancat.uds.NegativeResponseException as e:
         # 0x12:'SubFunctionNotSupported',
         if e.neg_code != 0x12:
-            session = { 'err':e }
+            session = { 'err':e.neg_code }
     return session
 
 
@@ -171,7 +169,7 @@ def session_scan(u, session_range):
         resp = try_session(u, i)
         if resp is not None:
             sessions[i] = resp
-            log.msg('session {}: {}'.format(hex(i), resp))
+            log.msg('session {}: {}'.format(i, resp))
     return sessions
 
 
@@ -184,17 +182,23 @@ def try_auth(u, level, key):
     except cancat.uds.NegativeResponseException as e:
         # 0x12:'SubFunctionNotSupported',
         if e.neg_code != 0x12:
-            resp = { 'err':e }
-    return resp
+            auth_data = { 'err':e.neg_code }
+    return auth_data
 
 
-def auth_scan(u, auth_range):
+def auth_scan(u, auth_range, key_func=None):
     log.debug('Starting auth scan for range: {}'.format(auth_range))
     auth_levels = {}
     for i in auth_range:  
-        log.detail('Trying auth level {}'.format(i))
-        resp = try_auth(u, i, b'')
+        if key_func:
+            key = ''
+        else:
+            key = key_func(i)
+
+        log.detail('Trying auth level {}: key \'{}\''.format(i, key))
+
+        resp = try_auth(u, i, key)
         if resp is not None:
             auth_levels[i] = resp
-            log.msg('auth {}: {}'.format(hex(i), resp))
+            log.msg('auth {}: {}'.format(i, resp))
     return auth_levels

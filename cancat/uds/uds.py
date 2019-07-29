@@ -92,7 +92,7 @@ class NegativeResponseException(Exception):
 
     def __repr__(self):
         negresprepr = NEG_RESP_CODES.get(self.neg_code)
-        return "NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s" % \
+        return "NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s   \tmsg: %s" % \
             (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg.encode('hex'))
 
     def __str__(self):

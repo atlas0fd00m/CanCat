@@ -28,6 +28,10 @@ class SparseRange(tuple):
     def __new__(cls, val):
         return super(SparseRange, cls).__new__(cls, (_dec_range(v) for v in val.split(',')))
 
+    @classmethod
+    def _get_classname(cls):
+        return cls.__name__
+
     def __iter__(self):
         for val in super(SparseRange, self).__iter__():
             try:
@@ -47,10 +51,10 @@ class SparseRange(tuple):
         return False
 
     def __repr__(self):
-        return 'SparseRange(%s)' % super(SparseRange, self).__repr__()
+        return '{}({})'.format(self._get_classname(), super(SparseRange, self).__repr__())
 
     def __str__(self):
-        return 'SparseRange(%s)' % super(SparseRange, self).__str__()
+        return '{}'.format(super(SparseRange, self).__str__())
 
 
 class SparseHexRange(SparseRange):
