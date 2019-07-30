@@ -21,6 +21,7 @@ from cancat.utils import log
 c = None
 _config = None
 _output_filename = None
+_can_session_filename = None
 
 
 def now():
@@ -130,7 +131,7 @@ def udsmap_parse_args():
     parser.add_argument('-p', '--port', default='/dev/ttyACM0',
             help='System device to use to communicate to the CanCat hardware (/dev/ttyACM0)') 
     parser.add_argument('-b', '--baud',
-            choices=_get_baud_options(), default='500K',
+            choices=_get_baud_options(), default='AUTO',
             help='Set the CAN Bus Speed') 
     parser.add_argument('-t', '--discovery-type',
             choices=['did', 'session'], default='did',
@@ -174,7 +175,7 @@ def udsmap_parse_args():
             help='Verbose logging, use -vv for extra verbosity')
     parser.add_argument('-l', '--log-file',
             help='Log filename to write to, log filename can contain "time.strftime" formatting like "udsscan_%%Y%%m%%d-%%H%%M%%S.log"')
-    parser.add_argument('-o', '--output-file', default='udsscan.yml',
+    parser.add_argument('-o', '--output-file',
             help='Scan results output filename, can contain "time.strftime" formatting like "udsscan_%%Y%%m%%d-%%H%%M%%S.yml"')
     parser.add_argument('-c', '--can-session-file',
             help='Filename for saving raw cancat session')
@@ -203,6 +204,7 @@ def import_results(c, scancls, scan_delay, filename=None):
             imported_data = yaml.load(f, Loader=yamlLoader)
 
         config = {}
+        config['config'] = imported_data['config']
         config['notes'] = imported_data['notes']
         config['ECUs'] = {}
         for e in imported_data['ECUs']:
@@ -242,6 +244,8 @@ def save_results(results, filename=None):
         # TODO: I should probably make the config a class of it's own also, with 
         #       .add_ecu(), .add_note(), .export(), .import()
         output_data = {}
+        global _config
+        output_data['config'] = results['config']
         output_data['notes'] = dict([(k, literal_unicode(v)) for k, v in results['notes'].items()])
         output_data['ECUs'] = []
         for addr, ecu in results['ECUs'].items():
@@ -253,7 +257,9 @@ def save_results(results, filename=None):
             f.write(yaml.dump(output_data))
 
 def save():
-    save_results(_config, _output_filename)
+    global _config, _output_filename, _can_session_filename
+    if _output_filename:
+        save_results(_config, _output_filename)
 
     if _can_session_filename:
         global c
@@ -373,22 +379,29 @@ def main():
     else:
         c = cancat.CanInterface(port=args.port)
 
-    c.setCanBaud(_get_baud_value(args.baud))
-
     global _config
     if args.input_file is not None:
         _config = import_results(c, scancls, args.scan_delay, args.input_file)
+        # If the input baudrate is AUTO (the default), and the input config
+        # file has a baud rate, use the value from the config file, otherwise
+        # override the config file.
+        if args.baud != 'AUTO':
+            _config['config']['baud'] = args.baud
     else:
         _config = {
+            'config': {'baud': args.baud},
             'notes': {},
             'ECUs': {},
         }
 
-    global _output_filename, _can_session_filename
-    _output_filename = time.strftime(args.output_file)
+    c.setCanBaud(_get_baud_value(_config['config']['baud']))
 
-    _can_session_filename = None
+    if args.output_file:
+        global _output_filename
+        _output_filename = time.strftime(args.output_file)
+
     if args.can_session_file:
+        global _can_session_filename
         _can_session_filename = time.strftime(args.can_session_file)
 
     start_time = now()
