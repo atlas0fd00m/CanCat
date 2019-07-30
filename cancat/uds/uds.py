@@ -115,7 +115,7 @@ class UDS(object):
         self.rx_arbid = rx_arbid
 
     def xmit_recv(self, data, extflag=0, count=1, service=None):
-        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, extflag, self.timeout, count, service)
+        msg, idx = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, extflag, self.timeout, count, service)
 
         # check if the response is something we know about and can help out
         if msg != None and len(msg):
@@ -133,16 +133,17 @@ class UDS(object):
             if negresprepr != None and svc_resp != svc + 0x40:
                 if self.verbose > 1: 
                     print negresprepr + "\n"
-                # TODO: Implement getting final message if ResponseCorrectlyReceivedResponsePending is received
+
                 if errcode != 0x78: # Don't throw an exception for ResponseCorrectlyReceivedResponsePending
                     raise NegativeResponseException(errcode, svc, msg)
-
+                else:
+                    # Try again but increment the start index
+                    msg, idx = self.c._isotp_get_msg(self.rx_arbid, start_index = idx+1, service = service, timeout = self.timeout)
 
         return msg
 
        
     def _do_Function(self, func, data=None, subfunc=None, service=None):
-
         omsg = chr(func)
         if subfunc != None:
             omsg += chr(subfunc)
