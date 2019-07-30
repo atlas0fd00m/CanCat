@@ -1,11 +1,13 @@
 # Utility functions for UDS
 
-import cancat.uds
+import time
+import string
+from cancat.uds import NegativeResponseException, NEG_RESP_CODES, UDS
 from cancat.uds.types import ECUAddress
 from cancat.utils import log
 
 
-_UDS_CLASS = cancat.uds.UDS
+_UDS_CLASS = UDS
 
 
 def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, timeout=3.0, delay=None, verbose_flag=False):
@@ -48,7 +50,7 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, timeout=3.0, delay=None, ve
                 log.msg('found {}'.format(addr))
 
                 ecus.append(addr)
-        except cancat.uds.NegativeResponseException as e:
+        except NegativeResponseException as e:
             log.debug('{} DID {}: {}'.format(addr, hex(did), e))
             log.msg('found {}'.format(addr))
 
@@ -100,7 +102,7 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, verbose_flag=False, time
                 log.msg('found {}'.format(addr))
 
                 ecus.append(addr)
-        except cancat.uds.NegativeResponseException as e:
+        except NegativeResponseException as e:
             log.debug('{} session {}: {}'.format(addr, session, e))
             log.msg('found {}'.format(addr))
 
@@ -120,7 +122,7 @@ def try_read_did(u, did):
         resp = u.ReadDID(did)
         if resp is not None:
             data = { 'resp':resp }
-    except cancat.uds.NegativeResponseException as e:
+    except NegativeResponseException as e:
         # 0x31:'RequestOutOfRange' usually means the DID is not valid
         if e.neg_code != 0x31:
             data = { 'err':e.neg_code }
@@ -136,8 +138,13 @@ def did_read_scan(u, did_range, delay=None):
         u.c.placeCanBookmark('ReadDID({})'.format(hex(i)))
         resp = try_read_did(u, i)
         if resp is not None:
+            log.debug('DID {}: {}'.format(hex(i), resp))
+            if 'resp' in resp:
+                printable_did = ''.join([x if x in string.printable else '' for x in resp['resp'][3:]])
+                log.msg('DID {}: {} ({})'.format(hex(i), resp['resp'].encode('hex'), printable_did))
+            else:
+                log.msg('DID {}: {}'.format(hex(i), NEG_RESP_CODES.get(resp['err'])))
             dids[i] = resp
-            log.msg('DID {}: {}'.format(hex(i), resp))
 
         if delay:
             time.sleep(delay)
@@ -151,7 +158,7 @@ def try_write_did(u, did, datg):
         resp = u.WriteDID(i, data)
         if resp is not None:
             did = { 'resp':resp }
-    except cancat.uds.NegativeResponseException as e:
+    except NegativeResponseException as e:
         # 0x31:'RequestOutOfRange' usually means the DID is not valid
         if e.neg_code != 0x31:
             did = { 'err':e.neg_code }
@@ -167,8 +174,12 @@ def did_write_scan(u, did_range, write_data, delay=None):
         u.c.placeCanBookmark('WriteDID({})'.format(hex(i)))
         resp = try_write_did(u, i, write_data)
         if resp is not None:
-            dids[i] = resp
             log.msg('DID {}: {}'.format(hex(i), resp))
+            if 'resp' in resp:
+                log.msg('DID {}: {}'.format(hex(i), resp['resp'].encode('hex')))
+            else:
+                log.msg('DID {}: {}'.format(hex(i), NEG_RESP_CODES.get(resp['err'])))
+            dids[i] = resp
 
         if delay:
             time.sleep(delay)
@@ -182,7 +193,7 @@ def try_session(u, sess_num):
         resp = u.DiagnosticSessionControl(sess_num)
         if resp is not None:
             session = { 'resp':resp }
-    except cancat.uds.NegativeResponseException as e:
+    except NegativeResponseException as e:
         # 0x12:'SubFunctionNotSupported',
         if e.neg_code != 0x12:
             session = { 'err':e.neg_code }
@@ -191,18 +202,24 @@ def try_session(u, sess_num):
 
 def session_scan(u, session_range, delay=None):
     log.debug('Starting session scan for range: {}'.format(session_range))
-    u.c.placeCanBookmark('did_write_scan({}, delay={})'.format(session_range, delay))
+    u.c.placeCanBookmark('session_scan({}, delay={})'.format(session_range, delay))
     sessions = {}
     for i in session_range:  
         log.detail('Trying session {}'.format(i))
         u.c.placeCanBookmark('DiagnosticSessionControl({})'.format(i))
         resp = try_session(u, i)
         if resp is not None:
+            log.debug('session {}: {}'.format(i, resp))
+            if 'resp' in resp:
+                log.msg('SESSION {}: {}'.format(i, resp['resp'].encode('hex')))
+                # Return to session 1 before continuing
+                u.DiagnosticSessionControl(1)
+            else:
+                log.msg('SESSION {}: {}'.format(i, NEG_RESP_CODES.get(resp['err'])))
             sessions[i] = resp
-            log.msg('session {}: {}'.format(i, resp))
 
-        if delay:
-            time.sleep(delay)
+        # Wait for the ECU to exit the mode
+        time.sleep(1.0)
 
     return sessions
 
@@ -213,7 +230,7 @@ def try_auth(u, level, key):
         resp = u.SecurityAccess(level, key)
         if resp is not None:
             auth_data = { 'resp':resp }
-    except cancat.uds.NegativeResponseException as e:
+    except NegativeResponseException as e:
         # 0x12:'SubFunctionNotSupported',
         if e.neg_code != 0x12:
             auth_data = { 'err':e.neg_code }
@@ -235,8 +252,12 @@ def auth_scan(u, auth_range, key_func=None, delay=None):
 
         resp = try_auth(u, i, key)
         if resp is not None:
+            log.debug('auth {}: {}'.format(i, resp))
+            if 'resp' in resp:
+                log.msg('SECURITY {}: {}'.format(i, resp['resp'].encode('hex')))
+            else:
+                log.msg('SECURITY {}: {}'.format(i, NEG_RESP_CODES.get(resp['err'])))
             auth_levels[i] = resp
-            log.msg('auth {}: {}'.format(i, resp))
 
         if delay:
             time.sleep(delay)

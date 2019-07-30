@@ -90,10 +90,10 @@ class ECU(object):
             #
             # TODO: generalize this part of this function so it can be called 
             #       from others?
-            u.StartTesterPresent(request_response=False)
             for sess in new_sessions:
                 if 'resp' in self._sessions[sess]:
                     u.DiagnosticSessionControl(sess)
+                    u.StartTesterPresent(request_response=False)
                     log.debug('{} session {} retrying DIDs with errors'.format(self._addr, sess))
 
                     self._sessions[sess]['dids'] = {}
@@ -107,8 +107,11 @@ class ECU(object):
                         valid_did_range = [d for d in self._sessions[1]['dids']]
                         results = cancat.uds.utils.did_read_scan(u, valid_did_range, delay=self._delay)
                         self._sessions[sess]['dids'].update(results)
-                    
-            u.StopTesterPresent()
+
+                    u.StopTesterPresent()
+
+                    # Wait for the ECU to exit the mode
+                    time.sleep(1.0)
 
     def auth_scan(self, auth_range, rescan=False):
         arb, resp, ext = self._addr
@@ -155,7 +158,7 @@ class ECU(object):
         # error 0x35 means that the key is invalid, which also means that the 
         # length is correct
         # 0x35:'InvalidKey'
-        if 'msg' in self._sessions[sess]['auth'][auth_level] or \
+        if 'resp' in self._sessions[sess]['auth'][auth_level] or \
                 ('err' in self._sessions[sess]['auth'][auth_level] and \
                  self._sessions[sess]['auth'][auth_level]['err'] == 0x35):
             return True
@@ -194,7 +197,7 @@ class ECU(object):
 
                         self._sessions[sess]['auth'][lvl]['seeds'].append(dict(u.seed))
 
-                        if 'msg' in resp:
+                        if 'resp' in resp:
                             # Get the key attempted from the recorded seed data 
                             # in case the scanning class modified it
                             log.msg('Session {}, auth {} key found! secret {} (seed {})'.format(
