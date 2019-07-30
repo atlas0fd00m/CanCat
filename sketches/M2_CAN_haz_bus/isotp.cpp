@@ -26,6 +26,30 @@ unsigned long isotp_last_tx_time;
  */
 void IsoTP_cb(CAN_FRAME *frame, CANRaw *device)
 {
+    /* Save the incoming message to the list of messages going upstream */
+    if(mode == CMD_CAN_MODE_SNIFF_CAN0 && !can_rx_frames0.enqueue(frame))
+        log("RX ENQ Err CAN0", 15);
+    else if(mode == CMD_CAN_MODE_SNIFF_CAN1 && !can_rx_frames1.enqueue(frame))
+        log("RX ENQ Err CAN1", 15);
+    else if(mode == CMD_CAN_MODE_CITM)
+    {
+        if(device == &Can0)
+        {
+            if(!can_rx_frames0.enqueue(frame))
+                log("RX ENQ Err CAN0", 15);
+            if(!can_tx_frames1.enqueue(frame))
+                log("TX ENQ Err CAN1", 15);
+        }
+        else if(device == &Can1)
+        {
+            if(!can_rx_frames0.enqueue(frame))
+                log("RX ENQ Err CAN0", 15);
+            if(!can_tx_frames1.enqueue(frame))
+                log("TX ENQ Err CAN1", 15);
+        }
+    }
+
+    /* Do any extra handling if necessary */
     if ((frame->data.bytes[0] & 0xF0) == 0x10) /* First message */
     {
         CAN_FRAME tx_frame;
@@ -128,27 +152,6 @@ void IsoTP_cb(CAN_FRAME *frame, CANRaw *device)
         {
             isotp_tx_go = 1;
             isotp_sep_time = 0;
-        }
-    }
-    if(mode == CMD_CAN_MODE_SNIFF_CAN0 && !can_rx_frames0.enqueue(frame))
-        log("RX ENQ Err CAN0", 15);
-    else if(mode == CMD_CAN_MODE_SNIFF_CAN1 && !can_rx_frames1.enqueue(frame))
-        log("RX ENQ Err CAN1", 15);
-    else if(mode == CMD_CAN_MODE_CITM)
-    {
-        if(device == &Can0)
-        {
-            if(!can_rx_frames0.enqueue(frame))
-                log("RX ENQ Err CAN0", 15);
-            if(!can_tx_frames1.enqueue(frame))
-                log("TX ENQ Err CAN1", 15);
-        }
-        else if(device == &Can1)
-        {
-            if(!can_rx_frames0.enqueue(frame))
-                log("RX ENQ Err CAN0", 15);
-            if(!can_tx_frames1.enqueue(frame))
-                log("TX ENQ Err CAN1", 15);
         }
     }
 }
