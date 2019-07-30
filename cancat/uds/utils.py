@@ -8,12 +8,14 @@ from cancat.utils import log
 _UDS_CLASS = cancat.uds.UDS
 
 
-def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, verbose_flag=False, timeout=3.0):
+def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, timeout=3.0, delay=None, verbose_flag=False):
     scan_type = ''
     if ext:
         scan_type = ' ext'
 
-    log.debug('Starting{} ECU scan for range: {}'.format(scan_type, arb_id_range))
+    log.debug('Starting{} DID read ECU scan for range: {}'.format(scan_type, arb_id_range))
+    c.placeCanBookmark('ecu_did_scan({}, ext={}, did={}, timeout={}, delay={})'.format(
+        arb_id_range, ext, did, timeout, delay))
     ecus = []
     for i in arb_id_range:  
         if ext and i == 0xF1:
@@ -42,7 +44,7 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, verbose_flag=False, timeout
         try:
             msg = u.ReadDID(did)
             if msg is not None:
-                log.debug('{} DID {}: {}'.format(addr, hex(did), msg))
+                log.debug('{} DID {}: {}'.format(addr, hex(did), repr(msg)))
                 log.msg('found {}'.format(addr))
 
                 ecus.append(addr)
@@ -54,10 +56,21 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, verbose_flag=False, timeout
             # to respond at this address.
             ecus.append(addr)
 
+        if delay:
+            time.sleep(delay)
+
     return ecus
 
 
-def ecu_session_scan(c, arb_id_range, ext=0, session=1, verbose_flag=False, timeout=3.0):
+def ecu_session_scan(c, arb_id_range, ext=0, session=1, verbose_flag=False, timeout=3.0, delay=None):
+    scan_type = ''
+    if ext:
+        scan_type = ' ext'
+
+    log.debug('Starting{} Session ECU scan for range: {}'.format(scan_type, arb_id_range))
+    c.placeCanBookmark('ecu_session_scan({}, ext={}, session={}, timeout={}, delay={})'.format(
+        arb_id_range, ext, session, timeout, delay))
+
     ecus = []
     for i in arb_id_range:  
         if ext and i == 0xF1:
@@ -83,7 +96,7 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, verbose_flag=False, time
         try:
             msg = u.DiagnosticSessionControl(did)
             if msg is not None:
-                log.debug('{} session {}: {}'.format(addr, session, msg))
+                log.debug('{} session {}: {}'.format(addr, session, repr(msg)))
                 log.msg('found {}'.format(addr))
 
                 ecus.append(addr)
@@ -94,6 +107,9 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, verbose_flag=False, time
             # If a negative response happened, that means an ECU is present 
             # to respond at this address.
             ecus.append(addr)
+
+        if delay:
+            time.sleep(delay)
 
     return ecus
 
@@ -111,15 +127,21 @@ def try_read_did(u, did):
     return data
 
 
-def did_read_scan(u, did_range):
+def did_read_scan(u, did_range, delay=None):
     log.debug('Starting DID read scan for range: {}'.format(did_range))
+    u.c.placeCanBookmark('did_read_scan({}, delay={})'.format(did_range, delay))
     dids = {}
     for i in did_range:  
         log.detail('Trying DID {}'.format(hex(i)))
+        u.c.placeCanBookmark('ReadDID({})'.format(hex(i)))
         resp = try_read_did(u, i)
         if resp is not None:
             dids[i] = resp
             log.msg('DID {}: {}'.format(hex(i), resp))
+
+        if delay:
+            time.sleep(delay)
+
     return dids
 
 
@@ -136,15 +158,21 @@ def try_write_did(u, did, datg):
     return did
 
 
-def did_write_scan(u, did_range, write_data):
+def did_write_scan(u, did_range, write_data, delay=None):
     log.debug('Starting DID write scan for range: {}'.format(did_range))
+    u.c.placeCanBookmark('did_write_scan({}, write_data={}, delay={})'.format(did_range, write_data, delay))
     dids = {}
     for i in did_range:  
         log.detail('Trying DID {}'.format(hex(i)))
+        u.c.placeCanBookmark('WriteDID({})'.format(hex(i)))
         resp = try_write_did(u, i, write_data)
         if resp is not None:
             dids[i] = resp
             log.msg('DID {}: {}'.format(hex(i), resp))
+
+        if delay:
+            time.sleep(delay)
+
     return dids
 
 
@@ -161,15 +189,21 @@ def try_session(u, sess_num):
     return session
 
 
-def session_scan(u, session_range):
+def session_scan(u, session_range, delay=None):
     log.debug('Starting session scan for range: {}'.format(session_range))
+    u.c.placeCanBookmark('did_write_scan({}, delay={})'.format(session_range, delay))
     sessions = {}
     for i in session_range:  
         log.detail('Trying session {}'.format(i))
+        u.c.placeCanBookmark('DiagnosticSessionControl({})'.format(i))
         resp = try_session(u, i)
         if resp is not None:
             sessions[i] = resp
             log.msg('session {}: {}'.format(i, resp))
+
+        if delay:
+            time.sleep(delay)
+
     return sessions
 
 
@@ -186,8 +220,9 @@ def try_auth(u, level, key):
     return auth_data
 
 
-def auth_scan(u, auth_range, key_func=None):
+def auth_scan(u, auth_range, key_func=None, delay=None):
     log.debug('Starting auth scan for range: {}'.format(auth_range))
+    u.c.placeCanBookmark('auth_scan({}, key_func={}, delay={})'.format(auth_range, key_func, delay))
     auth_levels = {}
     for i in auth_range:  
         if key_func:
@@ -196,9 +231,14 @@ def auth_scan(u, auth_range, key_func=None):
             key = key_func(i)
 
         log.detail('Trying auth level {}: key \'{}\''.format(i, key))
+        u.c.placeCanBookmark('SecurityAccess({}, {})'.format(i, repr(key)))
 
         resp = try_auth(u, i, key)
         if resp is not None:
             auth_levels[i] = resp
             log.msg('auth {}: {}'.format(i, resp))
+
+        if delay:
+            time.sleep(delay)
+
     return auth_levels

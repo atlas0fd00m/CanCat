@@ -31,17 +31,19 @@ class ScanClass(cancat.uds.UDS):
         # Special case to capture the final "key" being sent
         if func == cancat.uds.SVC_SECURITY_ACCESS and data is not None:
             self.seed['key'] = data
-        super(ScanClass, self)._do_Function(func, data=data, subfunc=subfunc, service=service)
+        return super(ScanClass, self)._do_Function(func, data=data, subfunc=subfunc, service=service)
 
 
 class ECU(object):
     # Add the kwargs param so we can construct an ECUAddress out of a dictionary 
     # that has extra stuff in it
-    def __init__(self, c, addr, uds_class=ScanClass, timeout=3.0, sessions=None, **kwargs):
+    def __init__(self, c, addr, uds_class=ScanClass, timeout=3.0, scan_delay=None, sessions=None, **kwargs):
         self._addr = addr # (arb_id, resp_id, extflag)
         self._uds = uds_class
         self._timeout = timeout
+        self._delay = scan_delay
         self.c = c
+
 
         if sessions is not None:
             # TODO: probably need to validate/massage this object instead of 
@@ -59,7 +61,7 @@ class ECU(object):
             arb, resp, ext = self._addr
             log.msg('{} starting DID scan'.format(self._addr))
             u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
-            self._sessions[1]['dids'].update(cancat.uds.utils.did_read_scan(u, did_range))
+            self._sessions[1]['dids'].update(cancat.uds.utils.did_read_scan(u, did_range, delay=self._delay))
 
     def did_write_scan(self, did_range, rescan=False):
         # Only do a scan if we don't already have data, unless rescan is set
@@ -69,7 +71,7 @@ class ECU(object):
             arb, resp, ext = self._addr
             log.msg('{} starting DID write scan'.format(self._addr))
             u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
-            self._write_dids.update(cancat.uds.utils.did_write_scan(u, did_range, b''))
+            self._write_dids.update(cancat.uds.utils.did_write_scan(u, did_range, b'', delay=self._delay))
 
     def session_scan(self, session_range, rescan=False, rescan_did_range=None):
         # Only do a scan if this ECU only has info for session 1 (the default 
@@ -80,7 +82,7 @@ class ECU(object):
 
             log.msg('{} starting session scan'.format(self._addr))
 
-            new_sessions = cancat.uds.utils.session_scan(u, session_range)
+            new_sessions = cancat.uds.utils.session_scan(u, session_range, delay=self._delay)
             self._sessions.update(new_sessions)
 
             # For each session that was found, go through the list of DIDs and 
@@ -98,12 +100,12 @@ class ECU(object):
                     # If rescan is set do a full DID scan instead of the short 
                     # scan of only existing DIDs
                     if rescan:
-                        results = cancat.uds.utils.did_read_scan(u, rescan_did_range)
+                        results = cancat.uds.utils.did_read_scan(u, rescan_did_range, delay=self._delay)
                         self._sessions[sess]['dids'].update(results)
 
                     else:
                         valid_did_range = [d for d in self._sessions[1]['dids']]
-                        results = cancat.uds.utils.did_read_scan(u, valid_did_range)
+                        results = cancat.uds.utils.did_read_scan(u, valid_did_range, delay=self._delay)
                         self._sessions[sess]['dids'].update(results)
                     
             u.StopTesterPresent()
@@ -122,7 +124,7 @@ class ECU(object):
 
                 # Pass the get_key() function in the UDS scan class through
                 results = cancat.uds.utils.auth_scan(u, auth_range,
-                        lambda x: u.get_key(sess, x))
+                        lambda x: u.get_key(sess, x), delay=self._delay)
 
                 if 'auth' in self._sessions[sess]:
                     self._sessions[sess]['auth'].update(results)
@@ -162,6 +164,7 @@ class ECU(object):
 
     def key_length_scan(self, len_range, rescan=False):
         log.msg('{} starting key/seed length scan {}'.format(self._addr, len_range))
+        self.c.placeCanBookmark('canmap key_length_scan({}, delay={})'.format(len_range, self._delay))
 
         arb, resp, ext = self._addr
         u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
@@ -185,6 +188,7 @@ class ECU(object):
                     for keylen in len_range:
                         key = '\x00' * keylen
                         log.detail('Trying session {}, auth {}, key \'{}\''.format(sess, lvl, key))
+                        self.c.placeCanBookmark('SecurityAccess({}, {})'.format(i, repr(key)))
                         resp = self._try_key(u, lvl, key)
                         self._sessions[sess]['auth'][lvl].update(resp)
 
@@ -200,6 +204,10 @@ class ECU(object):
                             log.debug('Session {}, auth {} length found! {} (seed {})'.format(
                                 sess, lvl, len(u.seed['secret']), repr(u.seed['seed'])))
                             break
+
+        if self._delay:
+            time.sleep(self._delay)
+
 
         u.StopTesterPresent()
 

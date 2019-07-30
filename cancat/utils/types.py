@@ -9,24 +9,26 @@ try:
 except NameError:
     _range_func = range
 
-def _dec_range(val, incr=1):
-    parts = re.split(r'([0-9]+)-([0-9]+)', val)
+def _dec_range(val, increment=1):
+    #parts = re.split(r'([0-9]+)(?:-([0-9]+))?', val)
+    parts = re.split(r'-', val)
     if len(parts) == 1:
-        return int(parts[0], incr)
+        return int(parts[0])
     else:
-        return _range_func(int(parts[1]), int(parts[2]) + 1)
+        return _range_func(int(parts[0]), int(parts[1]) + 1, increment)
 
-def _hex_range(val, incr=1):
-    parts = re.split(r'([A-Fa-f0-9]+)-([A-Fa-f0-9]+)', val)
+def _hex_range(val, increment=1):
+    #parts = re.split(r'([A-Fa-f0-9]+)(?:-([A-Fa-f0-9]+))?', val)
+    parts = re.split(r'-', val)
     if len(parts) == 1:
-        return int(parts[0], 16, incr)
+        return int(parts[0], 16)
     else:
-        return _range_func(int(parts[1], 16), int(parts[2], 16) + 1)
+        return _range_func(int(parts[0], 16), int(parts[1], 16) + 1, increment)
 
 
 class SparseRange(tuple):
-    def __new__(cls, val):
-        return super(SparseRange, cls).__new__(cls, (_dec_range(v) for v in val.split(',')))
+    def __new__(cls, val, increment=1):
+        return super(SparseRange, cls).__new__(cls, (_dec_range(v, increment) for v in val.split(',')))
 
     @classmethod
     def _get_classname(cls):
@@ -58,5 +60,5 @@ class SparseRange(tuple):
 
 
 class SparseHexRange(SparseRange):
-    def __new__(cls, val):
-        return super(SparseRange, cls).__new__(cls, (_hex_range(v) for v in val.split(',')))
+    def __new__(cls, val, increment=1):
+        return super(SparseRange, cls).__new__(cls, (_hex_range(v, increment) for v in val.split(',')))

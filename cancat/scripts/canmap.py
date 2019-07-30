@@ -1,4 +1,5 @@
 # CAN bus device mapping tool
+from __future__ import print_function
 
 import sys
 import argparse
@@ -7,6 +8,7 @@ import re
 import time
 import signal
 import importlib
+import traceback
 
 import cancat
 import cancat.uds
@@ -58,8 +60,7 @@ class SecurityAccessKeyRange(cancat.utils.types.SparseHexRange):
             raise ValueError('range {} exceeds max Security Access Key of 0x7D'.format(val))
 
         # The auth levels alternate
-        return super(cancat.utils.types.SparseRange, cls).__new__(cls, (cancat.utils.types._hex_range(v, 2) for v in val.split(',')))
-
+        return super(SecurityAccessKeyRange, cls).__new__(cls, val, 2)
 
 class PayloadLength(cancat.utils.types.SparseHexRange):
     def __new__(cls, val):
@@ -157,10 +158,12 @@ def udsmap_parse_args():
     parser.add_argument('-L', metavar='<Key Length Range>',
             type=PayloadLength, default='01-20',
             help='Key Length range to test')
-    parser.add_argument('-T', '--timeout', type=float, default=0.1,
-            help='UDS Timeout, 3 seconds is the ISO14229 standard, standard for this tool is 100 msec (0.1)')
-    parser.add_argument('-w', '--wait', action='store_true',
+    parser.add_argument('-T', '--timeout', type=float, default=0.2,
+            help='UDS Timeout, 3 seconds is the ISO14229 standard, standard for this tool is 100 msec (0.2)')
+    parser.add_argument('-w', '--startup-wait', type=float, default=0.0,
             help='Wait to receive CAN messages before starting the scan')
+    parser.add_argument('-d', '--scan-delay', type=float, default=0.0,
+            help='Wait a small time between requests, helps prevent flooding the bus')
     parser.add_argument('-r', '--rescan', action='store_true',
             help='Run a full rescan and merge new results with any existing data')
     parser.add_argument('-f', '--force', action='store_true',
@@ -187,7 +190,7 @@ def log_and_save(results, note):
     results['notes'][results['start_time']] += '\n' + note
 
 
-def import_results(c, scancls, timeout, filename=None):
+def import_results(c, scancls, scan_delay, filename=None):
     if filename is not None:
         # TODO: support multiple in/out file types?
         import yaml
@@ -204,8 +207,7 @@ def import_results(c, scancls, timeout, filename=None):
         config['ECUs'] = {}
         for e in imported_data['ECUs']:
             addr = cancat.uds.types.ECUAddress(**e)
-            config['ECUs'][addr] = cancat.uds.ecu.ECU(
-                    c, addr, uds_class=scancls, timeout=timeout, **e)
+            config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr, uds_class=scancls, delay=scan_delay, **e)
         return config
 
 
@@ -250,14 +252,16 @@ def save_results(results, filename=None):
         with open(filename, 'w') as f:
             f.write(yaml.dump(output_data))
 
-
-def save_and_exit(retval):
+def save():
     save_results(_config, _output_filename)
 
     if _can_session_filename:
         global c
         c.saveSessionToFile(_can_session_filename)
 
+
+def save_and_exit(retval):
+    save()
     sys.exit(retval)
 
 
@@ -274,62 +278,48 @@ def scan(config, args, c, scancls):
         if not _config['ECUs'] or args.rescan:
             ecus = []
             if args.discovery_type == 'did':
-                c.placeCanBookmark("Start_ECU_DID_Scan", str(args.E))
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=0, timeout=args.timeout))
+                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=0, timeout=args.timeout, delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=1, timeout=args.timeout))
-                c.placeCanBookmark("Stop_ECU_DID_Scan", None)
+                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=1, timeout=args.timeout, delay=args.scan_delay))
             else:
-                c.placeCanBookmark("Start_ECU_Session_Scan", str(args.E))
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=0, timeout=args.timeout))
+                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=0, timeout=args.timeout, delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=1, timeout=args.timeout))
-                c.placeCanBookmark("Stop_ECU_Session_Scan", None)
+                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=1, timeout=args.timeout, delay=args.scan_delay))
 
             for addr in ecus:
-                _config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr, uds_class=scancls, timeout=args.timeout)
+                _config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr, uds_class=scancls, delay=args.scan_delay)
 
     if 'D' in args.scan:
         log_and_save(_config, 'DID read scan started @ {}'.format(now()))
 
-        c.placeCanBookmark("Start_DID_Read_Scan", str(args.D))
         for ecu in _config['ECUs'].values():
             ecu.did_read_scan(args.D, args.rescan)
-        c.placeCanBookmark("Stop_DID_Read_Scan", None)
 
     #if 'W' in args.scan:
     #    log_and_save(_config, 'DID write scan started @ {}'.format(now()))
     #
-    #    c.placeCanBookmark("Start_DID_Write_Scan", str(args.D))
     #    for ecu in _config['ECUs'].values():
     #        ecu.did_write_scan(args.D, args.rescan)
-    #    c.placeCanBookmark("Stop_DID_Write_Scan", None)
 
     if 'S' in args.scan:
         log_and_save(_config, 'Session scan started @ {}'.format(now()))
 
-        c.placeCanBookmark("Start_Session_Scan", str(args.S))
         for ecu in _config['ECUs'].values():
             ecu.session_scan(args.S, args.rescan, rescan_did_range=args.D)
-        c.placeCanBookmark("Stop_Session_Scan", None)
 
     if 'A' in args.scan:
         log_and_save(_config, 'Auth scan started @ {}'.format(now()))
 
-        c.placeCanBookmark("Start_Auth_Level_Scan", str(args.A))
         for ecu in _config['ECUs'].values():
             ecu.auth_scan(args.A, args.rescan)
-        c.placeCanBookmark("Stop_Auth_Level_Scan", None)
 
     if 'L' in args.scan:
         log_and_save(_config, 'Key Length scan started @ {}'.format(now()))
 
-        c.placeCanBookmark("Start_Key_Length_Scan", str(args.L))
         for ecu in _config['ECUs'].values():
             ecu.key_length_scan(args.L, args.rescan)
-        c.placeCanBookmark("Stop_Key_Length_Scan", None)
 
 
 def main():
@@ -387,7 +377,7 @@ def main():
 
     global _config
     if args.input_file is not None:
-        _config = import_results(c, scancls, args.timeout, args.input_file)
+        _config = import_results(c, scancls, args.scan_delay, args.input_file)
     else:
         _config = {
             'notes': {},
@@ -401,17 +391,15 @@ def main():
     if args.can_session_file:
         _can_session_filename = time.strftime(args.can_session_file)
 
-    # wait a short delay and check how many can messages have been received
-    time.sleep(1.0)
-
     start_time = now()
     _config['notes'][start_time] = []
     _config['start_time'] = start_time
     _config['notes'][start_time] = 'command: {}'.format(' '.join(sys.argv))
 
-    if args.wait:
+    if args.startup_wait:
         # Listen for messages to ensure that the bus is working right
         count1 = c.getCanMsgCount()
+        time.sleep(args.startup_wait)
         count2 = c.getCanMsgCount()
         if count2 <= count1:
             log_and_save(_config, 'ERROR: No CAN traffic detected on {} @ {}'.format(args.port, args.baud))
@@ -429,3 +417,10 @@ def main():
     except KeyboardInterrupt:
         log_and_save(_config, 'scan aborted @ {}'.format(now()))
         save_and_exit(1)
+    except Exception as e:
+        saved_trace = traceback.format_exc()
+        log_and_save(_config, 'Exception @ {}: {}'.format(now(), e))
+        save()
+
+        print(saved_trace, file=sys.stderr)
+        raise e
