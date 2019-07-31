@@ -1,4 +1,4 @@
-import collections
+# Helper types for UDS functionality
 
 
 class ECUAddress(object):

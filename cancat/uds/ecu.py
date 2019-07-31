@@ -1,12 +1,12 @@
 # ECU class
 
 import time
-import cancat.uds
-import cancat.uds.utils
+from cancat.uds import UDS, SVC_SECURITY_ACCESS 
+from cancat.uds import utils
 from cancat.utils import log
 
 
-class ScanClass(cancat.uds.UDS):
+class ScanClass(UDS):
     def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0, timeout=3.0):
         super(ScanClass, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag, timeout=timeout)
 
@@ -29,7 +29,7 @@ class ScanClass(cancat.uds.UDS):
 
     def _do_Function(self, func, data=None, subfunc=None, service=None):
         # Special case to capture the final "key" being sent
-        if func == cancat.uds.SVC_SECURITY_ACCESS and data is not None:
+        if func == SVC_SECURITY_ACCESS and data is not None:
             self.seed['key'] = data
         return super(ScanClass, self)._do_Function(func, data=data, subfunc=subfunc, service=service)
 
@@ -37,13 +37,12 @@ class ScanClass(cancat.uds.UDS):
 class ECU(object):
     # Add the kwargs param so we can construct an ECUAddress out of a dictionary 
     # that has extra stuff in it
-    def __init__(self, c, addr, uds_class=ScanClass, timeout=3.0, scan_delay=None, sessions=None, **kwargs):
+    def __init__(self, c, addr, uds_class=ScanClass, timeout=3.0, delay=None, sessions=None, **kwargs):
         self._addr = addr # (arb_id, resp_id, extflag)
         self._uds = uds_class
         self._timeout = timeout
-        self._delay = scan_delay
+        self._delay = delay
         self.c = c
-
 
         if sessions is not None:
             # TODO: probably need to validate/massage this object instead of 
@@ -61,7 +60,7 @@ class ECU(object):
             arb, resp, ext = self._addr
             log.msg('{} starting DID scan'.format(self._addr))
             u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
-            self._sessions[1]['dids'].update(cancat.uds.utils.did_read_scan(u, did_range, delay=self._delay))
+            self._sessions[1]['dids'].update(utils.did_read_scan(u, did_range, delay=self._delay))
 
     def did_write_scan(self, did_range, rescan=False):
         # Only do a scan if we don't already have data, unless rescan is set
@@ -71,47 +70,48 @@ class ECU(object):
             arb, resp, ext = self._addr
             log.msg('{} starting DID write scan'.format(self._addr))
             u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
-            self._write_dids.update(cancat.uds.utils.did_write_scan(u, did_range, b'', delay=self._delay))
+            self._write_dids.update(utils.did_write_scan(u, did_range, b'', delay=self._delay))
 
     def session_scan(self, session_range, rescan=False, rescan_did_range=None):
-        # Only do a scan if this ECU only has info for session 1 (the default 
-        # sssion)
-        if len(self._sessions[1]) == 1 or rescan:
-            arb, resp, ext = self._addr
-            u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
+        arb, resp, ext = self._addr
+        u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
 
-            log.msg('{} starting session scan'.format(self._addr))
+        log.msg('{} starting session scan'.format(self._addr))
 
-            new_sessions = cancat.uds.utils.session_scan(u, session_range, delay=self._delay)
+        # Only scan for new sessions if the session list consists only of session 1
+        if len(self._sessions) == 1:
+            new_sessions = utils.session_scan(u, session_range, delay=self._delay)
             self._sessions.update(new_sessions)
 
-            # For each session that was found, go through the list of DIDs and 
-            # identify which DIDs can be read in this session
-            #
-            # TODO: generalize this part of this function so it can be called 
-            #       from others?
-            for sess in new_sessions:
-                if 'resp' in self._sessions[sess]:
-                    u.DiagnosticSessionControl(sess)
-                    u.StartTesterPresent(request_response=False)
-                    log.debug('{} session {} retrying DIDs with errors'.format(self._addr, sess))
+        # For each session that was found, go through the list of DIDs and 
+        # identify which DIDs can be read in this session
+        for sess in self._sessions:
+            if sess != 1 and 'resp' in self._sessions[sess] and (rescan or \
+                    'dids' not in self._sessions[sess] or len(self._sessions[sess]['dids']) == 0):
+                with utils.new_session(u, sess, self._sessions[sess]['prereqs'], True):
+                    log.debug('{} session {} ({}) re-reading DIDs'.format(
+                        self._addr, sess, self._sessions[sess]['prereqs']))
 
                     self._sessions[sess]['dids'] = {}
                     # If rescan is set do a full DID scan instead of the short 
                     # scan of only existing DIDs
                     if rescan:
-                        results = cancat.uds.utils.did_read_scan(u, rescan_did_range, delay=self._delay)
+                        results = utils.did_read_scan(u, rescan_did_range, delay=self._delay)
                         self._sessions[sess]['dids'].update(results)
-
                     else:
                         valid_did_range = [d for d in self._sessions[1]['dids']]
-                        results = cancat.uds.utils.did_read_scan(u, valid_did_range, delay=self._delay)
+                        results = utils.did_read_scan(u, valid_did_range, delay=self._delay)
                         self._sessions[sess]['dids'].update(results)
 
-                    u.StopTesterPresent()
+                # If a delay is set, wait that delay between each session
+                u.EcuReset()
 
-                    # Wait for the ECU to exit the mode
-                    time.sleep(1.0)
+                # Small delay to allow for the reset to complete
+                time.sleep(0.2)
+
+                # Add any extra specified delay
+                if self._delay:
+                    time.sleep(self._delay)
 
     def auth_scan(self, auth_range, rescan=False):
         arb, resp, ext = self._addr
@@ -123,34 +123,31 @@ class ECU(object):
                     ('auth' not in self._sessions[sess] or \
                     len(self._sessions[sess]['auth']) == 0 or rescan):
                 log.msg('{} session {} starting auth scan'.format(self._addr, sess))
-                u.DiagnosticSessionControl(sess)
+                with utils.new_session(u, sess, self._sessions[sess]['prereqs'], True):
+                    # Pass the get_key() function in the UDS scan class through
+                    results = utils.auth_scan(u, auth_range,
+                            lambda x: u.get_key(sess, x), delay=self._delay)
 
-                # Pass the get_key() function in the UDS scan class through
-                results = cancat.uds.utils.auth_scan(u, auth_range,
-                        lambda x: u.get_key(sess, x), delay=self._delay)
-
-                if 'auth' in self._sessions[sess]:
-                    self._sessions[sess]['auth'].update(results)
-                else:
-                    self._sessions[sess]['auth'] = results
-
-        u.StopTesterPresent()
+                    if 'auth' in self._sessions[sess]:
+                        self._sessions[sess]['auth'].update(results)
+                    else:
+                        self._sessions[sess]['auth'] = results
 
     def _try_key(self, u, auth_level, key):
-        resp = cancat.uds.utils.try_auth(u, auth_level, key)
+        resp = utils.try_auth(u, auth_level, key)
         if resp is not None and 'err' in resp:
             # Attempt to handle a few common errors
             if 'err' in resp and resp['err'] == 0x36:
                 # 0x36:'ExceedNumberOfAttempts'
                 log.detail('Retrying session {}, auth {}, length {}'.format(sess, lvl, keylen))
-                resp = cancat.uds.utils.try_auth(u, level, key)
+                resp = utils.try_auth(u, level, key)
                 log.detail('resp: {}'.format(resp))
 
             elif 'err' in resp and resp['err'] == 0x37:
                 # 0x37:'RequiredTimeDelayNotExpired'
                 time.sleep(1.0)
                 log.detail('Retrying session {}, auth {}, length {}'.format(sess, lvl, keylen))
-                resp = cancat.uds.utils.try_auth(u, level, key)
+                resp = utils.try_auth(u, level, key)
                 log.detail('resp: {}'.format(resp))
         return resp
 
@@ -180,38 +177,37 @@ class ECU(object):
             if sess == 1:
                 continue
 
-            u.DiagnosticSessionControl(sess)
+            with utils.new_session(u, sess, True):
+                for lvl in self._sessions[sess]['auth']:
+                    if not self._found_key_len(sess, lvl) or rescan:
+                        # TODO: For now, we delete the old scan data, not sure how 
+                        # best to track to new vs. old key key scans otherwise
+                        self._sessions[sess]['auth'][lvl] = { 'seeds': [] }
+                        log.msg('{} session {} auth {} starting key length scan'.format(self._addr, sess, lvl))
+                        for keylen in len_range:
+                            key = '\x00' * keylen
+                            log.detail('Trying session {}, auth {}, key \'{}\''.format(sess, lvl, key))
+                            self.c.placeCanBookmark('SecurityAccess({}, {})'.format(i, repr(key)))
+                            resp = self._try_key(u, lvl, key)
+                            self._sessions[sess]['auth'][lvl].update(resp)
 
-            for lvl in self._sessions[sess]['auth']:
-                if not self._found_key_len(sess, lvl) or rescan:
-                    # TODO: For now, we delete the old scan data, not sure how 
-                    # best to track to new vs. old key key scans otherwise
-                    self._sessions[sess]['auth'][lvl] = { 'seeds': [] }
-                    log.msg('{} session {} auth {} starting key length scan'.format(self._addr, sess, lvl))
-                    for keylen in len_range:
-                        key = '\x00' * keylen
-                        log.detail('Trying session {}, auth {}, key \'{}\''.format(sess, lvl, key))
-                        self.c.placeCanBookmark('SecurityAccess({}, {})'.format(i, repr(key)))
-                        resp = self._try_key(u, lvl, key)
-                        self._sessions[sess]['auth'][lvl].update(resp)
+                            self._sessions[sess]['auth'][lvl]['seeds'].append(dict(u.seed))
 
-                        self._sessions[sess]['auth'][lvl]['seeds'].append(dict(u.seed))
-
-                        if 'resp' in resp:
-                            # Get the key attempted from the recorded seed data 
-                            # in case the scanning class modified it
-                            log.msg('Session {}, auth {} key found! secret {} (seed {})'.format(
-                                sess, lvl, repr(u.seed['secret']), repr(u.seed['seed'])))
-                            break
-                        elif resp['err'] == 0x35:
-                            log.debug('Session {}, auth {} length found! {} (seed {})'.format(
-                                sess, lvl, len(u.seed['secret']), repr(u.seed['seed'])))
-                            break
+                            if 'resp' in resp:
+                                # Get the key attempted from the recorded seed data 
+                                # in case the scanning class modified it
+                                log.msg('Session {}, auth {} key found! secret {} (seed {})'.format(
+                                    sess, lvl, repr(u.seed['secret']), repr(u.seed['seed'])))
+                                break
+                            elif resp['err'] == 0x35:
+                                log.debug('Session {}, auth {} length found! {} (seed {})'.format(
+                                    sess, lvl, len(u.seed['secret']), repr(u.seed['seed'])))
+                                break
 
         if self._delay:
             time.sleep(self._delay)
 
-
+        # Ensure tester present is not being sent anymore
         u.StopTesterPresent()
 
     def memory_read_test(self):

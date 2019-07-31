@@ -171,11 +171,13 @@ class UDS(object):
 
     def StopTesterPresent(self):
         self.TesterPresent = False
-        self.t.join(5.0)
-        if self.t.isAlive():
-            print "Error killing Tester Present thread"
-        else:
-            del self.t
+        if hasattr(self, 't'):
+            self.t.join(5.0)
+            if self.t.isAlive():
+                if self.verbose: 
+                    print "Error killing Tester Present thread"
+            else:
+                del self.t
 
     def DiagnosticSessionControl(self, session):
         currIdx = self.c.getCanMsgCount()

@@ -191,8 +191,8 @@ def log_and_save(results, note):
     results['notes'][results['start_time']] += '\n' + note
 
 
-def import_results(c, scancls, scan_delay, filename=None):
-    if filename is not None:
+def import_results(args, c, scancls):
+    if args.input_file is not None:
         # TODO: support multiple in/out file types?
         import yaml
         try:
@@ -200,16 +200,27 @@ def import_results(c, scancls, scan_delay, filename=None):
         except ImportError:
             from yaml import Loader as yamlLoader
 
-        with open(filename, 'r') as f:
+        with open(args.input_file, 'r') as f:
             imported_data = yaml.load(f, Loader=yamlLoader)
 
-        config = {}
-        config['config'] = imported_data['config']
-        config['notes'] = imported_data['notes']
-        config['ECUs'] = {}
+        config = {
+            'config': imported_data['config'],
+            'notes': imported_data['notes'],
+            'ECUs': {},
+        }
+
+        if not config['notes']:
+            config['notes'] = {}
+
+        # If the input baudrate is AUTO (the default), and the input config
+        # file has a baud rate, use the value from the config file, otherwise
+        # override the config file.
+        if args.baud != 'AUTO' or 'baud' not in config['config']:
+            config['config']['baud'] = args.baud
+
         for e in imported_data['ECUs']:
             addr = cancat.uds.types.ECUAddress(**e)
-            config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr, uds_class=scancls, delay=scan_delay, **e)
+            config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr, uds_class=scancls, delay=args.scan_delay, **e)
         return config
 
 
@@ -285,17 +296,22 @@ def scan(config, args, c, scancls):
             ecus = []
             if args.discovery_type == 'did':
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=0, timeout=args.timeout, delay=args.scan_delay))
+                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, scancls,
+                        args.E, ext=0, timeout=args.timeout, delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, args.E, ext=1, timeout=args.timeout, delay=args.scan_delay))
+                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, scancls,
+                        args.E, ext=1, timeout=args.timeout, delay=args.scan_delay))
             else:
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=0, timeout=args.timeout, delay=args.scan_delay))
+                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, scancls,
+                        args.E, ext=0, timeout=args.timeout, delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, args.E, ext=1, timeout=args.timeout, delay=args.scan_delay))
+                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, scancls,
+                        args.E, ext=1, timeout=args.timeout, delay=args.scan_delay))
 
             for addr in ecus:
-                _config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr, uds_class=scancls, delay=args.scan_delay)
+                _config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr,
+                        uds_class=scancls, delay=args.scan_delay)
 
     if 'D' in args.scan:
         log_and_save(_config, 'DID read scan started @ {}'.format(now()))
@@ -366,11 +382,6 @@ def main():
     scanlib = importlib.import_module(pkg)
     scancls = getattr(scanlib, cls)
 
-    # TODO: there should be a better way to do this... I think?
-    #       It would probably be better organized if I turned this scan function 
-    #       into it's own class?
-    cancat.uds.utils._UDS_CLASS = scancls
-
     # If the custom UDS class package has a "CanInterface" class, use that 
     # instead of the real cancat.CanInterface class
     global c
@@ -381,12 +392,7 @@ def main():
 
     global _config
     if args.input_file is not None:
-        _config = import_results(c, scancls, args.scan_delay, args.input_file)
-        # If the input baudrate is AUTO (the default), and the input config
-        # file has a baud rate, use the value from the config file, otherwise
-        # override the config file.
-        if args.baud != 'AUTO':
-            _config['config']['baud'] = args.baud
+        _config = import_results(args, c, scancls)
     else:
         _config = {
             'config': {'baud': args.baud},
@@ -436,4 +442,4 @@ def main():
         save()
 
         print(saved_trace, file=sys.stderr)
-        raise e
+        sys.exit(3)
