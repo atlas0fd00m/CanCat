@@ -2156,7 +2156,8 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     except ImportError, e:
         try:
             from IPython.terminal.interactiveshell import TerminalInteractiveShell
-            ipsh = TerminalInteractiveShell()
+            from IPython.terminal.ipapp import load_default_config
+            ipsh = TerminalInteractiveShell(config=load_default_config())
             ipsh.user_global_ns.update(gbls)
             ipsh.user_global_ns.update(lcls)
             ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!
