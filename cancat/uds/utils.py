@@ -119,6 +119,7 @@ def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, dela
     c.placeCanBookmark('ecu_did_scan({}, ext={}, did={}, timeout={}, delay={})'.format(
         arb_id_range, ext, did, timeout, delay))
     ecus = []
+    possible_ecus = []
     for i in arb_id_range:  
         if ext and i == 0xF1:
             # Skip i == 0xF1 because in that case the sender and receiver IDs 
@@ -159,6 +160,29 @@ def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, dela
                     log.debug('tx msg:'.format(tx_msg.encode('hex')))
                     for rx_arbid, msg in responses:
                         log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
+                        possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
+        except uds.NegativeResponseException as e:
+            log.debug('{} DID {}: {}'.format(addr, hex(did), e))
+            log.msg('found {}'.format(addr))
+
+            # If a negative response happened, that means an ECU is present 
+            # to respond at this address.
+            ecus.append(addr)
+
+        if delay:
+            time.sleep(delay)
+
+    # Double check any non-standard responses that were found
+    for addr in possible_ecus:  
+        u = udsclass(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
+                verbose=verbose_flag, timeout=timeout)
+        log.detail('Trying {}'.format(addr))
+        try:
+            msg = u.ReadDID(did)
+            if msg is not None:
+                log.debug('{} DID {}: {}'.format(addr, hex(did), repr(msg)))
+                log.msg('found {}'.format(addr))
+                ecus.append(addr)
         except uds.NegativeResponseException as e:
             log.debug('{} DID {}: {}'.format(addr, hex(did), e))
             log.msg('found {}'.format(addr))
@@ -183,6 +207,7 @@ def ecu_session_scan(c, udsclass, arb_id_range, ext=0, session=1, verbose_flag=F
         arb_id_range, ext, session, timeout, delay))
 
     ecus = []
+    possible_ecus = []
     for i in arb_id_range:  
         if ext and i == 0xF1:
             # Skip i == 0xF1 because in that case the sender and receiver IDs 
@@ -218,8 +243,31 @@ def ecu_session_scan(c, udsclass, arb_id_range, ext=0, session=1, verbose_flag=F
                         log.debug('tx msg:'.format(tx_msg.encode('hex')))
                         for rx_arbid, msg in responses:
                             log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
+                            possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
         except uds.NegativeResponseException as e:
             log.debug('{} session {}: {}'.format(addr, session, e))
+            log.msg('found {}'.format(addr))
+
+            # If a negative response happened, that means an ECU is present 
+            # to respond at this address.
+            ecus.append(addr)
+
+        if delay:
+            time.sleep(delay)
+
+    # Double check any non-standard responses that were found
+    for addr in possible_ecus:  
+        u = udsclass(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
+                verbose=verbose_flag, timeout=timeout)
+        log.detail('Trying {}'.format(addr))
+        try:
+            msg = u.ReadDID(did)
+            if msg is not None:
+                log.debug('{} DID {}: {}'.format(addr, hex(did), repr(msg)))
+                log.msg('found {}'.format(addr))
+                ecus.append(addr)
+        except uds.NegativeResponseException as e:
+            log.debug('{} DID {}: {}'.format(addr, hex(did), e))
             log.msg('found {}'.format(addr))
 
             # If a negative response happened, that means an ECU is present 
