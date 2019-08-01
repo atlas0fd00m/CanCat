@@ -260,7 +260,11 @@ def did_read_scan(u, did_range, delay=None):
                 printable_did = ''.join([x if x in string.printable else '' for x in resp['resp'][3:]])
                 log.msg('DID {}: {} ({})'.format(hex(i), resp['resp'].encode('hex'), printable_did))
             else:
-                log.msg('DID {}: {}'.format(hex(i), uds.NEG_RESP_CODES.get(resp['err'])))
+                try:
+                    err_str = uds.NEG_RESP_CODES.get(resp['err'])
+                    log.msg('DID {}: {}'.format(i, err_str))
+                except IndexError:
+                    log.msg('DID {}: ISOSAEReserved({})'.format(i, hex(resp['err'])))
             dids[i] = resp
 
         if delay:
@@ -295,7 +299,11 @@ def did_write_scan(u, did_range, write_data, delay=None):
             if 'resp' in resp:
                 log.msg('DID {}: {}'.format(hex(i), resp['resp'].encode('hex')))
             else:
-                log.msg('DID {}: {}'.format(hex(i), uds.NEG_RESP_CODES.get(resp['err'])))
+                try:
+                    err_str = uds.NEG_RESP_CODES.get(resp['err'])
+                    log.msg('DID {}: {}'.format(i, err_str))
+                except IndexError:
+                    log.msg('DID {}: ISOSAEReserved({})'.format(i, hex(resp['err'])))
             dids[i] = resp
 
         if delay:
@@ -340,10 +348,10 @@ def try_session_scan(u, session_range, prereq_sessions, delay=None, try_ecu_rese
                 log.msg('SESSION {}: {} ({})'.format(i, resp['resp'].encode('hex'), prereq_sessions))
             else:
                 try:
-                    err_str = uds.NEG_RESP_CODES.get(resp['err'], prereq_sessions)
-                    log.msg('SESSION {}: {} ({})'.format(i, err_str))
+                    err_str = uds.NEG_RESP_CODES.get(resp['err'])
+                    log.msg('SESSION {}: {} ({})'.format(i, err_str, prereq_sessions))
                 except IndexError:
-                    log.msg('SESSION {}: UNKNOWN ERROR {}'.format(i, hex(resp['err'])))
+                    log.msg('SESSION {}: ISOSAEReserved({})'.format(i, hex(resp['err'])))
             sessions[i] = resp
 
         if try_ecu_reset:
@@ -420,7 +428,11 @@ def auth_scan(u, auth_range, key_func=None, delay=None):
             if 'resp' in resp:
                 log.msg('SECURITY {}: {}'.format(i, resp['resp'].encode('hex')))
             else:
-                log.msg('SECURITY {}: {}'.format(i, uds.NEG_RESP_CODES.get(resp['err'])))
+                try:
+                    err_str = uds.NEG_RESP_CODES.get(resp['err'])
+                    log.msg('SECURITY {}: {}'.format(i, err_str))
+                except IndexError:
+                    log.msg('SECURITY {}: ISOSAEReserved({})'.format(i, hex(resp['err'])))
             auth_levels[i] = resp
 
         if delay:
