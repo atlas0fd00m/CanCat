@@ -6,7 +6,8 @@ import struct
 from contextlib import contextmanager
 from cancat import uds
 from cancat.uds.types import ECUAddress
-from cancat.utils import log, _range_func
+from cancat.utils import log
+from cancat.utils.types import _range_func
 
 def enter_session(u, session, prereq_sessions=None):
     # Enter any required preq sessions
@@ -83,7 +84,7 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
             tx_index = idx
             tx_msg = msg
             break
-    else
+    else:
         err = 'Unable to find tx arbid {} starting at index {}'.format(hex(tx_arbid), start_index)
         raise RangeError(err)
 
@@ -104,7 +105,7 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
                 (ftype == 0 and msg[1:3] == err_match) or \
                 (ftype == 1 and msg[2:2+match_len] == rx_match_bytes):
             possible_matches.append((arbid, msg))
-    else
+    else:
         return tx_msg, None 
 
     return  tx_msg, possible_matches
