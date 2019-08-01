@@ -64,6 +64,7 @@ def new_session(u, session, prereq_sessions=None, tester_present=False):
 
 
 def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, timeout=3.0):
+    log.log(log.FIXME, (start_index, hex(tx_arbid), hex(service),  hex(subfunction), timeout))
     # Starting at the supplied starting index, find the service request, and
     # then look for possible responses until the supplied timeout
     
@@ -97,18 +98,14 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
 
     err_match = b'\x7F' + struct.pack('>B', service)
 
-    possible_matches = []
     for idx, _, arbid, msg in u.c.genCanMsgs(start=tx_index+1, arbids=rx_range, maxsecs=timeout):
         ftype = ord(msg[0]) >> 4
         # Check for frame types 0 (positive and negative responses) and 1
         if (ftype == 0 and msg[1:1+match_len] == rx_match_bytes) or \
                 (ftype == 0 and msg[1:3] == err_match) or \
                 (ftype == 1 and msg[2:2+match_len] == rx_match_bytes):
-            possible_matches.append((arbid, msg))
-    else:
-        return tx_msg, None 
-
-    return  tx_msg, possible_matches
+            return tx_msg, (arbid, msg)
+    return tx_msg, None 
 
 
 def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, delay=None, verbose_flag=False):
@@ -154,14 +151,15 @@ def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, dela
 
                 ecus.append(addr)
             else:
-                tx_msg, responses = find_possible_resp(u, start_index, arb_id,
+                tx_msg, possible_match = find_possible_resp(u, start_index, arb_id,
                         uds.SVC_READ_DATA_BY_IDENTIFIER, did, timeout)
-                if responses:
+                if possible_match:
                     log.warn('Possible non-standard responses for {} found:'.format(addr))
                     log.debug('tx msg:'.format(tx_msg.encode('hex')))
-                    for rx_arbid, msg in responses:
-                        log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
-                        possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
+
+                    rx_arbid, msg = possible_match
+                    log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
+                    possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
         except uds.NegativeResponseException as e:
             log.debug('{} DID {}: {}'.format(addr, hex(did), e))
             log.msg('found {}'.format(addr))
