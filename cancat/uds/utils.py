@@ -2,10 +2,11 @@
 
 import time
 import string
+import struct
 from contextlib import contextmanager
-from cancat.uds import NegativeResponseException, NEG_RESP_CODES, UDS
+from cancat import uds
 from cancat.uds.types import ECUAddress
-from cancat.utils import log
+from cancat.utils import log, _range_func
 
 def enter_session(u, session, prereq_sessions=None):
     # Enter any required preq sessions
@@ -20,7 +21,7 @@ def enter_session(u, session, prereq_sessions=None):
         try:
             msg = u.DiagnosticSessionControl(session)
             break
-        except NegativeResponseException as e:
+        except uds.NegativeResponseException as e:
             if e.neg_code != 0x7f:
                 raise e
 
@@ -44,7 +45,7 @@ def new_session(u, session, prereq_sessions=None, tester_present=False):
             try:
                 msg = u.DiagnosticSessionControl(session)
                 break
-            except NegativeResponseException as e:
+            except uds.NegativeResponseException as e:
                 if e.neg_code != 0x7f:
                     raise e
 
@@ -59,6 +60,54 @@ def new_session(u, session, prereq_sessions=None, tester_present=False):
     finally:
         if tester_present:
             u.StopTesterPresent()
+
+
+def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, timeout=3.0):
+    # Starting at the supplied starting index, find the service request, and
+    # then look for possible responses until the supplied timeout
+    
+    if subfunction:
+        tx_match_bytes = struct.pack('>BH', service, subfunction)
+        rx_match_bytes = struct.pack('>BH', service + 0x40, subfunction)
+        match_len = 3
+    else:
+        tx_match_bytes = struct.pack('>B', service)
+        rx_match_bytes = struct.pack('>B', service + 0x40)
+        match_len = 1
+
+    for idx, _, _, msg in u.c.genCanMsgs(start=start_index, arbids=[tx_arbid], maxsecs=timeout):
+        ftype = ord(msg[0]) >> 4
+        # Our Tx arbid is probably a 0, but check for frame type 1 as well.
+        if (ftype == 0 and msg[1:1+match_len] == tx_match_bytes) or \
+                (ftype == 1 and msg[2:2+match_len] == tx_match_bytes):
+            tx_index = idx
+            tx_msg = msg
+            break
+    else
+        err = 'Unable to find tx arbid {} starting at index {}'.format(hex(tx_arbid), start_index)
+        raise RangeError(err)
+
+    # Determine the proper rx_arbid range to look for
+    if tx_arbid > 0x18db0000:
+        base_arbid = tx_arbid & 0xFFFF00FF
+        rx_range = _range_func(base_arbid, base_arbid + 0x10000, 0x100)
+    else:
+        rx_range = _range_func(0x700, 0x800)
+
+    err_match = b'\x7F' + struct.pack('>B', service)
+
+    possible_matches = []
+    for idx, _, arbid, msg in u.c.genCanMsgs(start=tx_index+1, arbids=rx_range, maxsecs=timeout):
+        ftype = ord(msg[0]) >> 4
+        # Check for frame types 0 (positive and negative responses) and 1
+        if (ftype == 0 and msg[1:1+match_len] == rx_match_bytes) or \
+                (ftype == 0 and msg[1:3] == err_match) or \
+                (ftype == 1 and msg[2:2+match_len] == rx_match_bytes):
+            possible_matches.append((arbid, msg))
+    else
+        return tx_msg, None 
+
+    return  tx_msg, possible_matches
 
 
 def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, delay=None, verbose_flag=False):
@@ -91,16 +140,26 @@ def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, dela
 
         addr = ECUAddress(arb_id, resp_id, ext)
 
-        u = udsclass(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag, verbose=verbose_flag, timeout=timeout)
+        u = udsclass(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
+                verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
         try:
+            start_index = u.c.getCanMsgCount()
             msg = u.ReadDID(did)
             if msg is not None:
                 log.debug('{} DID {}: {}'.format(addr, hex(did), repr(msg)))
                 log.msg('found {}'.format(addr))
 
                 ecus.append(addr)
-        except NegativeResponseException as e:
+            else:
+                tx_msg, responses = find_possible_resp(u, start_index, arb_id,
+                        uds.SVC_READ_DATA_BY_IDENTIFIER, did, timeout)
+                if responses:
+                    log.warn('Possible non-standard responses for {} found:'.format(addr))
+                    log.debug('tx msg:'.format(tx_msg.encode('hex')))
+                    for rx_arbid, msg in responses:
+                        log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
+        except uds.NegativeResponseException as e:
             log.debug('{} DID {}: {}'.format(addr, hex(did), e))
             log.msg('found {}'.format(addr))
 
@@ -151,7 +210,15 @@ def ecu_session_scan(c, udsclass, arb_id_range, ext=0, session=1, verbose_flag=F
                     log.msg('found {}'.format(addr))
 
                     ecus.append(addr)
-        except NegativeResponseException as e:
+                else:
+                    tx_msg, responses = find_possible_resp(u, start_index, arb_id,
+                            uds.SVC_DIAGNOSTICS_SESSION_CONTROL, session, timeout)
+                    if responses:
+                        log.warn('Possible non-standard responses for {} found:'.format(addr))
+                        log.debug('tx msg:'.format(tx_msg.encode('hex')))
+                        for rx_arbid, msg in responses:
+                            log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
+        except uds.NegativeResponseException as e:
             log.debug('{} session {}: {}'.format(addr, session, e))
             log.msg('found {}'.format(addr))
 
@@ -171,7 +238,7 @@ def try_read_did(u, did):
         resp = u.ReadDID(did)
         if resp is not None:
             data = { 'resp':resp }
-    except NegativeResponseException as e:
+    except uds.NegativeResponseException as e:
         # 0x31:'RequestOutOfRange' usually means the DID is not valid
         if e.neg_code != 0x31:
             data = { 'err':e.neg_code }
@@ -193,7 +260,7 @@ def did_read_scan(u, did_range, delay=None):
                 printable_did = ''.join([x if x in string.printable else '' for x in resp['resp'][3:]])
                 log.msg('DID {}: {} ({})'.format(hex(i), resp['resp'].encode('hex'), printable_did))
             else:
-                log.msg('DID {}: {}'.format(hex(i), NEG_RESP_CODES.get(resp['err'])))
+                log.msg('DID {}: {}'.format(hex(i), uds.NEG_RESP_CODES.get(resp['err'])))
             dids[i] = resp
 
         if delay:
@@ -208,7 +275,7 @@ def try_write_did(u, did, datg):
         resp = u.WriteDID(i, data)
         if resp is not None:
             did = { 'resp':resp }
-    except NegativeResponseException as e:
+    except uds.NegativeResponseException as e:
         # 0x31:'RequestOutOfRange' usually means the DID is not valid
         if e.neg_code != 0x31:
             did = { 'err':e.neg_code }
@@ -228,7 +295,7 @@ def did_write_scan(u, did_range, write_data, delay=None):
             if 'resp' in resp:
                 log.msg('DID {}: {}'.format(hex(i), resp['resp'].encode('hex')))
             else:
-                log.msg('DID {}: {}'.format(hex(i), NEG_RESP_CODES.get(resp['err'])))
+                log.msg('DID {}: {}'.format(hex(i), uds.NEG_RESP_CODES.get(resp['err'])))
             dids[i] = resp
 
         if delay:
@@ -243,7 +310,7 @@ def try_session(u, sess_num):
         with new_session(u, sess_num) as resp:
             if resp is not None:
                 session = { 'resp':resp }
-    except NegativeResponseException as e:
+    except uds.NegativeResponseException as e:
         # 0x12:'SubFunctionNotSupported',
         if e.neg_code != 0x12:
             session = { 'err':e.neg_code }
@@ -272,7 +339,11 @@ def try_session_scan(u, session_range, prereq_sessions, delay=None, try_ecu_rese
             if 'resp' in resp:
                 log.msg('SESSION {}: {} ({})'.format(i, resp['resp'].encode('hex'), prereq_sessions))
             else:
-                log.msg('SESSION {}: {} ({})'.format(i, NEG_RESP_CODES.get(resp['err'], prereq_sessions)))
+                try:
+                    err_str = uds.NEG_RESP_CODES.get(resp['err'], prereq_sessions)
+                    log.msg('SESSION {}: {} ({})'.format(i, err_str))
+                except IndexError:
+                    log.msg('SESSION {}: UNKNOWN ERROR {}'.format(i, hex(resp['err'])))
             sessions[i] = resp
 
         if try_ecu_reset:
@@ -281,14 +352,14 @@ def try_session_scan(u, session_range, prereq_sessions, delay=None, try_ecu_rese
 
                 # Small delay to allow for the reset to complete
                 time.sleep(0.2)
-            except NegativeResponseException as e:
+            except uds.NegativeResponseException as e:
                 # 0x22:'ConditionsNotCorrect'
-                if e.neg_code == 0x22:
+                if e.neg_code in [0x22, 0x11]:
                     try_ecu_reset = False
         elif try_sess_ctrl_reset:
             # Try just changing back to session 1
             new_session(u, 1)
-            #except NegativeResponseException as e:
+            #except uds.NegativeResponseException as e:
             #   # The default method to try returning to session 1 is EcuReset, if
             #   # EcuReset doesn't work (or isn't enabled), then try using the
             #   # DiagnosticSessionControl message to return to session 1, if that
@@ -323,7 +394,7 @@ def try_auth(u, level, key):
         resp = u.SecurityAccess(level, key)
         if resp is not None:
             auth_data = { 'resp':resp }
-    except NegativeResponseException as e:
+    except uds.NegativeResponseException as e:
         # 0x12:'SubFunctionNotSupported',
         if e.neg_code != 0x12:
             auth_data = { 'err':e.neg_code }
@@ -349,7 +420,7 @@ def auth_scan(u, auth_range, key_func=None, delay=None):
             if 'resp' in resp:
                 log.msg('SECURITY {}: {}'.format(i, resp['resp'].encode('hex')))
             else:
-                log.msg('SECURITY {}: {}'.format(i, NEG_RESP_CODES.get(resp['err'])))
+                log.msg('SECURITY {}: {}'.format(i, uds.NEG_RESP_CODES.get(resp['err'])))
             auth_levels[i] = resp
 
         if delay:

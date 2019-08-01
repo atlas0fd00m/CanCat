@@ -103,16 +103,6 @@ class ECU(object):
                         results = utils.did_read_scan(u, valid_did_range, delay=self._delay)
                         self._sessions[sess]['dids'].update(results)
 
-                # If a delay is set, wait that delay between each session
-                u.EcuReset()
-
-                # Small delay to allow for the reset to complete
-                time.sleep(0.2)
-
-                # Add any extra specified delay
-                if self._delay:
-                    time.sleep(self._delay)
-
     def auth_scan(self, auth_range, rescan=False):
         arb, resp, ext = self._addr
         u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
