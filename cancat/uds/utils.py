@@ -367,18 +367,20 @@ def try_session(u, sess_num):
             if resp is not None:
                 session = { 'resp':resp }
     except uds.NegativeResponseException as e:
-        # 0x12:'SubFunctionNotSupported',
-        if e.neg_code != 0x12:
+        # 0x11:'ServiceNotSupported'
+        # 0x12:'SubFunctionNotSupported'
+        if e.neg_code not in [0x11, 0x12]:
             session = { 'err':e.neg_code }
     return session
 
-def try_session_scan(u, session_range, prereq_sessions, delay=None, try_ecu_reset=True, try_sess_ctrl_reset=True):
+def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=None, try_ecu_reset=True, try_sess_ctrl_reset=True):
     log.debug('Starting session scan for range: {}'.format(session_range))
     u.c.placeCanBookmark('session_scan({}, delay={})'.format(session_range, delay))
     sessions = {}
     for i in session_range:  
-        # If this session matches any one of the prereqs, skip it
-        if i in prereq_sessions:
+        # If this session matches any one of the prereqs, or one of the
+        # sessions already found, skip it
+        if i in prereq_sessions or i in found_sessions:
             continue
 
         log.detail('Trying session {}'.format(i))
@@ -413,26 +415,29 @@ def try_session_scan(u, session_range, prereq_sessions, delay=None, try_ecu_rese
                 if e.neg_code in [0x22, 0x11]:
                     try_ecu_reset = False
         elif try_sess_ctrl_reset:
-            # Try just changing back to session 1
-            new_session(u, 1)
-            #except uds.NegativeResponseException as e:
-            #   # The default method to try returning to session 1 is EcuReset, if
-            #   # EcuReset doesn't work (or isn't enabled), then try using the
-            #   # DiagnosticSessionControl message to return to session 1, if that
-            #   # doesn't work then we can't attempt recursive session scanning
+            try:
+                # Try just changing back to session 1
+                new_session(u, 1)
+            except uds.NegativeResponseException as e:
+                # The default method to try returning to session 1 is EcuReset, if
+                # EcuReset doesn't work (or isn't enabled), then try using the
+                # DiagnosticSessionControl message to return to session 1, if that
+                # doesn't work then we can't attempt recursive session scanning
+                try_sess_ctrl_reset = False
 
         # Extra delay if configured
         if delay:
             time.sleep(delay)
 
-    # For each session found re-scan for new sessions that can be entered from those, but only if we have a valid reset method:
+    # For each session found re-scan for new sessions that can be entered from
+    # those, but only if we have a valid reset method:
     if try_ecu_reset or try_sess_ctrl_reset:
         subsessions = {}
         for sess in sessions:
             log.debug('Scanning for sessions from session {} ({})'.format(sess, prereq_sessions))
             prereqs = prereq_sessions + [sess]
-            subsessions.update(try_session_scan(u, session_range, prereqs, delay=delay,
-                    try_ecu_reset=try_ecu_reset, try_sess_ctrl_reset=try_sess_ctrl_reset))
+            subsessions.update(try_session_scan(u, session_range, prereqs, sessions.keys(),
+                delay=delay, try_ecu_reset=try_ecu_reset, try_sess_ctrl_reset=try_sess_ctrl_reset))
         sessions.update(subsessions)
 
     return sessions
@@ -440,7 +445,7 @@ def try_session_scan(u, session_range, prereq_sessions, delay=None, try_ecu_rese
 
 def session_scan(u, session_range, delay=None):
     prereq_sessions = []
-    session_results = try_session_scan(u, session_range, prereq_sessions, delay)
+    session_results = try_session_scan(u, session_range, prereq_sessions, [], delay)
     return session_results
 
 
