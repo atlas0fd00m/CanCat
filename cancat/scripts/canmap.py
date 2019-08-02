@@ -143,8 +143,8 @@ def udsmap_parse_args():
             type=ECURange, default='00-FF',
             help='ECU address range to search')
     parser.add_argument('-D', metavar='<DID Read Range>',
-            type=DIDRange, default='F180-F1FF',
-            help='DID range to search, by default restricted to the ISO14229 specified DIDs (F180-F1FF), large DID ranges may take a long time')
+            type=DIDRange, default='F180-F18E,F190-F1FF',
+            help='DID range to search, by default restricted to the ISO14229 specified DIDs (F180-F18E,F190-F1FF), large DID ranges may take a long time')
     parser.add_argument('-S', metavar='<Diagnostic Session Range>',
             type=DiagnosticSessionRange, default='02-7F',
             help='Diagnostic Sessions to search for')
