@@ -37,9 +37,12 @@ class ScanClass(UDS):
 class ECU(object):
     # Add the kwargs param so we can construct an ECUAddress out of a dictionary 
     # that has extra stuff in it
-    def __init__(self, c, addr, uds_class=ScanClass, timeout=3.0, delay=None, sessions=None, **kwargs):
+    def __init__(self, c, addr, scancls=None, timeout=3.0, delay=None, sessions=None, **kwargs):
         self._addr = addr # (arb_id, resp_id, extflag)
-        self._uds = uds_class
+        if scancls is None:
+            self._scancls = ScanClass
+        else:
+            self._scancls = scancls
         self._timeout = timeout
         self._delay = delay
         self.c = c
@@ -59,7 +62,7 @@ class ECU(object):
         if not self._sessions[1]['dids'] or rescan:
             arb, resp, ext = self._addr
             log.msg('{} starting DID scan'.format(self._addr))
-            u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
+            u = self._scancls(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
             self._sessions[1]['dids'].update(utils.did_read_scan(u, did_range, delay=self._delay))
 
     def did_write_scan(self, did_range, rescan=False):
@@ -69,12 +72,12 @@ class ECU(object):
             # but if it does we're pretty screwed.
             arb, resp, ext = self._addr
             log.msg('{} starting DID write scan'.format(self._addr))
-            u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
+            u = self._scancls(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
             self._write_dids.update(utils.did_write_scan(u, did_range, b'', delay=self._delay))
 
     def session_scan(self, session_range, rescan=False, rescan_did_range=None):
         arb, resp, ext = self._addr
-        u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
+        u = self._scancls(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
 
         log.msg('{} starting session scan'.format(self._addr))
 
@@ -105,7 +108,7 @@ class ECU(object):
 
     def auth_scan(self, auth_range, rescan=False):
         arb, resp, ext = self._addr
-        u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
+        u = self._scancls(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
         u.StartTesterPresent(request_response=False)
 
         for sess in self._sessions:
@@ -157,7 +160,7 @@ class ECU(object):
         self.c.placeCanBookmark('canmap key_length_scan({}, delay={})'.format(len_range, self._delay))
 
         arb, resp, ext = self._addr
-        u = self._uds(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
+        u = self._scancls(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
         u.StartTesterPresent(request_response=False)
 
         # I can't think of a good way to turn this into a more generic utility 

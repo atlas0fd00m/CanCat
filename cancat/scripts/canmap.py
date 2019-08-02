@@ -11,11 +11,10 @@ import importlib
 import traceback
 
 import cancat
-import cancat.uds
-import cancat.uds.ecu
-import cancat.uds.utils
-import cancat.utils.types
+from cancat.utils.types import SparseHexRange, ECUAddress
 from cancat.utils import log
+from cancat.uds.ecu import ECU
+from cancat.uds.utils import ecu_did_scan, ecu_session_scan
 
 
 c = None
@@ -30,7 +29,7 @@ def now():
     return time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime())
 
 
-class ECURange(cancat.utils.types.SparseHexRange):
+class ECURange(SparseHexRange):
     def __new__(cls, val):
         # Ensure that values are <= than 0xFF (255)
         if any(int(n, 16) > 0xFF for n in re.findall(r'[A-Za-z0-9]+', val)):
@@ -38,7 +37,7 @@ class ECURange(cancat.utils.types.SparseHexRange):
         return super(ECURange, cls).__new__(cls, val)
 
 
-class DIDRange(cancat.utils.types.SparseHexRange):
+class DIDRange(SparseHexRange):
     def __new__(cls, val):
         # Ensure that values are <= than 0xFFFF (65535)
         if any(int(n, 16) > 0xFFFF for n in re.findall(r'[A-Za-z0-9]+', val)):
@@ -46,7 +45,7 @@ class DIDRange(cancat.utils.types.SparseHexRange):
         return super(DIDRange, cls).__new__(cls, val)
 
 
-class DiagnosticSessionRange(cancat.utils.types.SparseHexRange):
+class DiagnosticSessionRange(SparseHexRange):
     def __new__(cls, val):
         # Ensure that values are <= than 0x7F (127)
         if any(int(n, 16) > 0x7F for n in re.findall(r'[A-Za-z0-9]+', val)):
@@ -54,7 +53,7 @@ class DiagnosticSessionRange(cancat.utils.types.SparseHexRange):
         return super(DiagnosticSessionRange, cls).__new__(cls, val)
 
 
-class SecurityAccessKeyRange(cancat.utils.types.SparseHexRange):
+class SecurityAccessKeyRange(SparseHexRange):
     def __new__(cls, val):
         # Ensure that values are >= 2 and <= than 0x7D (125)
         if any(int(n, 16) > 0x7D for n in re.findall(r'[A-Za-z0-9]+', val)):
@@ -63,7 +62,7 @@ class SecurityAccessKeyRange(cancat.utils.types.SparseHexRange):
         # The auth levels alternate
         return super(SecurityAccessKeyRange, cls).__new__(cls, val, 2)
 
-class PayloadLength(cancat.utils.types.SparseHexRange):
+class PayloadLength(SparseHexRange):
     def __new__(cls, val):
         # Ensure that values are <= than 0xFFF (4095)
         if any(int(n, 16) > 0xFFF for n in re.findall(r'[A-Za-z0-9]+', val)):
@@ -126,8 +125,11 @@ def udsmap_parse_args():
     parser.add_argument('-s', '--scan', required=True,
             #choices='EDWSAL', nargs='+', action=OneOrMoreOf,
             #help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (W) write DIDs, (S) diagnostic Sessions, (A) seed/key Authentication levels, (L) authentication key Length')
-            choices='EDSAL', nargs='+', action=OneOrMoreOf,
-            help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (S) diagnostic Sessions, (A) seed/key Authentication levels, (L) authentication key Length')
+            # re-enable only after security access levels and key length scanning has been tested
+            #choices='EDSAL', nargs='+', action=OneOrMoreOf,
+            #help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (S) diagnostic Sessions, (A) security Authentication levels, (L) authentication key Length')
+            choices='EDS', nargs='+', action=OneOrMoreOf,
+            help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (S) diagnostic Sessions')
     parser.add_argument('-p', '--port', default='/dev/ttyACM0',
             help='System device to use to communicate to the CanCat hardware (/dev/ttyACM0)') 
     parser.add_argument('-b', '--baud',
@@ -161,7 +163,7 @@ def udsmap_parse_args():
             help='Key Length range to test')
     parser.add_argument('-T', '--timeout', type=float, default=0.2,
             help='UDS Timeout, 3 seconds is the ISO14229 standard, standard for this tool is 100 msec (0.2)')
-    parser.add_argument('-w', '--startup-wait', type=float, default=0.0,
+    parser.add_argument('-w', '--startup-wait', type=float, nargs='?' const=2.0,
             help='Wait to receive CAN messages before starting the scan')
     parser.add_argument('-d', '--scan-delay', type=float, default=0.0,
             help='Wait a small time between requests, helps prevent flooding the bus')
@@ -173,16 +175,16 @@ def udsmap_parse_args():
             help='Automatically answer "yes" to any questions the tool asks')
     parser.add_argument('-v', '--verbose', action='count',
             help='Verbose logging, use -vv for extra verbosity')
-    parser.add_argument('-l', '--log-file',
-            help='Log filename to write to, log filename can contain "time.strftime" formatting like "udsscan_%%Y%%m%%d-%%H%%M%%S.log"')
-    parser.add_argument('-o', '--output-file',
-            help='Scan results output filename, can contain "time.strftime" formatting like "udsscan_%%Y%%m%%d-%%H%%M%%S.yml"')
-    parser.add_argument('-c', '--can-session-file',
-            help='Filename for saving raw cancat session')
+    parser.add_argument('-l', '--log-file', nargs='?', const='canmap_%%Y%%m%%d-%%H%%M%%S.log',
+            help='Log filename to write to, log filename can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.log"')
+    parser.add_argument('-o', '--output-file', nargs='?', const='canmap_%%Y%%m%%d-%%H%%M%%S.yml',
+            help='Scan results output filename, can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.yml"')
+    parser.add_argument('-c', '--can-session-file', nargs='?', const='canmap_%%Y%%m%%d-%%H%%M%%S.sess',
+            help='Filename for saving raw cancat session, can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.sess"')
     parser.add_argument('-i', '--input-file',
             help='Input file containing previous scan results')
-    parser.add_argument('-u', '--uds-class', default='cancat.uds.ecu.ScanClass',
-            help='Custom UDS class, allows for implementing key/seed unlock functions or testing')
+    parser.add_argument('-u', '--uds-class',
+            help='Custom UDS class, allows for implementing key/seed unlock functions or testing, example: cancat.uds.test.TestUDS')
     return parser.parse_args()
 
 
@@ -219,8 +221,8 @@ def import_results(args, c, scancls):
             config['config']['baud'] = args.baud
 
         for e in imported_data['ECUs']:
-            addr = cancat.uds.types.ECUAddress(**e)
-            config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr, uds_class=scancls, delay=args.scan_delay, **e)
+            config['ECUs'][addr] = uds.ECU(c, ECUAddress(**e),
+                    uds_class=scancls, delay=args.scan_delay, **e)
         return config
 
 
@@ -296,22 +298,22 @@ def scan(config, args, c, scancls):
             ecus = []
             if args.discovery_type == 'did':
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, scancls,
+                    ecus.extend(ecu_did_scan(c, scancls,
                         args.E, ext=0, timeout=args.timeout, delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_did_scan(c, scancls,
+                    ecus.extend(ecu_did_scan(c, scancls,
                         args.E, ext=1, timeout=args.timeout, delay=args.scan_delay))
             else:
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, scancls,
+                    ecus.extend(ecu_session_scan(c, scancls,
                         args.E, ext=0, timeout=args.timeout, delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(cancat.uds.utils.ecu_session_scan(c, scancls,
+                    ecus.extend(ecu_session_scan(c, scancls,
                         args.E, ext=1, timeout=args.timeout, delay=args.scan_delay))
 
             for addr in ecus:
-                _config['ECUs'][addr] = cancat.uds.ecu.ECU(c, addr,
-                        uds_class=scancls, delay=args.scan_delay)
+                _config['ECUs'][addr] = uds.ECU(c, addr, uds_class=scancls,
+                        delay=args.scan_delay)
 
     if 'D' in args.scan:
         log_and_save(_config, 'DID read scan started @ {}'.format(now()))

@@ -5,9 +5,8 @@ import string
 import struct
 from contextlib import contextmanager
 from cancat import uds
-from cancat.uds.types import ECUAddress
 from cancat.utils import log
-from cancat.utils.types import _range_func
+from cancat.utils.types import ECUAddress, _range_func
 
 def enter_session(u, session, prereq_sessions=None):
     # Enter any required preq sessions
@@ -147,11 +146,15 @@ def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, dela
             # are the same
             log.detail('Skipping 0xF1 on ext ECU scan: invalid ECU address')
             continue
+        elif ext == False and i in _range_func(0xe0, 0xef):
+            # Skip OBD2 addresses
+            log.detail('Skipping OBD2 11-bit address {}'.format(hex(0x700 + i)))
+            break
         elif ext == False and i >= 0xF8:
             # For non-extended scans the valid range goes from 0x00 to 0xFF, but 
-            # stop the scan at 0xF7 because at that time the response is the 
+            # stop the scan at 0xf7 because at that time the response is the 
             # largest possible valid value
-            log.detail('Stopping std ECU scan at 0xF7: last valid ECU address')
+            log.detail('Stopping std ECU scan at 0xf7: last valid ECU address')
             break
         elif ext:
             arb_id = 0x18db00f1 + (i << 8)
@@ -241,8 +244,8 @@ def ecu_session_scan(c, udsclass, arb_id_range, ext=0, session=1, verbose_flag=F
             # largest possible valid value
             break
         elif ext:
-            arb_id = 0x18db00f1 + (i << 8)
-            resp_id = 0x18dbf100 + i
+            arb_id = 0x18da00f1 + (i << 8)
+            resp_id = 0x18daf100 + i
         else:
             arb_id = 0x700 + i
             resp_id = 0x700 + i + 8
@@ -309,8 +312,9 @@ def try_read_did(u, did):
         if resp is not None:
             data = { 'resp':resp }
     except uds.NegativeResponseException as e:
-        # 0x31:'RequestOutOfRange' usually means the DID is not valid
-        if e.neg_code != 0x31:
+        # 0x12:'SubFunctionNotSupported' - not standard, but I've seen it
+        # 0x31:'RequestOutOfRange'       - means the DID is not valid
+        if e.neg_code not in [0x12, 0x31]:
             data = { 'err':e.neg_code }
     return data
 
