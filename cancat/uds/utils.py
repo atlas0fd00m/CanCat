@@ -406,7 +406,7 @@ def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=No
 
         resp = try_session(u, i)
         if resp is not None:
-            resp['prereqs'] = prereq_sessions
+            resp['prereqs'] = list(prereq_sessions)
             log.debug('session {}: {}'.format(i, resp))
             if 'resp' in resp:
                 log.msg('SESSION {}: {} ({})'.format(i, resp['resp'].encode('hex'), prereq_sessions))
