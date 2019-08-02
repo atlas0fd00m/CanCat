@@ -33,6 +33,7 @@ CMD_CAN_SEND_ISOTP_RESULT   = 0x38
 CMD_CAN_RECV_ISOTP_RESULT   = 0x39
 CMD_CAN_SENDRECV_ISOTP_RESULT = 0x3A
 CMD_SET_FILT_MASK_RESULT    = 0x3B
+CMD_PRINT_CAN_REGS          = 0x3C
 
 CMD_PING                    = 0x41
 CMD_CHANGE_BAUD             = 0x42
@@ -1525,6 +1526,10 @@ class CanInterface(object):
             print "ERROR: Received ", msg_count, " out of expected 76330 message"
         else:
             print "PASS: 29 bit IDs, 8 byte messages"
+
+    def _printCanRegs(self):
+        self._send(CMD_PRINT_CAN_REGS, "")
+
 
 
 class CanControl(cmd.Cmd):

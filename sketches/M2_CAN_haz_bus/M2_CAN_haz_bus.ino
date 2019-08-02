@@ -27,6 +27,8 @@ uint16_t serial_buf_index = 0;
 uint16_t serial_buf_count = 0;
 uint8_t initialized = 0;
 uint8_t mode = CMD_CAN_MODE_SNIFF_CAN0;
+static void printCanRegs(void);
+
 
 uint32_t baud_rates_table[NUM_BAUD_RATES] = {
     0,      // CAN_AUTO     = 0
@@ -258,6 +260,10 @@ void loop()
                 send(&results, CMD_CAN_SENDRECV_ISOTP_RESULT, 1);
                 break;
 
+            case CMD_PRINT_CAN_REGS:
+                printCanRegs();
+                break;
+
             default:
                 Serial.write("@\x15\x03""BAD COMMAND: ");
                 Serial.print(serial_buffer[2]);
@@ -340,6 +346,95 @@ uint8_t SendFrame(CAN_FRAME frame)
 
     return results;
 }
+
+// Print all of the configuration registers for the CAN peripheral with log messages
+static void printCanRegs(void)
+{
+    char msg[50];
+    log("CAN 0", 5);
+
+    snprintf(msg, 50, "CAN_MR: 0x%08X", CAN0->CAN_MR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_IMR: 0x%08X", CAN0->CAN_IMR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_SR: 0x%08X", CAN0->CAN_SR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_BR: 0x%08X", CAN0->CAN_BR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_TIM: 0x%08X", CAN0->CAN_TIM);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_TIMESTP: 0x%08X", CAN0->CAN_TIMESTP);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_ECR: 0x%08X", CAN0->CAN_ECR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_WPMR: 0x%08X", CAN0->CAN_WPMR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_WPSR: 0x%08X", CAN0->CAN_WPSR);
+    log(msg, strnlen(msg, 50));
+
+    for (int i = 0; i < 8; i++)
+    {
+        snprintf(msg, 50, "CAN 0 Mailbox %d", i);
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MMR: 0x%08X", CAN0->CAN_MB[i].CAN_MMR);        
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MAM: 0x%08X", CAN0->CAN_MB[i].CAN_MAM);        
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MID: 0x%08X", CAN0->CAN_MB[i].CAN_MID);        
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MFID: 0x%08X", CAN0->CAN_MB[i].CAN_MFID);        
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MSR: 0x%08X", CAN0->CAN_MB[i].CAN_MSR);        
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MDL: 0x%08X", CAN0->CAN_MB[i].CAN_MDL);
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MDH: 0x%08X", CAN0->CAN_MB[i].CAN_MDH);        
+        log(msg, strnlen(msg, 50));
+    }
+
+    log("CAN 1", 5);
+
+    snprintf(msg, 50, "CAN_MR: 0x%08X", CAN1->CAN_MR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_IMR: 0x%08X", CAN1->CAN_IMR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_SR: 0x%08X", CAN1->CAN_SR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_BR: 0x%08X", CAN1->CAN_BR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_TIM: 0x%08X", CAN1->CAN_TIM);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_TIMESTP: 0x%08X", CAN1->CAN_TIMESTP);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_ECR: 0x%08X", CAN1->CAN_ECR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_WPMR: 0x%08X", CAN1->CAN_WPMR);
+    log(msg, strnlen(msg, 50));
+    snprintf(msg, 50, "CAN_WPSR: 0x%08X", CAN1->CAN_WPSR);
+    log(msg, strnlen(msg, 50));
+
+    for (int i = 0; i < 8; i++)
+    {
+        snprintf(msg, 50, "CAN 1 Mailbox %d", i);
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MMR: 0x%08X", CAN1->CAN_MB[i].CAN_MMR);        
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MAM: 0x%08X", CAN1->CAN_MB[i].CAN_MAM);        
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MID: 0x%08X", CAN1->CAN_MB[i].CAN_MID);        
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MFID: 0x%08X", CAN1->CAN_MB[i].CAN_MFID);        
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MSR: 0x%08X", CAN1->CAN_MB[i].CAN_MSR);        
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MDL: 0x%08X", CAN1->CAN_MB[i].CAN_MDL);
+        log(msg, strnlen(msg, 50));
+        snprintf(msg, 50, "CAN_MDH: 0x%08X", CAN1->CAN_MB[i].CAN_MDH);        
+        log(msg, strnlen(msg, 50));
+    }
+
+}
+
 
 /*********************************************************************************************************
   END FILE
