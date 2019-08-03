@@ -221,7 +221,7 @@ def import_results(args, c, scancls):
             config['config']['baud'] = args.baud
 
         for e in imported_data['ECUs']:
-            config['ECUs'][addr] = uds.ECU(c, ECUAddress(**e),
+            config['ECUs'][addr] = ECU(c, ECUAddress(**e),
                     uds_class=scancls, delay=args.scan_delay, **e)
         return config
 
@@ -312,7 +312,7 @@ def scan(config, args, c, scancls):
                         timeout=args.timeout, delay=args.scan_delay))
 
             for addr in ecus:
-                _config['ECUs'][addr] = uds.ECU(c, addr, uds_class=scancls,
+                _config['ECUs'][addr] = ECU(c, addr, uds_class=scancls,
                         delay=args.scan_delay)
 
     if 'D' in args.scan:

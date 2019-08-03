@@ -150,10 +150,6 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
             # are the same
             log.detail('Skipping 0xF1 on ext ECU scan: invalid ECU address')
             continue
-        elif ext == False and i in _range_func(0xe0, 0xef):
-            # Skip OBD2 addresses
-            log.detail('Skipping OBD2 11-bit address {}'.format(hex(0x700 + i)))
-            break
         elif ext == False and i >= 0xF8:
             # For non-extended scans the valid range goes from 0x00 to 0xFF, but 
             # stop the scan at 0xf7 because at that time the response is the 
@@ -161,8 +157,8 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
             log.detail('Stopping std ECU scan at 0xf7: last valid ECU address')
             break
         elif ext:
-            arb_id = 0x18db00f1 + (i << 8)
-            resp_id = 0x18dbf100 + i
+            arb_id = 0x18da00f1 + (i << 8)
+            resp_id = 0x18daf100 + i
         else:
             arb_id = 0x700 + i
             resp_id = 0x700 + i + 8
@@ -185,8 +181,6 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
                         uds.SVC_READ_DATA_BY_IDENTIFIER, did, timeout)
                 if possible_match:
                     log.warn('Possible non-standard responses for {} found:'.format(addr))
-                    log.debug('tx msg:'.format(tx_msg.encode('hex')))
-
                     rx_arbid, msg = possible_match
                     log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
                     possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
@@ -272,10 +266,9 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
                             uds.SVC_DIAGNOSTICS_SESSION_CONTROL, session, timeout)
                     if responses:
                         log.warn('Possible non-standard responses for {} found:'.format(addr))
-                        log.debug('tx msg:'.format(tx_msg.encode('hex')))
-                        for rx_arbid, msg in responses:
-                            log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
-                            possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
+                        rx_arbid, msg = possible_match
+                        log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
+                        possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
         except uds.NegativeResponseException as e:
             log.debug('{} session {}: {}'.format(addr, session, e))
             log.msg('found {}'.format(addr))
