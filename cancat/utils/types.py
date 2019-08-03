@@ -10,7 +10,6 @@ except NameError:
     _range_func = range
 
 def _dec_range(val, increment=1):
-    #parts = re.split(r'([0-9]+)(?:-([0-9]+))?', val)
     parts = re.split(r'-', val)
     if len(parts) == 1:
         return int(parts[0])
@@ -18,7 +17,6 @@ def _dec_range(val, increment=1):
         return _range_func(int(parts[0]), int(parts[1]) + 1, increment)
 
 def _hex_range(val, increment=1):
-    #parts = re.split(r'([A-Fa-f0-9]+)(?:-([A-Fa-f0-9]+))?', val)
     parts = re.split(r'-', val)
     if len(parts) == 1:
         return int(parts[0], 16)

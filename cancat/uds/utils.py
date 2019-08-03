@@ -4,6 +4,7 @@ import time
 import string
 import struct
 from contextlib import contextmanager
+
 from cancat import uds
 from cancat.utils import log
 from cancat.utils.types import ECUAddress, _range_func

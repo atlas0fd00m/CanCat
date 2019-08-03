@@ -1,6 +1,7 @@
 # ECU class
 
 import time
+
 from cancat.uds import UDS, SVC_SECURITY_ACCESS 
 from cancat.uds import utils
 from cancat.utils import log
