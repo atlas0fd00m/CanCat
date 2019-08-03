@@ -163,7 +163,7 @@ def udsmap_parse_args():
             help='Key Length range to test')
     parser.add_argument('-T', '--timeout', type=float, default=0.2,
             help='UDS Timeout, 3 seconds is the ISO14229 standard, standard for this tool is 100 msec (0.2)')
-    parser.add_argument('-w', '--startup-wait', type=float, nargs='?' const=2.0,
+    parser.add_argument('-w', '--startup-wait', type=float, nargs='?', const=2.0,
             help='Wait to receive CAN messages before starting the scan')
     parser.add_argument('-d', '--scan-delay', type=float, default=0.0,
             help='Wait a small time between requests, helps prevent flooding the bus')
@@ -298,18 +298,18 @@ def scan(config, args, c, scancls):
             ecus = []
             if args.discovery_type == 'did':
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(ecu_did_scan(c, scancls,
-                        args.E, ext=0, timeout=args.timeout, delay=args.scan_delay))
+                    ecus.extend(ecu_did_scan(c, args.E, ext=0, udscls=scancls,
+                        timeout=args.timeout, delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(ecu_did_scan(c, scancls,
-                        args.E, ext=1, timeout=args.timeout, delay=args.scan_delay))
+                    ecus.extend(ecu_did_scan(c, args.E, ext=1, udscls=scancls,
+                        timeout=args.timeout, delay=args.scan_delay))
             else:
                 if args.bus_mode in ['std', 'both']:
-                    ecus.extend(ecu_session_scan(c, scancls,
-                        args.E, ext=0, timeout=args.timeout, delay=args.scan_delay))
+                    ecus.extend(ecu_session_scan(c, args.E, ext=0, udscls=scancls,
+                        timeout=args.timeout, delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
-                    ecus.extend(ecu_session_scan(c, scancls,
-                        args.E, ext=1, timeout=args.timeout, delay=args.scan_delay))
+                    ecus.extend(ecu_session_scan(c, args.E, ext=1, udscls=scancls,
+                        timeout=args.timeout, delay=args.scan_delay))
 
             for addr in ecus:
                 _config['ECUs'][addr] = uds.ECU(c, addr, uds_class=scancls,
@@ -380,17 +380,20 @@ def main():
     #   - DID Scan: 
     #log.warning('ECU scan {} may take up to 25 minutes to complete'.format(args.E))
 
-    pkg, cls = args.uds_class.rsplit('.', 1)
-    scanlib = importlib.import_module(pkg)
-    scancls = getattr(scanlib, cls)
-
-    # If the custom UDS class package has a "CanInterface" class, use that 
-    # instead of the real cancat.CanInterface class
     global c
-    if hasattr(scanlib, 'CanInterface'):
-        c = getattr(scanlib, 'CanInterface')(port=args.port)
-    else:
-        c = cancat.CanInterface(port=args.port)
+
+    ifaceclass = cancat.CanInterface
+    scancls = None
+    if args.uds_class:
+        pkg, cls = args.uds_class.rsplit('.', 1)
+        scanlib = importlib.import_module(pkg)
+        scancls = getattr(scanlib, cls)
+
+        # If the custom UDS class package has a "CanInterface" class, use that 
+        # instead of the real cancat.CanInterface class
+        if hasattr(scanlib, 'CanInterface'):
+            ifaceclass = getattr(scanlib, 'CanInterface')
+    c = ifaceclass(port=args.port)
 
     global _config
     if args.input_file is not None:

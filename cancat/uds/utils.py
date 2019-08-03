@@ -6,6 +6,7 @@ import struct
 from contextlib import contextmanager
 
 from cancat import uds
+from cancat.uds import UDS
 from cancat.utils import log
 from cancat.utils.types import ECUAddress, _range_func
 
@@ -64,7 +65,6 @@ def new_session(u, session, prereq_sessions=None, tester_present=False):
 
 
 def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, timeout=3.0):
-    log.log(log.FIXME, (start_index, hex(tx_arbid), hex(service),  hex(subfunction), timeout))
     # Starting at the supplied starting index, find the service request, and
     # then look for possible responses until the supplied timeout
     
@@ -131,10 +131,13 @@ def did_str(did):
         return hex(did)
 
 
-def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, delay=None, verbose_flag=False):
+def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, delay=None, verbose_flag=False):
     scan_type = ''
     if ext:
         scan_type = ' ext'
+
+    if udscls is None:
+        udscls = UDS
 
     log.debug('Starting{} DID read ECU scan for range: {}'.format(scan_type, arb_id_range))
     c.placeCanBookmark('ecu_did_scan({}, ext={}, did={}, timeout={}, delay={})'.format(
@@ -166,7 +169,7 @@ def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, dela
 
         addr = ECUAddress(arb_id, resp_id, ext)
 
-        u = udsclass(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
+        u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
                 verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
         try:
@@ -200,7 +203,7 @@ def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, dela
 
     # Double check any non-standard responses that were found
     for addr in possible_ecus:  
-        u = udsclass(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
+        u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
                 verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
         try:
@@ -223,10 +226,13 @@ def ecu_did_scan(c, udsclass, arb_id_range, ext=0, did=0xf190, timeout=3.0, dela
     return ecus
 
 
-def ecu_session_scan(c, udsclass, arb_id_range, ext=0, session=1, verbose_flag=False, timeout=3.0, delay=None):
+def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0, delay=None, verbose_flag=False):
     scan_type = ''
     if ext:
         scan_type = ' ext'
+
+    if udscls is None:
+        udscls = UDS
 
     log.debug('Starting{} Session ECU scan for range: {}'.format(scan_type, arb_id_range))
     c.placeCanBookmark('ecu_session_scan({}, ext={}, session={}, timeout={}, delay={})'.format(
@@ -252,7 +258,7 @@ def ecu_session_scan(c, udsclass, arb_id_range, ext=0, session=1, verbose_flag=F
             resp_id = 0x700 + i + 8
 
         addr = ECUAddress(arb_id, resp_id, ext)
-        u = udsclass(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag, verbose=verbose_flag, timeout=timeout)
+        u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag, verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
         try:
             with new_session(u, sess) as msg:
@@ -283,7 +289,7 @@ def ecu_session_scan(c, udsclass, arb_id_range, ext=0, session=1, verbose_flag=F
 
     # Double check any non-standard responses that were found
     for addr in possible_ecus:  
-        u = udsclass(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
+        u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
                 verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
         try:
