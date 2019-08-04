@@ -55,7 +55,13 @@ class ECU(object):
             self._sessions = {1: {'dids': {}}}
 
     def export(self):
-        return {'sessions': self._sessions}
+        import collections
+        data = collections.OrderedDict()
+        data['tx_arbid'] = self._addr.tx_arbid
+        data['rx_arbid'] = self._addr.rx_arbid
+        data['extflag'] = self._addr.extflag
+        data['sessions'] = self._sessions
+        return data
 
     def did_read_scan(self, did_range, rescan=False):
         # Only do a scan if we don't already have data, unless rescan is set

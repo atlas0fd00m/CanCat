@@ -248,6 +248,14 @@ def save_results(results, filename=None):
             return dumper.represent_int(hex(data))
         yaml.add_representer(int, hexint_presenter)
 
+        def ecu_presenter(dumper, ecu):
+            obj = []
+            for key, val in ecu.export().items():
+                obj.append((dumper.represent_data(key), dumper.represent_data(val)))
+            return yaml.nodes.MappingNode(u'tag:yaml.org,2002:map', obj)
+
+        yaml.add_representer(ECU, ecu_presenter)
+
         # TODO: It'd be more esthetically pleasing in the output files if 
         #       response data could be represented as a simple ascii string with 
         #       escaped bytes in it rather than the standard yaml "!!binary 
@@ -269,15 +277,7 @@ def save_results(results, filename=None):
         global _config
         output_data['config'] = results['config']
         output_data['notes'] = dict([(k, literal_unicode(v)) for k, v in results['notes'].items()])
-        output_data['ECUs'] = []
-        for addr, ecu in results['ECUs'].items():
-            data = {
-                'tx_arbid': addr.tx_arbid,
-                'rx_arbid': addr.rx_arbid,
-                'extflag': addr.extflag,
-            }
-            data.update(ecu.export())
-            output_data['ECUs'].append(data)
+        output_data['ECUs'] = [e for e in results['ECUs'].values()]
 
         with open(filename, 'w') as f:
             f.write(yaml.dump(output_data))
@@ -326,7 +326,7 @@ def scan(config, args, c, scancls):
 
             for addr in ecus:
                 _config['ECUs'][addr] = ECU(c, addr, uds_class=scancls,
-                        timeout=_config['config']['timeout'], delay=args.scan_delay))
+                        timeout=_config['config']['timeout'], delay=args.scan_delay)
 
     if 'D' in args.scan:
         log_and_save(_config, 'DID read scan started @ {}'.format(now()))
