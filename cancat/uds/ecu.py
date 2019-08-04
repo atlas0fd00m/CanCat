@@ -2,8 +2,7 @@
 
 import time
 
-from cancat.uds import UDS, SVC_SECURITY_ACCESS 
-from cancat.uds import utils
+from cancat.uds import utils, UDS, SVC_SECURITY_ACCESS, NegativeResponseException 
 from cancat.utils import log
 
 
@@ -63,7 +62,9 @@ class ECU(object):
         if not self._sessions[1]['dids'] or rescan:
             arb, resp, ext = self._addr
             log.msg('{} starting DID scan'.format(self._addr))
-            u = self._scancls(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
+            # The DID scan is more reliable using the standard UDS timeout 
+            # because of the length of time that block transfers can take
+            u = self._scancls(self.c, arb, resp, extflag=ext, verbose=False, timeout=3.0)
             self._sessions[1]['dids'].update(utils.did_read_scan(u, did_range, delay=self._delay))
 
     def did_write_scan(self, did_range, rescan=False):
@@ -76,15 +77,18 @@ class ECU(object):
             u = self._scancls(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
             self._write_dids.update(utils.did_write_scan(u, did_range, b'', delay=self._delay))
 
-    def session_scan(self, session_range, rescan=False, rescan_did_range=None):
+    def session_scan(self, session_range, rescan=False, rescan_did_range=None, recursive_scan=True):
         arb, resp, ext = self._addr
-        u = self._scancls(self.c, arb, resp, extflag=ext, verbose=False, timeout=self._timeout)
+        # Unfortunately session scanning (and the later DID scanning) is more 
+        # reliable with the standard 3 second timeout
+        u = self._scancls(self.c, arb, resp, extflag=ext, verbose=False, timeout=3.0)
 
         log.msg('{} starting session scan'.format(self._addr))
 
         # Only scan for new sessions if the session list consists only of session 1
         if len(self._sessions) == 1:
-            new_sessions = utils.session_scan(u, session_range, delay=self._delay)
+            new_sessions = utils.session_scan(u, session_range, delay=self._delay,
+                    recursive_scan=recursive_scan)
             self._sessions.update(new_sessions)
 
         # For each session that was found, go through the list of DIDs and 
@@ -92,20 +96,24 @@ class ECU(object):
         for sess in self._sessions:
             if sess != 1 and 'resp' in self._sessions[sess] and (rescan or \
                     'dids' not in self._sessions[sess] or len(self._sessions[sess]['dids']) == 0):
-                with utils.new_session(u, sess, self._sessions[sess]['prereqs'], True):
-                    log.debug('{} session {} ({}) re-reading DIDs'.format(
-                        self._addr, sess, self._sessions[sess]['prereqs']))
+                try:
+                    with utils.new_session(u, sess, self._sessions[sess]['prereqs'], True):
+                        log.debug('{} session {} ({}) re-reading DIDs'.format(
+                            self._addr, sess, self._sessions[sess]['prereqs']))
 
-                    self._sessions[sess]['dids'] = {}
-                    # If rescan is set do a full DID scan instead of the short 
-                    # scan of only existing DIDs
-                    if rescan:
-                        results = utils.did_read_scan(u, rescan_did_range, delay=self._delay)
-                        self._sessions[sess]['dids'].update(results)
-                    else:
-                        valid_did_range = [d for d in self._sessions[1]['dids']]
-                        results = utils.did_read_scan(u, valid_did_range, delay=self._delay)
-                        self._sessions[sess]['dids'].update(results)
+                        self._sessions[sess]['dids'] = {}
+                        # If rescan is set do a full DID scan instead of the short 
+                        # scan of only existing DIDs
+                        if rescan:
+                            results = utils.did_read_scan(u, rescan_did_range, delay=self._delay)
+                            self._sessions[sess]['dids'].update(results)
+                        else:
+                            valid_did_range = [d for d in self._sessions[1]['dids']]
+                            results = utils.did_read_scan(u, valid_did_range, delay=self._delay)
+                            self._sessions[sess]['dids'].update(results)
+                except NegativeResponseException as e:
+                    log.error('Failed to enter session {} ({}) to re-scan DIDs, try again later: {}'.format(
+                        sess, self._sessions[sess]['prereqs'], e))
 
     def auth_scan(self, auth_range, rescan=False):
         arb, resp, ext = self._addr

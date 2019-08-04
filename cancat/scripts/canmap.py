@@ -141,6 +141,8 @@ def udsmap_parse_args():
     parser.add_argument('-m', '--bus-mode',
             choices=['std', 'ext', 'both'], default='both',
             help='Bus mode, only run standard 11-bit ECU discovery, extended 29-bit discovery or both - in the default "both" mode a standard 11-bit scan is run and then an exgtended 29-bit scan')
+    parser.add_argument('--no-recursive-session-scanning', action='store_true',
+            help='Disable recursive session')
     parser.add_argument('-E', metavar='<ECU Range>',
             type=ECURange, default='00-FF',
             help='ECU address range to search')
@@ -220,9 +222,13 @@ def import_results(args, c, scancls):
         if args.baud != 'AUTO' or 'baud' not in config['config']:
             config['config']['baud'] = args.baud
 
+        if 'no_recursive_session_scanning' not in config['config']:
+            config['config']['no_recursive_session_scanning'] = args.no_recursive_session_scanning
+
         for e in imported_data['ECUs']:
-            config['ECUs'][addr] = ECU(c, ECUAddress(**e),
-                    uds_class=scancls, delay=args.scan_delay, **e)
+            addr = ECUAddress(**e)
+            config['ECUs'][addr] = ECU(c, addr, uds_class=scancls,
+                    timeout=args.timeout, delay=args.scan_delay, **e)
         return config
 
 
@@ -313,7 +319,7 @@ def scan(config, args, c, scancls):
 
             for addr in ecus:
                 _config['ECUs'][addr] = ECU(c, addr, uds_class=scancls,
-                        delay=args.scan_delay)
+                        timeout=args.timeout, delay=args.scan_delay)
 
     if 'D' in args.scan:
         log_and_save(_config, 'DID read scan started @ {}'.format(now()))
@@ -330,8 +336,13 @@ def scan(config, args, c, scancls):
     if 'S' in args.scan:
         log_and_save(_config, 'Session scan started @ {}'.format(now()))
 
+        if config['config']['no_recursive_session_scanning']:
+            recursive = False
+        else:
+            recursive = True
+
         for ecu in _config['ECUs'].values():
-            ecu.session_scan(args.S, args.rescan, rescan_did_range=args.D)
+            ecu.session_scan(args.S, args.rescan, rescan_did_range=args.D, recursive_scan=recursive)
 
     if 'A' in args.scan:
         log_and_save(_config, 'Auth scan started @ {}'.format(now()))
@@ -400,7 +411,10 @@ def main():
         _config = import_results(args, c, scancls)
     else:
         _config = {
-            'config': {'baud': args.baud},
+            'config': {
+                'baud': args.baud,
+                'no_recursive_session_scanning': args.no_recursive_session_scanning,
+            },
             'notes': {},
             'ECUs': {},
         }
