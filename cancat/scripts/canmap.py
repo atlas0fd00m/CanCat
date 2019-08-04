@@ -277,7 +277,7 @@ def save_results(results, filename=None):
         global _config
         output_data['config'] = results['config']
         output_data['notes'] = dict([(k, literal_unicode(v)) for k, v in results['notes'].items()])
-        output_data['ECUs'] = [e for e in results['ECUs'].values()]
+        output_data['ECUs'] = sorted([e for e in results['ECUs'].values()], key=lambda x: x._addr.tx_arbid)
 
         with open(filename, 'w') as f:
             f.write(yaml.dump(output_data))
