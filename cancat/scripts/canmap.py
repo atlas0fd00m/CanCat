@@ -225,10 +225,13 @@ def import_results(args, c, scancls):
         if 'no_recursive_session_scanning' not in config['config']:
             config['config']['no_recursive_session_scanning'] = args.no_recursive_session_scanning
 
+        if 'timeout' not in config['config']:
+            config['config']['timeout'] = args.timeout
+
         for e in imported_data['ECUs']:
             addr = ECUAddress(**e)
             config['ECUs'][addr] = ECU(c, addr, uds_class=scancls,
-                    timeout=args.timeout, delay=args.scan_delay, **e)
+                    timeout=config['config']['timeout'], delay=args.scan_delay, **e)
         return config
 
 
@@ -268,7 +271,11 @@ def save_results(results, filename=None):
         output_data['notes'] = dict([(k, literal_unicode(v)) for k, v in results['notes'].items()])
         output_data['ECUs'] = []
         for addr, ecu in results['ECUs'].items():
-            data = dict(addr)
+            data = {
+                'tx_arbid': addr.tx_arbid,
+                'rx_arbid': addr.rx_arbid,
+                'extflag': addr.extflag,
+            }
             data.update(ecu.export())
             output_data['ECUs'].append(data)
 
@@ -305,21 +312,21 @@ def scan(config, args, c, scancls):
             if args.discovery_type == 'did':
                 if args.bus_mode in ['std', 'both']:
                     ecus.extend(ecu_did_scan(c, args.E, ext=0, udscls=scancls,
-                        timeout=args.timeout, delay=args.scan_delay))
+                        timeout=_config['config']['timeout'], delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
                     ecus.extend(ecu_did_scan(c, args.E, ext=1, udscls=scancls,
-                        timeout=args.timeout, delay=args.scan_delay))
+                        timeout=_config['config']['timeout'], delay=args.scan_delay))
             else:
                 if args.bus_mode in ['std', 'both']:
                     ecus.extend(ecu_session_scan(c, args.E, ext=0, udscls=scancls,
-                        timeout=args.timeout, delay=args.scan_delay))
+                        timeout=_config['config']['timeout'], delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
                     ecus.extend(ecu_session_scan(c, args.E, ext=1, udscls=scancls,
-                        timeout=args.timeout, delay=args.scan_delay))
+                        timeout=_config['config']['timeout'], delay=args.scan_delay))
 
             for addr in ecus:
                 _config['ECUs'][addr] = ECU(c, addr, uds_class=scancls,
-                        timeout=args.timeout, delay=args.scan_delay)
+                        timeout=_config['config']['timeout'], delay=args.scan_delay))
 
     if 'D' in args.scan:
         log_and_save(_config, 'DID read scan started @ {}'.format(now()))
