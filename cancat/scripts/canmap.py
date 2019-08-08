@@ -152,17 +152,18 @@ def udsmap_parse_args():
     parser.add_argument('-S', metavar='<Diagnostic Session Range>',
             type=DiagnosticSessionRange, default='02-7F',
             help='Diagnostic Sessions to search for')
-    parser.add_argument('-A', metavar='<Security Access Key Range>',
-            type=SecurityAccessKeyRange, default='01-41,61-7D',
-            help='Security Access Key range to test, by default Security Sessions 43-60 are not tested, those values are used for end-of-life airbag deployment and may cause damage.')
+    #parser.add_argument('-A', metavar='<Security Access Key Range>',
+    #        type=SecurityAccessKeyRange, default='01-41,61-7D',
+    #        help='Security Access Key range to test, by default Security Sessions 43-60 are not tested, those values are used for end-of-life airbag deployment and may cause damage.')
 
     # According to ISO 14229 there is no upper bound on the size of the key 
     # (that I could see) aside from the constraints of the ISO-TP protocol 
     # itself. But for sanity's sake the default will be to stop trying when we 
     # reach 32 bytes.
-    parser.add_argument('-L', metavar='<Key Length Range>',
-            type=PayloadLength, default='01-20',
-            help='Key Length range to test')
+    #parser.add_argument('-L', metavar='<Key Length Range>',
+    #        type=PayloadLength, default='01-20',
+    #        help='Key Length range to test')
+
     parser.add_argument('-T', '--timeout', type=float, default=0.2,
             help='UDS Timeout, 3 seconds is the ISO14229 standard, standard for this tool is 100 msec (0.2)')
     parser.add_argument('-w', '--startup-wait', type=float, nargs='?', const=2.0,
@@ -171,10 +172,10 @@ def udsmap_parse_args():
             help='Wait a small time between requests, helps prevent flooding the bus')
     parser.add_argument('-r', '--rescan', action='store_true',
             help='Run a full rescan and merge new results with any existing data')
-    parser.add_argument('-f', '--force', action='store_true',
-            help='Force udsmap to scan with potentially harmful options')
-    parser.add_argument('-y', '--yes', action='store_true',
-            help='Automatically answer "yes" to any questions the tool asks')
+    #parser.add_argument('-f', '--force', action='store_true',
+    #        help='Force udsmap to scan with potentially harmful options')
+    #parser.add_argument('-y', '--yes', action='store_true',
+    #        help='Automatically answer "yes" to any questions the tool asks')
     parser.add_argument('-v', '--verbose', action='count',
             help='Verbose logging, use -vv for extra verbosity')
     parser.add_argument('-l', '--log-file', nargs='?', const='canmap_%%Y%%m%%d-%%H%%M%%S.log',
