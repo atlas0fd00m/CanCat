@@ -47,9 +47,11 @@ class DIDRange(SparseHexRange):
 
 class DiagnosticSessionRange(SparseHexRange):
     def __new__(cls, val):
-        # Ensure that values are <= than 0x7F (127)
+        # Ensure that values are >= 2 and <= than 0x7F (127)
         if any(int(n, 16) > 0x7F for n in re.findall(r'[A-Za-z0-9]+', val)):
             raise ValueError('range {} exceeds max Diagnostic Session of 0x7F'.format(val))
+        elif any(int(n, 16) < 0x02 for n in re.findall(r'[A-Za-z0-9]+', val)):
+            raise ValueError('range {} below min Diagnostic Session of 0x02'.format(val))
         return super(DiagnosticSessionRange, cls).__new__(cls, val)
 
 
@@ -58,6 +60,8 @@ class SecurityAccessKeyRange(SparseHexRange):
         # Ensure that values are >= 2 and <= than 0x7D (125)
         if any(int(n, 16) > 0x7D for n in re.findall(r'[A-Za-z0-9]+', val)):
             raise ValueError('range {} exceeds max Security Access Key of 0x7D'.format(val))
+        elif any(int(n, 16) < 0x02 for n in re.findall(r'[A-Za-z0-9]+', val)):
+            raise ValueError('range {} below min Security Access Key of 0x02'.format(val))
 
         # The auth levels alternate
         return super(SecurityAccessKeyRange, cls).__new__(cls, val, 2)
