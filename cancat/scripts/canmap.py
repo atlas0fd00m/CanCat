@@ -141,8 +141,8 @@ def udsmap_parse_args():
     parser.add_argument('-m', '--bus-mode',
             choices=['std', 'ext', 'both'], default='both',
             help='Bus mode, only run standard 11-bit ECU discovery, extended 29-bit discovery or both - in the default "both" mode a standard 11-bit scan is run and then an exgtended 29-bit scan')
-    parser.add_argument('--no-recursive-session-scanning', action='store_true',
-            help='Disable recursive session')
+    parser.add_argument('-n', '--no-recursive-session-scanning', action='store_true',
+            help='Disable recursive session scanning')
     parser.add_argument('-E', metavar='<ECU Range>',
             type=ECURange, default='00-FF',
             help='ECU address range to search')
