@@ -49,21 +49,30 @@ $ pip install --user ipython
 
 3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software).  
 
-4) (OPTIONAL) If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
+4) (OPTIONAL) If you are using a [Macchina M2](https://www.macchina.cc/) follow 
+the [getting started 
+guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to 
+install the M2 hardware definitions in the Arduino tool.
 
-5) (OPTIONAL) If you are on a Linux system, you may choose to install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform. The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE. 
+5) (OPTIONAL) If you are on a Linux system, you may choose to install the 
+[arduino-cli](https://github.com/arduino/arduino-cli) for your platform. The 
+arduino-cli tool can be used to compile and flash your CAN device without 
+opening the Arudino IDE. 
 
-6) Clone CanCat and build the desired firmware. If you are not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device. 
+6) Clone CanCat and build the desired firmware. If you are not using the 
+arduino-cli tool, use the Arduino IDE as normal to build and flash the sketch 
+onto your target device. If you have installed the arguing-cli tool you can 
+compile and flash the CanCat firmware with the following steps:
 
 ```
+$ arduino-cli lib install due_can
 $ git clone https://github.com/atlas0fd00m/CanCat
 $ cd CanCat/sketches
-$ make m2
-$ make bootloader
-$ make flash
+$ make due
 ```
 
-7) Ensure that your CAN-transceiver is not in bootloader mode by unplugging its USB connector and then plugging it back in again.
+7) Ensure that your CAN-transceiver is not in bootloader mode by unplugging its 
+USB connector and then plugging it back in again.
 
 8) Connect to your CAN-transceiver with CanCat
 
