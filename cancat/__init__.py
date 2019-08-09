@@ -296,7 +296,13 @@ class CanInterface(object):
 
         returns a list of the messages
         '''
-        return self.recvall(CMD_CAN_RECV)
+        allmsgs = self.recvall(CMD_CAN_RECV) 
+
+        # Clear the bookmarks as well because they are no longer meaningful
+        self.bookmarks = []
+        self.bookmark_info = {}
+
+        return allmsgs
 
     def _rxtx(self):
         '''
