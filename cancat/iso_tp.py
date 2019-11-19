@@ -4,7 +4,7 @@ import struct
 def msg_encode(data, verbose=False):
     olist = []
     dlen = len(data)
-    
+
     if dlen > 4095:
         raise Exception("Data too long for one ISO-TP message (<4096)")
 
@@ -29,7 +29,7 @@ def msg_encode(data, verbose=False):
         for dataidx in range(6, dlen, 7):
             ftype = 2
             b0 = (ftype << 4) | frameidx
-            if verbose: print hex(b0)
+            if verbose: print(hex(b0))
             olist.append( "%c%s" % (b0, data[dataidx:dataidx+7]) )
 
             frameidx += 1
@@ -71,12 +71,12 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
             data_len = ctrl # Number of bytes in message
             if len(output):
                 msg = ''.join(output)
-                print "Failed to reach length %d:  only got %d" % (length, len(msg))
+                print("Failed to reach length %d:  only got %d" % (length, len(msg)))
                 return arbid, msg, count
 
             # Single packet message, return only the relevant data
             data = msg[1:data_len+1]
-            if verbose: print "0: %r" % data.encode('hex')
+            if verbose: print("0: %r" % data.encode('hex'))
 
             return narbid, data, count+1
 
@@ -84,11 +84,11 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
             length = struct.unpack(">H", msg[0:2])[0] & 0xfff
             arbid = narbid
 
-            if verbose: print "length: %r" % length
+            if verbose: print("length: %r" % length)
 
             msg = msg[2:]
             output.append(msg)
-            if verbose: print "1: %r" % msg.encode('hex')
+            if verbose: print("1: %r" % msg.encode('hex'))
             length -= len(msg)
             nextidx += 1
 
@@ -96,21 +96,21 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
             if length == None:
                 raise Exception("Cannot parse ISO-TP, type 2 without type 1")
             idx = ctrl & 0xf
-            if verbose: print "\t\t\t%x" % idx
+            if verbose: print("\t\t\t%x" % idx)
             if idx != (nextidx):
                 #raise Exception("Indexing Bug: idx: %x != nextidx: %x" % (idx, nextidx))
                 print("Indexing Bug: idx: %x != nextidx: %x" % (idx, nextidx))
 
             msg = msg[1:length+1]
             output.append(msg)
-            if verbose: print "2: %r" % msg.encode('hex')
+            if verbose: print("2: %r" % msg.encode('hex'))
             length -= len(msg)
             nextidx += 1
 
         elif ftype == 3:
-            if verbose: print "Flow Control packet found: %r" % (msg.encode('hex'))
+            if verbose: print("Flow Control packet found: %r" % (msg.encode('hex')))
         else:
-            if verbose: print "Doesn't fit: %r" % (msg.encode('hex'))
+            if verbose: print("Doesn't fit: %r" % (msg.encode('hex')))
 
         if nextidx >= 0x10:
             nextidx = 0
@@ -119,7 +119,7 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
         midx += 1
 
     if length != None and length < 0:
-        if verbose: print "Extra bytes at the end: %r" % (output[-1][length:])
+        if verbose: print("Extra bytes at the end: %r" % (output[-1][length:]))
 
     if length == None or length > 0:
         raise IncompleteIsoTpMsg(output, length)
@@ -147,7 +147,7 @@ def msgs_decode(msglist, verbose=False):
             output = []
             length = struct.unpack(">H", msg[1:3])[0] & 0xfff
             idx = ctrl & 0xf
-            if verbose: print "\t\t\t%x" % idx
+            if verbose: print("\t\t\t%x" % idx)
 
             output.append(msg[2:])
             nextidx += 1
@@ -157,7 +157,7 @@ def msgs_decode(msglist, verbose=False):
             if not length:
                 raise Exception("Cannot parse ISO-TP, type 2 without type 1")
             idx = ctrl & 0xf
-            if verbose: print "\t\t\t%x" % idx
+            if verbose: print("\t\t\t%x" % idx)
             if idx != (nextidx):
                 #raise Exception("Indexing Bug: idx: %x != nextidx: %x" % (idx, nextidx))
                 print("Indexing Bug: idx: %x != nextidx: %x" % (idx, nextidx))
@@ -171,12 +171,11 @@ def msgs_decode(msglist, verbose=False):
                 messages[-1] = ''.join(output)
 
         elif ftype == 3:
-            if verbose: print "Flow Control packet found: %r" % (msg.encode('hex'))
+            if verbose: print("Flow Control packet found: %r" % (msg.encode('hex')))
         else:
-            if verbose: print "Doesn't fit: %r" % (msg.encode('hex'))
+            if verbose: print("Doesn't fit: %r" % (msg.encode('hex')))
 
         if nextidx >= 0x10:
             nextidx = 0
 
     return messages
-

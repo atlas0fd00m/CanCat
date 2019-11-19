@@ -6,8 +6,8 @@ import serial
 import select
 import struct
 import threading
-import math   
-import cPickle as pickle
+import math
+import pickle
 
 from cancat import iso_tp
 
@@ -16,7 +16,7 @@ serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
 baud = 4000000
 
 
-# command constants (used to identify messages between 
+# command constants (used to identify messages between
 # python client and the CanCat transceiver
 CMD_LOG                     = 0x2f
 CMD_LOG_HEX                 = 0x2e
@@ -65,7 +65,7 @@ CAN_AUTOBPS  = 0
 CAN_5KBPS    = 1
 CAN_10KBPS   = 2
 CAN_20KBPS   = 3
-CAN_25KBPS   = 4 
+CAN_25KBPS   = 4
 CAN_31K25BPS = 5
 CAN_33KBPS   = 6
 CAN_40KBPS   = 7
@@ -90,13 +90,13 @@ RXTX_GO         = 1
 TIMING_FAST         = 0
 TIMING_REAL         = 1
 TIMING_INTERACTIVE  = 2
-TIMING_SEARCH       = 3 
+TIMING_SEARCH       = 3
 
 # constants for VIEW settings:
 VIEW_ASCII =        1<<0
 VIEW_COMPARE =      1<<1
 VIEW_BOOKMARKS =    1<<2
-VIEW_TS_DELTA =     1<<3    
+VIEW_TS_DELTA =     1<<3
 VIEW_ENDSUM =       1<<4
 VIEW_ALL = VIEW_ASCII | VIEW_COMPARE | VIEW_BOOKMARKS | VIEW_TS_DELTA | VIEW_ENDSUM
 
@@ -152,9 +152,9 @@ def handleCanMsgsDuringSniff(message, canbuf, arbids=None):
 
     if arbids:
         if arbid in arbids:
-            print reprCanMsg(idx, ts, arbid, data)
+            print(reprCanMsg(idx, ts, arbid, data))
     else:
-        print reprCanMsg(idx, ts, arbid, data)
+        print(reprCanMsg(idx, ts, arbid, data))
 
 default_cmdhandlers = {
         CMD_LOG : handleLogToScreen,
@@ -179,7 +179,7 @@ class CanInterface(object):
     def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
         '''
         CAN Analysis Workspace
-        This can be subclassed by vendor to allow more vendor-specific code 
+        This can be subclassed by vendor to allow more vendor-specific code
         based on the way each vendor uses the varios Buses
         '''
         if orig_iface != None:
@@ -255,7 +255,7 @@ class CanInterface(object):
         Attempt to connect/reconnect to the CanCat Transceiver
         '''
         if self.port == None and port == None:
-            print "cannot connect to an unspecified port"
+            print("cannot connect to an unspecified port")
             return
 
         if self._io != None:
@@ -286,7 +286,7 @@ class CanInterface(object):
         Destructor, called when the CanInterface object is being garbage collected
         '''
         if isinstance(self._io, serial.Serial):
-            print "shutting down serial connection"
+            print("shutting down serial connection")
             self._io.close()
         self._shutdown = True
         if self._commsthread != None:
@@ -294,7 +294,7 @@ class CanInterface(object):
 
     def clearCanMsgs(self):
         '''
-        Clear out all messages currently received on the CAN bus, allowing for 
+        Clear out all messages currently received on the CAN bus, allowing for
         basically a new analysis session without creating a new object/connection
 
         returns a list of the messages
@@ -310,20 +310,20 @@ class CanInterface(object):
         self._rxtx_state = RXTX_SYNC
 
         while not self._shutdown:
-            try:    
+            try:
                 if not self._go:
                     time.sleep(.04)
                     continue
 
                 if self.verbose > 4:
-                    if self.verbose > 5: 
-                        print "STATE: %s" % self._rxtx_state
+                    if self.verbose > 5:
+                        print("STATE: %s" % self._rxtx_state)
                     else:
                         sys.stderr.write('.')
 
                 # try to reconnect to disconnected unit (FIXME: not working right yet)
                 if self._rxtx_state == RXTX_DISCONN:
-                    print "FIXME: reconnect disconnected serial port..."
+                    print("FIXME: reconnect disconnected serial port...")
                     time.sleep(1)
                     self._reconnect()
                     self._rxtx_state = RXTX_SYNC
@@ -334,7 +334,7 @@ class CanInterface(object):
                 try:
                     char = self._io.read()
 
-                except serial.serialutil.SerialException, e:
+                except serial.serialutil.SerialException as e:
                     self.errorcode = e
                     self.log("serial exception")
                     if "disconnected" in e.message:
@@ -376,7 +376,7 @@ class CanInterface(object):
                 # handle buffer if we have anything in it
                 if self._rxtx_state == RXTX_GO:
                     if len(self._inbuf) < 3: continue
-                    if self._inbuf[0] != '@': 
+                    if self._inbuf[0] != '@':
                         self._rxtx_state = RXTX_SYNC
                         continue
 
@@ -386,7 +386,7 @@ class CanInterface(object):
                         self._queuelock.acquire()
                         try:
                             cmd = ord(self._inbuf[2])                # first bytes are @<size>
-                            message = self._inbuf[3:pktlen]  
+                            message = self._inbuf[3:pktlen]
                             self._inbuf = self._inbuf[pktlen:]
                         finally:
                             self._queuelock.release()
@@ -401,7 +401,7 @@ class CanInterface(object):
                             self._submitMessage(cmd, message)
                         self._rxtx_state = RXTX_SYNC
 
-                
+
             except:
                 if self.verbose:
                     sys.excepthook(*sys.exc_info())
@@ -423,7 +423,7 @@ class CanInterface(object):
             mbox.append((timestamp, message))
             self._msg_events[cmd].set()
 
-        except Exception, e:
+        except Exception as e:
             self.log("_submitMessage: ERROR: %r" % e, -1)
 
         finally:
@@ -435,7 +435,7 @@ class CanInterface(object):
         print a log message.  Only prints if CanCat's verbose setting >=verbose
         '''
         if self.verbose >= verbose:
-            print "%.2f %s: %s" % (time.time(), self.name, message)
+            print("%.2f %s: %s" % (time.time(), self.name, message))
 
     def recv(self, cmd, wait=None):
         '''
@@ -461,7 +461,7 @@ class CanInterface(object):
         '''
         Warning: Destructive:
             removes ALL messages from a mailbox and returns them.
-            For CMD_CAN_RECV mailbox, this is like getting a new 
+            For CMD_CAN_RECV mailbox, this is like getting a new
                 analysis session
         '''
         mbox = self._messages.get(cmd)
@@ -525,12 +525,12 @@ class CanInterface(object):
             ts, result = self.recv(CMD_CAN_SEND_RESULT, timeout)
 
         if result == None:
-            print "CANxmit:  Return is None!?"
+            print("CANxmit:  Return is None!?")
             return None
 
         resval = ord(result)
         if resval != 0:
-            print "CANxmit() failed: %s" % CAN_RESPS.get(resval)
+            print("CANxmit() failed: %s" % CAN_RESPS.get(resval))
 
         return resval
 
@@ -545,10 +545,10 @@ class CanInterface(object):
             ts, result = self.recv(CMD_CAN_SEND_ISOTP_RESULT, timeout)
 
         if result == None:
-            print "ISOTPxmit: Return is None!?"
+            print("ISOTPxmit: Return is None!?")
         resval = ord(result)
         if resval != 0:
-            print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
+            print("ISOTPxmit() failed: %s" % CAN_RESPS.get(resval))
 
         return resval
 
@@ -575,17 +575,17 @@ class CanInterface(object):
         ts, result = self.recv(CMD_CAN_RECV_ISOTP_RESULT, timeout)
 
         if result == None:
-            print "_isotp_enable_flowcontrol: Return is None!?"
+            print("_isotp_enable_flowcontrol: Return is None!?")
         resval = ord(result)
         if resval != 0:
-            print "_isotp_enable_flowcontrol() failed: %s" % CAN_RESPS.get(resval)
+            print("_isotp_enable_flowcontrol() failed: %s" % CAN_RESPS.get(resval))
 
         return resval
 
     def ISOTPxmit_recv(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1, service=None):
         '''
         Transmit an ISOTP can message, then wait for a response.
-        tx_arbid is the arbid we're transmitting, and rx_arbid 
+        tx_arbid is the arbid we're transmitting, and rx_arbid
         is the arbid we're listening for
         '''
         currIdx = self.getCanMsgCount()
@@ -595,16 +595,16 @@ class CanInterface(object):
             ts, result = self.recv(CMD_CAN_SENDRECV_ISOTP_RESULT, timeout)
 
         if result == None:
-            print "ISOTPxmit: Return is None!?"
+            print("ISOTPxmit: Return is None!?")
         resval = ord(result)
         if resval != 0:
-            print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
+            print("ISOTPxmit() failed: %s" % CAN_RESPS.get(resval))
 
         msg = self._isotp_get_msg(rx_arbid, start_index = currIdx, service = service, timeout = timeout)
         return msg
 
     def _isotp_get_msg(self, rx_arbid, start_index=0, service=None, timeout=None):
-        ''' 
+        '''
         Internal Method to piece together a valid ISO-TP message from received CAN packets.
         '''
         found = False
@@ -627,40 +627,40 @@ class CanInterface(object):
                             msg_found = True
                             return msg
 
-                        print "Hey, we got here, wrong service code?"
-                        print msg.encode('hex')
+                        print("Hey, we got here, wrong service code?")
+                        print(msg.encode('hex'))
                         start_index = msgs[count-1][0] + 1
                     else:
                         msg_found = True
                         return msg
 
-                except iso_tp.IncompleteIsoTpMsg, e:
-                    #print e # debugging only, this is expected
+                except iso_tp.IncompleteIsoTpMsg as e:
+                    #print(e) # debugging only, this is expected
                     pass
 
             time.sleep(0.1)
             lasttime = time.time()
-            #print "_isotp_get_msg: status: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
+            #print("_isotp_get_msg: status: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout))
 
-        print "_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
+        print("_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout))
         return None
 
     def CANsniff(self, start_msg=None, arbids=None, advfilters=[], maxmsgs=None):
         '''
-        Print messages in real time. 
+        Print messages in real time.
 
-        start_msg - first message to print 
+        start_msg - first message to print
                     (None: the next message captured, 0: first message since starting CanCat)
         arbids - list of arbids to print (others will be ignored)
         advfilters - list of python code to eval for each message (message context provided)
-                    eg. ['pf==0xeb', 'sa==0', 'ps & 0xf']  
-                        will print TP data message from source address 0 if the top 4 bits of PS 
+                    eg. ['pf==0xeb', 'sa==0', 'ps & 0xf']
+                        will print TP data message from source address 0 if the top 4 bits of PS
                         are set.
 
                     Expressions are evaluated from left to right in a "and" like fashion.  If any
                     expression evaluates to "False" and the message will be ignored.
 
-                    Variables mapped into default namespace: 
+                    Variables mapped into default namespace:
                         'arbid'
                         'id'
                         'ts'
@@ -678,8 +678,8 @@ class CanInterface(object):
             if maxmsgs != None and maxmsgs < count:
                 return
             line = msg_gen.next()
-            print line
-            
+            print(line)
+
             count += 1
             if keystop():
                 break
@@ -689,11 +689,11 @@ class CanInterface(object):
         '''
         Replay packets between two bookmarks.
         timing = TIMING_FAST: just slam them down the CAN bus as fast as possible
-        timing = TIMING_READ: send the messages using similar timing to how they 
+        timing = TIMING_READ: send the messages using similar timing to how they
                     were received
         timing = TIMING_INTERACTIVE: wait for the user to press Enter between each
                     message being transmitted
-        timing = TIMING_SEARCH: wait for the user to respond (binary search) 
+        timing = TIMING_SEARCH: wait for the user to respond (binary search)
         '''
         if start_bkmk != None:
             start_msg = self.getMsgIndexFromBookmark(start_bkmk)
@@ -701,11 +701,11 @@ class CanInterface(object):
         if stop_bkmk != None:
             stop_msg = self.getMsgIndexFromBookmark(stop_bkmk)
 
-        if timing == TIMING_SEARCH: 
+        if timing == TIMING_SEARCH:
                 diff = stop_msg - start_msg
                 if diff == 1:
                     mid_msg = stop_msg
-                    start_tmp = start_msg 
+                    start_tmp = start_msg
                 else:
                     mid_msg = int(start_msg + math.floor((stop_msg - start_msg) / 2))
                     start_tmp = start_msg
@@ -724,23 +724,23 @@ class CanInterface(object):
                 if char is not None and len(char) > 0 and char[0] == 'n':
                     return
 
-            elif timing == TIMING_SEARCH:    
-                self.CANreplay(start_msg=mid_msg, stop_msg=stop_msg)   
+            elif timing == TIMING_SEARCH:
+                self.CANreplay(start_msg=mid_msg, stop_msg=stop_msg)
                 char = raw_input("Expected outcome?  start_msg = %s, stop_msg = %s (Y/n/q)" % (mid_msg, stop_msg))
                 if char is not None and len(char) > 0 and char[0] == 'q':
-                    return 
+                    return
                 if diff > 1:
                     if char is not None and len(char) > 0 and char[0] == 'y':
-                        return self.CANreplay(start_msg=mid_msg, stop_msg=stop_msg, timing=TIMING_SEARCH) 
-                    elif char is not None and len(char) > 0 and char[0] == 'n': 
+                        return self.CANreplay(start_msg=mid_msg, stop_msg=stop_msg, timing=TIMING_SEARCH)
+                    elif char is not None and len(char) > 0 and char[0] == 'n':
                         return self.CANreplay(start_msg=start_tmp, stop_msg=mid_msg, timing=TIMING_SEARCH)
-                else: 
+                else:
                     if char is not None and len(char) > 0 and char[0] == 'y':
-                        print "Target message: %s" % (stop_msg)
-                        return 
-                    elif char is not None and len(char) > 0 and char[0] == 'n':  
-                        print "Target message: %s" % (start_tmp)
-                        return  
+                        print("Target message: %s" % (stop_msg))
+                        return
+                    elif char is not None and len(char) > 0 and char[0] == 'n':
+                        print("Target message: %s" % (start_tmp))
+                        return
 
             elif timing == TIMING_REAL:
                 if last_time != -1:
@@ -751,18 +751,18 @@ class CanInterface(object):
 
             self.CANxmit(arbid, data)
             if timing == TIMING_INTERACTIVE:
-                print "Message transmitted"
+                print("Message transmitted")
 
     def setCanBaud(self, baud_const=CAN_500KBPS):
         '''
-        set the baud rate for the CAN bus.  this has nothing to do with the 
+        set the baud rate for the CAN bus.  this has nothing to do with the
         connection from the computer to the tool
         '''
         self._send(CMD_CAN_BAUD, chr(baud_const))
         response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
 
         while(response[1] != '\x01'):
-            print "CAN INIT FAILED: Retrying"
+            print("CAN INIT FAILED: Retrying")
             response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
 
     def setCanMode(self, mode):
@@ -773,20 +773,20 @@ class CanInterface(object):
         '''
         CAN_MODES = { v: k for k,v in globals().items() if k.startswith('CMD_CAN_MODE_') and k is not 'CMD_CAN_MODE_RESULT' }
         if mode not in CAN_MODES:
-            print "{} is not a valid can mode. Valid modes are:".format(mode)
+            print("{} is not a valid can mode. Valid modes are:".format(mode))
             for k in CAN_MODES:
-                print "{} ({})".format(CAN_MODES[k], k)
+                print("{} ({})".format(CAN_MODES[k], k))
         else:
             self._send(CMD_CAN_MODE, chr(mode))
             response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
 
             while(response[1] != '\x01'):
-                print "CAN INIT FAILED: Retrying"
+                print("CAN INIT FAILED: Retrying")
                 response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
 
     def ping(self, buf='ABCDEFGHIJKL'):
         '''
-        Utility function, only to send and receive data from the 
+        Utility function, only to send and receive data from the
         CanCat Transceiver.  Has no effect on the CAN bus
         '''
         self._send(CMD_PING, buf)
@@ -829,17 +829,17 @@ class CanInterface(object):
             if maxsecs != None and time.time() > maxsecs+starttime:
                 return
 
-            # If we start sniffing before we receive any messages, 
+            # If we start sniffing before we receive any messages,
             # messages will be "None". In this case, each time through
             # this loop, check to see if we have messages, and if so,
             # re-create the messages handle
             if messages == None:
                 messages = self._messages.get(CMD_CAN_RECV, None)
-        
+
             # if we're off the end of the original request, and "tailing"
             if messages != None:
                 if tail and idx >= stop:
-                    msglen = len(messages) 
+                    msglen = len(messages)
                     self.log("stop=%d  len=%d" % (stop, msglen), 3)
 
                     if stop == msglen:
@@ -875,7 +875,7 @@ class CanInterface(object):
         takes in captured message
         returns arbid and data
 
-        does not check msg size.  MUST be at least 4 bytes in length as the 
+        does not check msg size.  MUST be at least 4 bytes in length as the
         tool should send 4 bytes for the arbid
         '''
         arbid = struct.unpack(">I", msg[:4])[0]
@@ -893,7 +893,7 @@ class CanInterface(object):
         '''
         Prints session stats only for messages between two bookmarks
         '''
-        print self.getSessionStatsByBookmark(start, stop)
+        print(self.getSessionStatsByBookmark(start, stop))
 
     def printSessionStats(self, start=0, stop=None):
         '''
@@ -901,7 +901,7 @@ class CanInterface(object):
         between two message indexes (where they sit in the CMD_CAN_RECV
         mailbox)
         '''
-        print self.getSessionStats(start, stop)
+        print(self.getSessionStats(start, stop))
 
     def getSessionStatsByBookmark(self, start=None, stop=None):
         '''
@@ -917,7 +917,7 @@ class CanInterface(object):
         else:
             stop_msg = self.getCanMsgCount()
 
-        return self.getSessionStats(start=start_msg, stop=stop_msg)
+        return(self.getSessionStats(start=start_msg, stop=stop_msg))
 
     def getArbitrationIds(self, start=0, stop=None, reverse=False):
         '''
@@ -940,7 +940,7 @@ class CanInterface(object):
 
     def getSessionStats(self, start=0, stop=None):
         out = []
-        
+
         arbid_list = self.getArbitrationIds(start=start, stop=stop, reverse=True)
 
         for datalen, arbid, msgs in arbid_list:
@@ -1002,7 +1002,7 @@ class CanInterface(object):
     def saveSessionToFile(self, filename=None):
         '''
         Saves the current analysis session to the filename given
-        If saved previously, the name will already be cached, so it is 
+        If saved previously, the name will already be cached, so it is
         unnecessary to provide it again.
         '''
         if filename != None:
@@ -1018,7 +1018,7 @@ class CanInterface(object):
         outfile = file(filename, 'w')
         outfile.write(me)
         outfile.close()
-    
+
     def saveSession(self):
         '''
         Save the current analysis session to a python dictionary object
@@ -1037,7 +1037,7 @@ class CanInterface(object):
     def placeCanBookmark(self, name=None, comment=None):
         '''
         Save a named bookmark (with optional comment).
-        This stores the message index number from the 
+        This stores the message index number from the
         CMD_CAN_RECV mailbox.
 
         DON'T USE CANrecv or recv(CMD_CAN_RECV) with Bookmarks or Snapshots!!
@@ -1050,7 +1050,7 @@ class CanInterface(object):
 
         bkmk_index = len(self.bookmarks)
         self.bookmarks.append(msg_index)
-        
+
         info = { 'name' : name,
                 'comment' : comment }
 
@@ -1093,7 +1093,7 @@ class CanInterface(object):
         raw_input("Press Enter When Done...")
         stop_bkmk = self.placeCanBookmark("Stop_" + name, comment)
 
-    def filterCanMsgsByBookmark(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, 
+    def filterCanMsgsByBookmark(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None,
                     arbids=None, ignore=[], advfilters=[]):
 
         if start_bkmk != None:
@@ -1110,7 +1110,7 @@ class CanInterface(object):
             start_baseline_msg = self.getMsgIndexFromBookmark(start_baseline_bkmk)
         else:
             start_baseline_msg = None
-        
+
         if stop_baseline_bkmk != None:
             stop_baseline_msg = self.getMsgIndexFromBookmark(stop_baseline_bkmk)
         else:
@@ -1124,7 +1124,7 @@ class CanInterface(object):
     def filterCanMsgs(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], tail=False, maxsecs=None):
         '''
         returns the received CAN messages between indexes "start_msg" and "stop_msg"
-        but only messages to ID's that *do not* appear in the the baseline indicated 
+        but only messages to ID's that *do not* appear in the the baseline indicated
         by "start_baseline_msg" and "stop_baseline_msg".
 
         for message indexes, you *will* want to look into the bookmarking subsystem!
@@ -1133,7 +1133,7 @@ class CanInterface(object):
         if stop_baseline_msg != None:
             self.log("ignoring arbids from baseline...")
             # get a list of baseline arbids
-            filter_ids = { arbid:1 for idx,ts,arbid,data in self.genCanMsgs(start_baseline_msg, stop_baseline_msg) 
+            filter_ids = { arbid:1 for idx,ts,arbid,data in self.genCanMsgs(start_baseline_msg, stop_baseline_msg)
                 }.keys()
         else:
             filter_ids = None
@@ -1158,14 +1158,14 @@ class CanInterface(object):
                 self.log("skipping message(adv): (%r, %r, %r, %r)" % ((idx, ts, arbid, msg)))
                 continue
 
-            yield (idx, ts, arbid, msg) 
+            yield (idx, ts, arbid, msg)
 
-    def printCanMsgsByBookmark(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, 
+    def printCanMsgsByBookmark(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None,
                     arbids=None, ignore=[], advfilters=[]):
         '''
         deprecated: use printCanMsgs(start_bkmk=foo, stop_bkmk=bar)
         '''
-        print self.reprCanMsgsByBookmark(start_bkmk, stop_bkmk, start_baseline_bkmk, stop_baseline_bkmk, arbids, ignore, advfilters)
+        print(self.reprCanMsgsByBookmark(start_bkmk, stop_bkmk, start_baseline_bkmk, stop_baseline_bkmk, arbids, ignore, advfilters))
 
     def reprCanMsgsByBookmark(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, arbids=None, ignore=[], advfilters=[]):
         '''
@@ -1187,7 +1187,7 @@ class CanInterface(object):
             start_baseline_msg = self.getMsgIndexFromBookmark(start_baseline_bkmk)
         else:
             start_baseline_msg = None
-        
+
         if stop_baseline_bkmk != None:
             stop_baseline_msg = self.getMsgIndexFromBookmark(stop_baseline_bkmk)
         else:
@@ -1205,7 +1205,7 @@ class CanInterface(object):
                 line = data.next()
                 lines = line.split('\n')
                 for thing in lines:
-                    print thing
+                    print(thing)
                     pidx += 1
 
                     if paginate != None and pidx % paginate == 0:
@@ -1219,8 +1219,8 @@ class CanInterface(object):
         '''
         String representation of a set of CAN Messages.
         These can be filtered by start and stop message indexes, as well as
-        use a baseline (defined by start/stop message indexes), 
-        by a list of "desired" arbids as well as a list of 
+        use a baseline (defined by start/stop message indexes),
+        by a list of "desired" arbids as well as a list of
         ignored arbids
 
         Many functions wrap this one.
@@ -1238,14 +1238,14 @@ class CanInterface(object):
 
         if (viewbits & VIEW_BOOKMARKS) and start_msg in self.bookmarks:
             bkmk = self.bookmarks.index(start_msg)
-            yield ("starting from bookmark %d: '%s'" % 
+            yield ("starting from bookmark %d: '%s'" %
                     (bkmk,
                     self.bookmark_info[bkmk].get('name'))
                     )
 
         if (viewbits & VIEW_BOOKMARKS) and stop_msg in self.bookmarks:
             bkmk = self.bookmarks.index(stop_msg)
-            yield ("stoppng at bookmark %d: '%s'" % 
+            yield ("stoppng at bookmark %d: '%s'" %
                     (bkmk,
                     self.bookmark_info[bkmk].get('name'))
                     )
@@ -1258,7 +1258,7 @@ class CanInterface(object):
         last_ts = None
         tot_delta_ts = 0
         counted_msgs = 0    # used for calculating averages, excluding outliers
-        
+
         data_delta = None
 
 
@@ -1346,7 +1346,7 @@ class CanInterface(object):
             arbids = [arbdata for arbdata in self.getArbitrationIds() if arbdata[1] in arbid_list]
 
         for datalen,arbid,msgs in arbids:
-            print self.reprCanMsgs(arbids=[arbid], advfilters=advfilters)
+            print(self.reprCanMsgs(arbids=[arbid], advfilters=advfilters))
             cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, S)earchReplay, Q)uit: ").upper()
             while len(cmd) and cmd != 'N':
                 if cmd == 'R':
@@ -1360,12 +1360,12 @@ class CanInterface(object):
 
                 elif cmd == 'S':
                     self.CANreplay(arbids=[arbid], timing=TIMING_SEARCH)
-                
+
                 elif cmd == 'Q':
                     return
 
                 cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, S)earchReplay, Q)uit: ").upper()
-            print 
+            print
 
     def printBookmarks(self):
         '''
@@ -1379,7 +1379,7 @@ class CanInterface(object):
         '''
         for idx, ts, arbid, msg in self.genCanMsgs():
             if hasAscii(msg, minbytes=minbytes, strict=strict):
-                print reprCanMsg(idx, ts, arbid, msg, repr(msg))
+                print(reprCanMsg(idx, ts, arbid, msg, repr(msg)))
 
     def reprBookmarks(self):
         '''
@@ -1402,10 +1402,10 @@ class CanInterface(object):
 
         return "bkmkidx: %d\tmsgidx: %d\tbkmk: %s \tcomment: %s" % (bid, msgidx, info.get('name'), info.get('comment'))
 
-    def setMaskAndFilter(self, 
-                         mask0=0, 
-                         mask1=0, 
-                         filter0=0, 
+    def setMaskAndFilter(self,
+                         mask0=0,
+                         mask1=0,
+                         filter0=0,
                          filter1=0,
                          filter2=0,
                          filter3=0,
@@ -1429,7 +1429,7 @@ class CanInterface(object):
         '''
         msg = struct.pack('>IIIIIIII', mask0, mask1, filter0, filter1, filter2, filter3, filter4, filter5)
         return self._send(CMD_SET_FILT_MASK, msg)
-    
+
     def clearMaskAndFilter(self):
         '''
         Clears all masks and filters
@@ -1448,13 +1448,13 @@ class CanInterface(object):
         self.clearCanMsgs()
         self.CANxmit(0x0010, "TEST")
         for i in range(6, 3, -1):
-            print "Time remaining: ", i*10, " seconds"
+            print("Time remaining: ", i*10, " seconds")
             time.sleep(10)
         self.CANxmit(0x810, "TEST", extflag=True)
         for i in range(3, 0, -1):
-            print "Time remaining: ", i*10, " seconds"
+            print("Time remaining: ", i*10, " seconds")
             time.sleep(10)
-                
+
         out_of_order_count = 0
         msg_count = 0
         prev_val = 0xFF
@@ -1467,12 +1467,12 @@ class CanInterface(object):
                 out_of_order_count += 1
                 prev_val = ord(foo[3])
         if (out_of_order_count > 0):
-            print "ERROR: 11 bit IDs, 1 byte messages, ", out_of_order_count, " Messages received out of order"
+            print("ERROR: 11 bit IDs, 1 byte messages, ", out_of_order_count, " Messages received out of order")
         elif (msg_count != 181810):
-            print "ERROR: Received ", msg_count, " out of expected 181810 message"
+            print("ERROR: Received ", msg_count, " out of expected 181810 message")
         else:
-            print "PASS: 11 bit IDs, 1 byte messages"
-        
+            print("PASS: 11 bit IDs, 1 byte messages")
+
         out_of_order_count = 0
         msg_count = 0
         prev_val = 0xFF
@@ -1485,12 +1485,12 @@ class CanInterface(object):
                 out_of_order_count += 1
                 prev_val = ord(foo[3][0])
         if (out_of_order_count > 0):
-            print "ERROR: 11 bit IDs, 8 byte messages, ", out_of_order_count, " Messages received out of order"
+            print("ERROR: 11 bit IDs, 8 byte messages, ", out_of_order_count, " Messages received out of order")
         elif (msg_count != 90090):
-            print "ERROR: Received ", msg_count, " out of expected 90090 message"
+            print("ERROR: Received ", msg_count, " out of expected 90090 message")
         else:
-            print "PASS: 11 bit IDs, 8 byte messages"
-        
+            print("PASS: 11 bit IDs, 8 byte messages")
+
         out_of_order_count = 0
         msg_count = 0
         prev_val = 0xFF
@@ -1503,12 +1503,12 @@ class CanInterface(object):
                 out_of_order_count += 1
                 prev_val = ord(foo[3])
         if (out_of_order_count > 0):
-            print "ERROR: 29 bit IDs, 1 byte messages, ", out_of_order_count, " Messages received out of order"
+            print("ERROR: 29 bit IDs, 1 byte messages, ", out_of_order_count, " Messages received out of order")
         elif (msg_count != 133330):
-            print "ERROR: Received ", msg_count, " out of expected 133330 message"
+            print("ERROR: Received ", msg_count, " out of expected 133330 message")
         else:
-            print "PASS: 29 bit IDs, 1 byte messages"
-        
+            print("PASS: 29 bit IDs, 1 byte messages")
+
         out_of_order_count = 0
         msg_count = 0
         prev_val = 0xFF
@@ -1521,11 +1521,11 @@ class CanInterface(object):
                 out_of_order_count += 1
                 prev_val = ord(foo[3][0])
         if (out_of_order_count > 0):
-            print "ERROR: 29 bit IDs, 8 byte messages, ", out_of_order_count, " Messages received out of order"
+            print("ERROR: 29 bit IDs, 8 byte messages, ", out_of_order_count, " Messages received out of order")
         elif (msg_count != 76330):
-            print "ERROR: Received ", msg_count, " out of expected 76330 message"
+            print("ERROR: Received ", msg_count, " out of expected 76330 message")
         else:
-            print "PASS: 29 bit IDs, 8 byte messages"
+            print("PASS: 29 bit IDs, 8 byte messages")
 
     def _printCanRegs(self):
         self._send(CMD_PRINT_CAN_REGS, "")
@@ -1547,7 +1547,7 @@ def getAscii(msg, minbytes=3):
     otherwise, look for strings of at least minbytes in length
     '''
     strings = []
-    
+
     ascii_match = 0
     ascii_count = 0
     startidx = None
@@ -1648,9 +1648,9 @@ class CanInTheMiddleInterface(CanInterface):
         which CAN message, since CAN messages have no source information and all messages
         are broadcast.
 
-        The Can shield connected to the device is referred to as the isolation CanCat. 
-        This CanCat should be modified so that the CS SPI pin is connected to D10, rather 
-        than the default of D9. This is accomplished by cutting a trace on the circuit 
+        The Can shield connected to the device is referred to as the isolation CanCat.
+        This CanCat should be modified so that the CS SPI pin is connected to D10, rather
+        than the default of D9. This is accomplished by cutting a trace on the circuit
         board and bridging the CS pad to the D10 pad. Seeedstudio has instructions
         on their Wiki, but there shield differed slightly from my board. The CanCat
         connected to the vehicle is referred to as the vehicle CanCat and should be unmodified.
@@ -1660,7 +1660,7 @@ class CanInTheMiddleInterface(CanInterface):
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
         if load_filename is None:
             self.setCanMode(CMD_CAN_MODE_CITM)
-        
+
 
     def genCanMsgsIso(self, start=0, stop=None, arbids=None):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
@@ -1698,7 +1698,7 @@ class CanInTheMiddleInterface(CanInterface):
         '''
         Prints session stats only for messages between two bookmarks
         '''
-        print self.getSessionStatsByBookmarkIso(start, stop)
+        print(self.getSessionStatsByBookmarkIso(start, stop))
 
     def printSessionStatsIso(self, start=0, stop=None):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
@@ -1707,7 +1707,7 @@ class CanInTheMiddleInterface(CanInterface):
         between two message indexes (where they sit in the CMD_CAN_RECV
         mailbox)
         '''
-        print self.getSessionStatsIso(start, stop)
+        print(self.getSessionStatsIso(start, stop))
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
 
     def getSessionStatsByBookmarkIso(self, start=None, stop=None):
@@ -1750,7 +1750,7 @@ class CanInTheMiddleInterface(CanInterface):
     def getSessionStatsIso(self, start=0, stop=None):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         out = []
-        
+
         arbid_list = self.getArbitrationIdsIso(start=start, stop=stop, reverse=True)
 
         for datalen, arbid, msgs in arbid_list:
@@ -1790,7 +1790,7 @@ class CanInTheMiddleInterface(CanInterface):
     def placeCanBookmark(self, name=None, comment=None):
         '''
         Save a named bookmark (with optional comment).
-        This stores the message index number from the 
+        This stores the message index number from the
         CMD_ISO_RECV mailbox.
 
         This also places a bookmark in the normal CAN message
@@ -1806,7 +1806,7 @@ class CanInTheMiddleInterface(CanInterface):
 
         bkmk_index = len(self.bookmarks_iso)
         self.bookmarks_iso.append(msg_index)
-        
+
         info = { 'name' : name,
                 'comment' : comment }
 
@@ -1857,7 +1857,7 @@ class CanInTheMiddleInterface(CanInterface):
         raw_input("Press Enter When Done...")
         stop_bkmk = self.placeCanBookmarkIso("Stop_" + name, comment)
 
-    def filterCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, 
+    def filterCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None,
                     arbids=None, ignore=[], advfilters=[]):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
 
@@ -1875,7 +1875,7 @@ class CanInTheMiddleInterface(CanInterface):
             start_baseline_msg = self.getMsgIndexFromBookmarkIso(start_baseline_bkmk)
         else:
             start_baseline_msg = None
-        
+
         if stop_baseline_bkmk != None:
             stop_baseline_msg = self.getMsgIndexFromBookmarkIso(stop_baseline_bkmk)
         else:
@@ -1889,7 +1889,7 @@ class CanInTheMiddleInterface(CanInterface):
         Iso means the second CAN bus (M2's and DUE_CAN models have two CAN interfaces)
 
         returns the received CAN messages between indexes "start_msg" and "stop_msg"
-        but only messages to ID's that *do not* appear in the the baseline indicated 
+        but only messages to ID's that *do not* appear in the the baseline indicated
         by "start_baseline_msg" and "stop_baseline_msg".
 
         for message indexes, you *will* want to look into the bookmarking subsystem!
@@ -1898,7 +1898,7 @@ class CanInTheMiddleInterface(CanInterface):
         if stop_baseline_msg != None:
             self.log("ignoring arbids from baseline...")
             # get a list of baseline arbids
-            filter_ids = { arbid:1 for ts,arbid,data in self.genCanMsgs(start_baseline_msg, stop_baseline_msg) 
+            filter_ids = { arbid:1 for ts,arbid,data in self.genCanMsgs(start_baseline_msg, stop_baseline_msg)
                 }.keys()
         else:
             filter_ids = None
@@ -1921,15 +1921,15 @@ class CanInTheMiddleInterface(CanInterface):
             if skip:
                 continue
 
-            yield (idx, ts,arbid,msg) 
-        
-    def printCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, 
+            yield (idx, ts,arbid,msg)
+
+    def printCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None,
                     arbids=None, ignore=[], advfilters=[]):
         '''
         deprecated: use printCanMsgs(start_bkmk=foo, stop_bkmk=bar)
         '''
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
-        print self.reprCanMsgsByBookmarkIso(start_bkmk, stop_bkmk, start_baseline_bkmk, stop_baseline_bkmk, arbids, ignore, advfilters)
+        print(self.reprCanMsgsByBookmarkIso(start_bkmk, stop_bkmk, start_baseline_bkmk, stop_baseline_bkmk, arbids, ignore, advfilters))
 
     def reprCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None, arbids=None, ignore=[], advfilters=[]):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
@@ -1952,7 +1952,7 @@ class CanInTheMiddleInterface(CanInterface):
             start_baseline_msg = self.getMsgIndexFromBookmarkIso(start_baseline_bkmk)
         else:
             start_baseline_msg = None
-        
+
         if stop_baseline_bkmk != None:
             stop_baseline_msg = self.getMsgIndexFromBookmarkIso(stop_baseline_bkmk)
         else:
@@ -1962,15 +1962,15 @@ class CanInTheMiddleInterface(CanInterface):
 
     def printCanMsgsIso(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[]):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
-        print self.reprCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters)
+        print(self.reprCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters))
 
     def reprCanMsgsIso(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], adfilters=[]):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         String representation of a set of CAN Messages.
         These can be filtered by start and stop message indexes, as well as
-        use a baseline (defined by start/stop message indexes), 
-        by a list of "desired" arbids as well as a list of 
+        use a baseline (defined by start/stop message indexes),
+        by a list of "desired" arbids as well as a list of
         ignored arbids
 
         Many functions wrap this one.
@@ -1979,14 +1979,14 @@ class CanInTheMiddleInterface(CanInterface):
 
         if start_msg in self.bookmarks_iso:
             bkmk = self.bookmarks_iso.index(start_msg)
-            out.append("starting from bookmark %d: '%s'" % 
+            out.append("starting from bookmark %d: '%s'" %
                     (bkmk,
                     self.bookmark_info_iso[bkmk].get('name'))
                     )
 
         if stop_msg in self.bookmarks_iso:
             bkmk = self.bookmarks_iso.index(stop_msg)
-            out.append("stoppng at bookmark %d: '%s'" % 
+            out.append("stoppng at bookmark %d: '%s'" %
                     (bkmk,
                     self.bookmark_info_iso[bkmk].get('name'))
                     )
@@ -1999,7 +1999,7 @@ class CanInTheMiddleInterface(CanInterface):
         last_ts = None
         tot_delta_ts = 0
         counted_msgs = 0    # used for calculating averages, excluding outliers
-        
+
         data_delta = None
 
 
@@ -2073,9 +2073,9 @@ class CanInTheMiddleInterface(CanInterface):
         else:
             arbids = [arbdata for arbdata in self.getArbitrationIdsIso() if arbdata[1] in arbid_list]
         for datalen,arbid,msgs in arbids:
-            print self.reprCanMsgsIso(arbids=[arbid], advfilters=advfilters)
+            print(self.reprCanMsgsIso(arbids=[arbid], advfilters=advfilters))
             raw_input("\nPress Enter to review the next Session...")
-            print 
+            print
 
     def printBookmarksIso(self):
         '''
@@ -2089,7 +2089,7 @@ class CanInTheMiddleInterface(CanInterface):
         '''
         for idx, ts, arbid, msg in self.genCanMsgsIso():
             if hasAscii(msg, minbytes=minbytes, strict=strict):
-                print reprCanMsgIso(idx, ts, arbid, msg, repr(msg))
+                print(reprCanMsgIso(idx, ts, arbid, msg, repr(msg)))
 
     def reprBookmarksIso(self):
         '''
@@ -2189,10 +2189,10 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     try:
         import IPython.Shell
         ipsh = IPython.Shell.IPShell(argv=[''], user_ns=lcls, user_global_ns=gbls)
-        print intro
+        print(intro)
         ipsh.mainloop(intro)
 
-    except ImportError, e:
+    except ImportError as e:
         try:
             from IPython.terminal.interactiveshell import TerminalInteractiveShell
             ipsh = TerminalInteractiveShell()
@@ -2200,7 +2200,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
             ipsh.user_global_ns.update(lcls)
             ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!
             ipsh.mainloop(intro)
-        except ImportError, e:
+        except ImportError as e:
             try:
                 from IPython.frontend.terminal.interactiveshell import TerminalInteractiveShell
                 ipsh = TerminalInteractiveShell()
@@ -2208,8 +2208,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
                 ipsh.user_global_ns.update(lcls)
                 ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!
                 ipsh.mainloop(intro)
-            except ImportError, e:
-                print e
+            except ImportError as e:
+                print(e)
                 shell = code.InteractiveConsole(gbls)
                 shell.interact(intro)
-
