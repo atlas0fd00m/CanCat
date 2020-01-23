@@ -161,9 +161,8 @@ default_cmdhandlers = {
         CMD_LOG_HEX: handleLogHexToScreen,
         }
 
-
 def loadCanBuffer(filename):
-    return pickle.load(file(filename))
+    return pickle.load(open(filename))
 
 def keystop(delay=0):
     if os.name == 'posix':
@@ -187,7 +186,7 @@ class CanInterface(object):
             return
 
         self._go = False
-        self._inbuf = ''
+        self._inbuf = bytearray()
         self._trash = []
         self._messages = {}
         self._msg_events = {}
@@ -261,7 +260,7 @@ class CanInterface(object):
         if self._io != None:
             self._io.close()
 
-        self._io = serial.Serial(port=self.port, baudrate=self._baud, dsrdtr=True)
+        self._io = serial.Serial(port=self.port, baudrate=self._baud, dsrdtr=True, timeout=None)
         self._io.setDTR(True)
 
         # clear all locks and free anything waiting for them
@@ -350,16 +349,15 @@ class CanInterface(object):
                 #self.log("RECV: %s" % repr(self._inbuf), 4)
                 ##########################################################
 
-
                 # FIXME: should we make the rest of this a separate thread, so we're not keeping messages from flowing?
                 # ====== it would require more locking/synchronizing...
 
                 # make sure we're synced
                 if self._rxtx_state == RXTX_SYNC:
-                    if self._inbuf[0] != "@":
+                    if self._inbuf.startswith(b'@') != True:
                         self._queuelock.acquire()
                         try:
-                            idx = self._inbuf.find('@')
+                            idx = self._inbuf.find(b'@')
                             if idx == -1:
                                 self.log("sitting on garbage...", 3)
                                 continue
@@ -376,16 +374,16 @@ class CanInterface(object):
                 # handle buffer if we have anything in it
                 if self._rxtx_state == RXTX_GO:
                     if len(self._inbuf) < 3: continue
-                    if self._inbuf[0] != '@':
+                    if self._inbuf.startswith(b'@') != True:
                         self._rxtx_state = RXTX_SYNC
                         continue
 
-                    pktlen = ord(self._inbuf[1]) + 2        # <size>, doesn't include "@"
+                    pktlen = self._inbuf[1] + 2        # <size>, doesn't include "@"
 
                     if len(self._inbuf) >= pktlen:
                         self._queuelock.acquire()
                         try:
-                            cmd = ord(self._inbuf[2])                # first bytes are @<size>
+                            cmd = self._inbuf[2]                # first bytes are @<size>
                             message = self._inbuf[3:pktlen]
                             self._inbuf = self._inbuf[pktlen:]
                         finally:
@@ -400,7 +398,6 @@ class CanInterface(object):
                         else:
                             self._submitMessage(cmd, message)
                         self._rxtx_state = RXTX_SYNC
-
 
             except:
                 if self.verbose:
@@ -486,12 +483,18 @@ class CanInterface(object):
             return 0
         return len(mbox)
 
+    def _int_to_bytes(self, x: int) -> bytes:
+        return x.to_bytes((x.bit_length() + 7) // 8, 'big')
+
     def _send(self, cmd, message):
         '''
         Send a message to the CanCat transceiver (not the CAN bus)
         '''
+
         msgchar = struct.pack(">H", len(message) + 3) # 2 byte Big Endian
-        msg = msgchar + chr(cmd) + message
+
+        # JL should message arrive as a byte array?  is utf-8 correct here?
+        msg = msgchar + self._int_to_bytes(cmd) + bytes(message, 'utf-8')
         self.log("XMIT: %s" % repr(msg),  4)
 
         self._out_lock.acquire()
@@ -684,7 +687,6 @@ class CanInterface(object):
             if keystop():
                 break
 
-
     def CANreplay(self, start_bkmk=None, stop_bkmk=None, start_msg=0, stop_msg=None, arbids=None, timing=TIMING_FAST):
         '''
         Replay packets between two bookmarks.
@@ -758,10 +760,11 @@ class CanInterface(object):
         set the baud rate for the CAN bus.  this has nothing to do with the
         connection from the computer to the tool
         '''
+
         self._send(CMD_CAN_BAUD, chr(baud_const))
         response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
 
-        while(response[1] != '\x01'):
+        while(response[1] != b'\x01'):
             print("CAN INIT FAILED: Retrying")
             response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
 
@@ -784,6 +787,7 @@ class CanInterface(object):
                 print("CAN INIT FAILED: Retrying")
                 response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
 
+    # JL - DONE
     def ping(self, buf='ABCDEFGHIJKL'):
         '''
         Utility function, only to send and receive data from the
@@ -878,10 +882,12 @@ class CanInterface(object):
         does not check msg size.  MUST be at least 4 bytes in length as the
         tool should send 4 bytes for the arbid
         '''
+
         arbid = struct.unpack(">I", msg[:4])[0]
         data = msg[4:]
         return arbid, data
 
+    # JL - DONE
     def getCanMsgCount(self):
         '''
         the number of CAN messages we've received this session
@@ -981,7 +987,8 @@ class CanInterface(object):
         Load a previous analysis session from a saved file
         see: saveSessionToFile()
         '''
-        me = pickle.load(file(filename))
+        loadedFile = open(filename, 'rb')
+        me = pickle.load(loadedFile)
         self.restoreSession(me, force=force)
         self._filename = filename
 
@@ -1015,7 +1022,7 @@ class CanInterface(object):
         savegame = self.saveSession()
         me = pickle.dumps(savegame)
 
-        outfile = file(filename, 'w')
+        outfile = file(filename, 'w') # TODO open?
         outfile.write(me)
         outfile.close()
 
@@ -1530,8 +1537,6 @@ class CanInterface(object):
     def _printCanRegs(self):
         self._send(CMD_PRINT_CAN_REGS, "")
 
-
-
 class CanControl(cmd.Cmd):
     '''
     Command User Interface (as if ipython wasn't enough!)
@@ -1576,7 +1581,6 @@ def getAscii(msg, minbytes=3):
 
     return strings
 
-
 def hasAscii(msg, minbytes=3, strict=False):
     '''
     if minbytes == -1, every character has to be clean ASCII
@@ -1602,7 +1606,6 @@ def reprCanMsg(idx, ts, arbid, data, comment=None):
         comment = ''
     return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, arbid, len(data), data.encode('hex'), comment)
 
-
 class FordInterface(CanInterface):
     def setCanBaudHSCAN(self):
         self.setCanBaud(CAN_500KBPS)
@@ -1612,7 +1615,6 @@ class FordInterface(CanInterface):
 
     def setCanBaudICAN(self):
         self.setCanBaud(CAN_500KBPS)
-
 
 class GMInterface(CanInterface):
     '''
@@ -2143,7 +2145,6 @@ class CanInTheMiddleInterface(CanInterface):
         return savegame
 
 
-
 ######### administrative, supporting code ##########
 cs = []
 
@@ -2187,10 +2188,8 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     lcls = locals()
 
     try:
-        import IPython.Shell
-        ipsh = IPython.Shell.IPShell(argv=[''], user_ns=lcls, user_global_ns=gbls)
-        print(intro)
-        ipsh.mainloop(intro)
+        import IPython
+        ipsh = IPython.embed(banner1=intro, colors="neutral")
 
     except ImportError as e:
         try:

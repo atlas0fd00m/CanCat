@@ -5,12 +5,11 @@ import readline
 import rlcompleter
 readline.parse_and_bind("tab: complete")
 import os
+from termcolor import colored, cprint
 
 from cancat import *
 
-
-
-intro = """'CanCat, the greatest thing since J2534!'
+intro = colored("""'CanCat, the greatest thing since J2534!'
 
 Research Mode: enjoy the raw power of CanCat
 
@@ -27,7 +26,7 @@ you interact with the CanCat tool:
     >>> c.saveSessionToFile('file_to_save_session_to')
     >>> help(c)
 
-"""
+""", "green")
 
 if __name__ == "__main__":
     import argparse
@@ -63,6 +62,7 @@ if __name__ == "__main__":
         if baud_val == None:
             raise Exception("Invalid baud: %s.  Must use one of the following: %s" % (ifo.baud, baud_nums))
 
+    # TODO make a try/except block
     results = interactive(ifo.port, intro=intro, InterfaceClass=interface, load_filename=ifo.filename, can_baud=baud_val)
     if results == -1:
-        print("Error.  Try '-h' from CLI for help.")
+        print(colored("Error.  Try '-h' from CLI for help.", "red"))
