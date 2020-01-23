@@ -1202,6 +1202,7 @@ class CanInterface(object):
 
         return self.reprCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters)
 
+    # JL - DONE
     def printCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, paginate=None, viewbits=VIEW_ALL):
 
         data = self.reprCanMsgsLines(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty, viewbits=viewbits)
@@ -1209,7 +1210,7 @@ class CanInterface(object):
         pidx = 0
         try:
             while True:
-                line = data.next()
+                line = next(data)
                 lines = line.split('\n')
                 for thing in lines:
                     print(thing)
@@ -1559,7 +1560,7 @@ def getAscii(msg, minbytes=3):
 
     for bidx in range(len(msg)):
         byte = msg[bidx]
-        if 0x20 <= ord(byte) < 0x7f:
+        if 0x20 <= byte < 0x7f:
             if startidx == None:
                 startidx = bidx
 
@@ -1589,7 +1590,7 @@ def hasAscii(msg, minbytes=3, strict=False):
     ascii_match = 0
     ascii_count = 0
     for byte in msg:
-        if 0x20 <= ord(byte) < 0x7f:
+        if 0x20 <= byte < 0x7f:
             ascii_count +=1
             if ascii_count >= minbytes:
                 ascii_match = 1
@@ -1604,7 +1605,8 @@ def reprCanMsg(idx, ts, arbid, data, comment=None):
     #TODO: make some repr magic that spits out known ARBID's and other subdata
     if comment == None:
         comment = ''
-    return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, arbid, len(data), data.encode('hex'), comment)
+    # JL format this so the 'bytearray(...)' wrapper is not printed
+    return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, arbid, len(data), data, comment)
 
 class FordInterface(CanInterface):
     def setCanBaudHSCAN(self):
