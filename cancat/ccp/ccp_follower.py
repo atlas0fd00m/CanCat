@@ -587,6 +587,33 @@ class CCPFollower(object):
 
         return parsed
 
+    def _parse_select_cal_page_CRO():
+        print "JL TODO"
+
+    def _parse_get_active_cal_page_CRO():
+        print "JL TODO"
+
+    def _parse_diag_service_CRO():
+        print "JL TODO"
+
+    def _parse_action_service_CRO():
+        print "JL TODO"
+
+    def _parse_get_daq_size_CRO():
+        print "JL TODO"
+
+    def _parse_set_daq_ptr_CRO():
+        print "JL TODO"
+
+    def _parse_write_daq_CRO():
+        print "JL TODO"
+
+    def _parse_start_stop_CRO():
+        print "JL TODO"
+
+    def _parse_start_stop_all_CRO():
+        print "JL TODO"
+
     '''
     +---------------------------------------------------------------------+
     |                                                                     |
@@ -933,3 +960,30 @@ class CCPFollower(object):
               _gen_byte(addl_status_qual) + addl_info_bytes
 
         return msg
+
+    def _generate_select_cal_page_CRO():
+        print "JL TODO"
+
+    def _generate_get_active_cal_page_CRO():
+        print "JL TODO"
+
+    def _generate_diag_service_CRO():
+        print "JL TODO"
+
+    def _generate_action_service_CRO():
+        print "JL TODO"
+
+    def _generate_get_daq_size_CRO():
+        print "JL TODO"
+
+    def _generate_set_daq_ptr_CRO():
+        print "JL TODO"
+
+    def _generate_write_daq_CRO():
+        print "JL TODO"
+
+    def _generate_start_stop_CRO():
+        print "JL TODO"
+
+    def _generate_start_stop_all_CRO():
+        print "JL TODO"

@@ -573,6 +573,194 @@ class CCPLeader(object):
 
         return msg
 
+    def _select_cal_page_CRO(self, counter):
+        '''
+        SELECT_CAL_PAGE CRO
+
+        data to be sent after CMD and CTR values:
+        +-------+--------+-----------------------------------------------+
+        |  2..7 |  bytes |  don't care                                             |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        data = _gen_byte(DONT_CARE_VAL)*6
+
+        msg = self._constructCRO(CCP_SELECT_CAL_PAGE, counter, data)
+
+        return msg
+
+    def _get_active_cal_page_CRO(self, counter):
+        '''
+        GET_ACTIVE_CAL_PAGE CRO
+
+        data to be sent after CMD and CTR values:
+        +-------+--------+-----------------------------------------------+
+        |  2..7 |  bytes |  don't care                                             |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        data = _gen_byte(DONT_CARE_VAL)*6
+
+        msg = self._constructCRO(CCP_GET_ACTIVE_CAL_PAGE, counter, data)
+
+        return msg
+
+    def _diag_service_CRO(self, counter, diagnostic_service_num, parameters=None):
+        '''
+        DIAG_SERVICE CRO
+
+        Diagnostic service # is supposed to be two bytes but example shows it as one byte.
+
+        Unsure what valid values for diag service numbers or corresponding parameters are.
+
+        data to be sent after CMD and CTR values:
+        +-------+--------+-----------------------------------------------+
+        |  2,3  |  word  |   Diagnostic service number                   |
+        +-------+--------+-----------------------------------------------+
+        |  4..7 |  bytes |   Parameters, if applicable                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        data = _gen_byte(diagnostic_service_num) + _gen_byte(DONT_CARE_VAL)*5
+
+        msg = self._constructCRO(CCP_DIAG_SERVICE, counter, data)
+
+        return msg
+
+    def _action_service_CRO(self, counter, action_service_num, parameters):
+        '''
+        ACTION_SERVICE CRO
+
+        Action service # is supposed to be two bytes but example shows it as one byte.
+
+        Unsure what valid values for action service numbers or corresponding parameters are.
+
+        data to be sent after CMD and CTR values:
+        +-------+--------+-----------------------------------------------+
+        |  2,3  |  word  |   Action service number                       |
+        +-------+--------+-----------------------------------------------+
+        |  4..7 |  bytes |   Parameters, if applicable                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        data = _gen_byte(action_service_num) + _gen_byte(parameters) + _gen_byte(DONT_CARE_VAL)*4
+
+        msg = self._constructCRO(CCP_ACTION_SERVICE, counter, data)
+
+        return msg
+
+    def _get_daq_size_CRO(self, counter, daq_list_number, can_identifier):
+        '''
+        GET_DAQ_SIZE CRO
+
+        data to be sent after CMD and CTR values:
+        +-------+--------+-----------------------------------------------+
+        |   2   |  byte  |  DAQ list number (0,1,...)                    |
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        |  4..7 |  ulong |  CAN Identifier of DTO dedicated              |
+        |       |        |  to list number                               |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        data = _gen_byte(daq_list_number) + _gen_byte(DONT_CARE_VAL) + \
+               _gen_4_byte_val(can_identifier)
+
+        msg = self._constructCRO(CCP_GET_DAQ_SIZE, counter, data)
+
+        return msg
+
+    def _set_daq_ptr_CRO(self, counter, daq_list_number, odt_number, odt_element_number):
+        '''
+        SET_DAQ_PTR CRO
+
+        data to be sent after CMD and CTR values:
+        +-------+--------+-----------------------------------------------+
+        |   2   |        |  DAQ list number (0,1,...)                    |
+        +-------+--------+-----------------------------------------------+
+        |   3   |        |  Object Descriptor Table ODT number (0,1,...) |
+        +-------+--------+-----------------------------------------------+
+        |   4   |        |  Element number within ODT (0,1,...)          |
+        +-------+--------+-----------------------------------------------+
+        |  5..7 |        |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        data = _gen_byte(daq_list_number) + _gen_byte(odt_number) + \
+               _gen_byte(odt_element_number) + _gen_byte(DONT_CARE_VAL)*3 \
+
+        msg = self._constructCRO(CCP_SET_DAQ_PTR, counter, data)
+
+        return msg
+
+    def _write_daq_CRO(self, counter, daq_element_size, daq_element_addr_extension, daq_element_addr):
+        '''
+        WRITE_DAQ CRO
+
+        data to be sent after CMD and CTR values:
+        +-------+--------+-----------------------------------------------+
+        |   2   |  byte  |  Size of DAQ element in bytes { 1, 2, 4 }     |
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  Address extension of DAQ element             |
+        +-------+--------+-----------------------------------------------+
+        |  4..7 |  ulong |  Address of DAQ element                       |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        data = _gen_byte(daq_element_size) + _gen_byte(daq_element_addr_extension) + \
+               _gen_4_byte_val(daq_element_addr)
+
+        msg = self._constructCRO(CCP_WRITE_DAQ, counter, data)
+
+        return msg
+
+    def _start_stop_CRO(self, counter, mode, daq_list_number, last_odt_num, event_chan_num, transmission_rate_prescaler):
+        '''
+        START_STOP CRO
+
+        data to be sent after CMD and CTR values:
+        +-------+--------+-----------------------------------------------+
+        |   2   |  byte  |  Mode: start/stop/prepare data tranmission    |
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  DAQ list number                              |
+        +-------+--------+-----------------------------------------------+
+        |   4   |  byte  |  Last ODT number                              |
+        +-------+--------+-----------------------------------------------+
+        |   5   |  byte  |  Event Channel No.                            |
+        +-------+--------+-----------------------------------------------+
+        |  6,7  |  word  |  Transmission rate prescaler                  |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        # this one is motorola instead of intel format, according to the spec
+        trans_rate_prescaler = struct.pack('>H', transmission_rate_prescaler)
+
+        data = _gen_byte(mode) + _gen_byte(daq_list_number) + \
+               _gen_byte(last_odt_num) + _gen_byte(event_chan_num) + \
+               trans_rate_prescaler
+
+        msg = self._constructCRO(CCP_START_STOP, counter, data)
+
+        return msg
+
+    def _start_stop_all_CRO(self, counter, start_or_stop):
+        '''
+        START_STOP_ALL CRO
+
+        data to be sent after CMD and CTR values:
+        +-------+--------+-----------------------------------------------+
+        |   2   |  byte  |  0x00 stops, 0x01 starts data transmission    |
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        data = _gen_byte(start_or_stop) + _gen_byte(DONT_CARE_VAL)*5
+
+        msg = self._constructCRO(CCP_START_STOP_ALL, counter, data)
+
+        return msg
 
     '''
     +---------------------------------------------------------------------+
@@ -604,7 +792,7 @@ class CCPLeader(object):
         sent to the follower device.
 
         Currently unsure how the "counter" is used (as a session id, command id, etc)
-        
+
         All DTOs of type CRM* should start off with this format:
         +-------+--------+-----------------------------------------------+
         |   0   |  byte  |  0xFF                                         |
@@ -1050,6 +1238,148 @@ class CCPLeader(object):
                 'session_status': session_status, 'addl_info_bool': 'true', \
                 'addl_info': 'not implemented yet' }
 
+    def _parse_select_cal_page_CRM(self, CCP_message):
+        '''
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  Don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        return self._CRM_parser_status_ctr_only(CCP_message)
+
+    def _parse_get_active_cal_page_CRM(self, CCP_message):
+        '''
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  Address extension                            |
+        +-------+--------+-----------------------------------------------+
+        |  4..7 |  ulong |  Address                                      |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        crc_byte = ord(CCP_message[1]) # is this python 3 compatible?
+        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        counter = ord(CCP_message[2])
+
+        address_ext = _parse_byte(CCP_message[3])
+        address = _parse_4_byte_value(CCP_message[4:])
+
+        msg = {'CRC': crc_tuple[0], 'CTR': counter, 'address_ext': address_ext, 'address': address}
+
+        return msg
+
+    def _parse_action_service_CRM(self, CCP_message):
+        '''
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  length of return information in bytes        |
+        +-------+--------+-----------------------------------------------+
+        |   4   |  byte  |  data type qualifier of return information    |
+        |       |        |  (to be defined)                              |
+        +-------+--------+-----------------------------------------------+
+        |  5..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        crc_byte = ord(CCP_message[1]) # is this python 3 compatible?
+        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        counter = ord(CCP_message[2])
+
+        length_of_return_info = _parse_byte(CCP_message[3])
+        data_type_qual = _parse_byte(CCP_message[4])
+
+        msg = {'CRC': crc_tuple[0], 'CTR': counter, 'length_of_return_info': length_of_return_info, 'data_type_qual': data_type_qual}
+
+        return msg
+
+    def _parse_diag_service_CRM(self, CCP_message):
+        '''
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  length of return information in bytes        |
+        +-------+--------+-----------------------------------------------+
+        |   4   |  byte  |  data type qualifier of return information    |
+        |       |        |  (to be defined)                              |
+        +-------+--------+-----------------------------------------------+
+        |  5..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        crc_byte = ord(CCP_message[1]) # is this python 3 compatible?
+        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        counter = ord(CCP_message[2])
+
+        length_of_return_info = _parse_byte(CCP_message[3])
+        data_type_qual = _parse_byte(CCP_message[4])
+
+        msg = {'CRC': crc_tuple[0], 'CTR': counter, 'length_of_return_info': length_of_return_info, 'data_type_qual': data_type_qual}
+
+        return msg
+
+    def _parse_get_daq_size_CRM(self, CCP_message):
+        '''
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  | DAQ list size (= number of ODTs in this list) |
+        +-------+--------+-----------------------------------------------+
+        |   4   |  byte  | First PID of DAQ list                         |
+        +-------+--------+-----------------------------------------------+
+        |  5..7 |  bytes | don't care                                    |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        crc_byte = ord(CCP_message[1]) # is this python 3 compatible?
+        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        counter = ord(CCP_message[2])
+
+        daq_list_size = _parse_byte(CCP_message[3])
+        first_pid = _parse_byte(CCP_message[4])
+
+        msg = {'CRC': crc_tuple[0], 'CTR': counter, 'daq_list_size': daq_list_size, 'first_pid': first_pid}
+
+        return msg
+
+    def _parse_set_daq_ptr_CRM(self, CCP_message):
+        '''
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  Don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        return self._CRM_parser_status_ctr_only(CCP_message)
+
+    def _parse_write_daq_CRM(self, CCP_message):
+        '''
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  Don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        return self._CRM_parser_status_ctr_only(CCP_message)
+
+    def _parse_start_stop_CRM(self, CCP_message):
+        '''
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  Don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        return self._CRM_parser_status_ctr_only(CCP_message)
+
+    def _parse_start_stop_all_CRM(self, CCP_message):
+        '''
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  Don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        return self._CRM_parser_status_ctr_only(CCP_message)
+
     def _CRM_parser_status_ctr_only(self, CCP_message):
         crc_byte = ord(CCP_message[1]) # is this python 3 compatible?
         crc_tuple = COMMAND_RET_CODES.get(crc_byte)
@@ -1169,3 +1499,66 @@ class CCPLeader(object):
 
         msg = self._set_s_status_CRO(counter=counter, session_status_mask=session_status_mask)
         return self._do_Function(msg=msg, command_type=CCP_SET_S_STATUS, currIdx=currIdx)
+
+    def Send_SelectCalPage_Command(self, counter):
+        currIdx = self.c.getCanMsgCount()
+
+        msg = self._select_cal_page_CRO(self, counter)
+
+        return self._do_Function(msg=msg, command_type=CCP_SELECT_CAL_PAGE, currIdx=currIdx)
+
+    def Send_GetActiveCalPage_Command(self, counter):
+        currIdx = self.c.getCanMsgCount()
+
+        msg = self._get_active_cal_page_CRO(self, counter)
+
+        return self._do_Function(msg=msg, command_type=CCP_GET_ACTIVE_CAL_PAGE, currIdx=currIdx)
+
+    def Send_DiagService_Command(self, counter, diagnostic_service_num, parameters=None):
+        currIdx = self.c.getCanMsgCount()
+
+        msg = self._diag_service_CRO(self, counter, diagnostic_service_num, parameters)
+
+        return self._do_Function(msg=msg, command_type=CCP_DIAG_SERVICE, currIdx=currIdx)
+
+    def Send_ActionService_Command(self, counter, action_service_num, parameters):
+        currIdx = self.c.getCanMsgCount()
+
+        msg = self._action_service_CRO(self, counter, action_service_num, parameters)
+
+        return self._do_Function(msg=msg, command_type=CCP_ACTION_SERVICE, currIdx=currIdx)
+
+    def Send_GetDaqSize_Command(self, counter, daq_list_number, can_identifier):
+        currIdx = self.c.getCanMsgCount()
+
+        msg = self._get_daq_size_CRO(self, counter, daq_list_number, can_identifier)
+
+        return self._do_Function(msg=msg, command_type=CCP_GET_DAQ_SIZE, currIdx=currIdx)
+
+    def Send_SetDaqPtr_Command(self, counter, daq_list_number, odt_number, odt_element_number):
+        currIdx = self.c.getCanMsgCount()
+
+        msg = self._set_daq_ptr_CRO(self, counter, daq_list_number, odt_number, odt_element_number)
+
+        return self._do_Function(msg=msg, command_type=CCP_SET_DAQ_PTR, currIdx=currIdx)
+
+    def Send_WriteDaq_Command(self, counter, daq_element_size, daq_element_addr_extension, daq_element_addr):
+        currIdx = self.c.getCanMsgCount()
+
+        msg = self._write_daq_CRO(self, counter, daq_element_size, daq_element_addr_extension, daq_element_addr)
+
+        return self._do_Function(msg=msg, command_type=CCP_WRITE_DAQ, currIdx=currIdx)
+
+    def Send_StartStop_Command(self, counter, mode, daq_list_number, last_odt_num, event_chan_num, transmission_rate_prescaler):
+        currIdx = self.c.getCanMsgCount()
+
+        msg = self._start_stop_CRO(self, counter, mode, daq_list_number, last_odt_num, event_chan_num, transmission_rate_prescaler)
+
+        return self._do_Function(msg=msg, command_type=CCP_START_STOP, currIdx=currIdx)
+
+    def Send_StartStopAll_Command(self, counter, start_or_stop):
+        currIdx = self.c.getCanMsgCount()
+
+        msg = self._start_stop_all_CRO(self, counter, start_or_stop)
+
+        return self._do_Function(msg=msg, command_type=CCP_START_STOP_ALL, currIdx=currIdx)

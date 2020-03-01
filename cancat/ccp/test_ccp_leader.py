@@ -247,7 +247,7 @@ class TestCcpMessageGeneration(unittest.TestCase):
 
         self.assertTrue("Data block size must bye 1-5 bytes" in context.exception)
 
-    def test_get_s_status_CRO(self):
+    def test_GetSStatus_CRO(self):
         ccp = CCPLeader(c=None)
 
         CTR = 0x39
@@ -256,13 +256,124 @@ class TestCcpMessageGeneration(unittest.TestCase):
         msg = ccp._get_s_status_CRO(CTR)
         self.assertEqual(msg, expected)
 
-    def test_set_s_status_CRO(self):
+    def test_SetSStatus_CRO(self):
         ccp = CCPLeader(c=None)
 
         CTR = 0x40
 
         expected = bytes('\x0D\x40\x81\x90\x90\x90\x90\x90')
         msg = ccp._set_s_status_CRO(CTR, 0x81)
+        self.assertEqual(msg, expected)
+
+    def test_SelectCalPage_CRO(self):
+        ccp = CCPLeader(c=None)
+
+        CTR = 0x41
+
+        expected = bytes('\x11\x41\x90\x90\x90\x90\x90\x90')
+        msg = ccp._select_cal_page_CRO(CTR)
+
+        self.assertEqual(msg, expected)
+
+    def test_GetActiveCalPage_CRO(self):
+        ccp = CCPLeader(c=None)
+
+        CTR = 0x42
+
+        expected = bytes('\x09\x42\x90\x90\x90\x90\x90\x90')
+        msg = ccp._get_active_cal_page_CRO(CTR)
+
+        self.assertEqual(msg, expected)
+
+    def test_ActionService_CRO(self):
+        ccp = CCPLeader(c=None)
+
+        CTR = 0x43
+        action_service_num = 0x08
+        params = 0x05
+
+        expected = bytes('\x21\x43\x08\x05\x90\x90\x90\x90')
+        msg = ccp._action_service_CRO(CTR, action_service_num, params)
+
+        self.assertEqual(msg, expected)
+
+    def test_DiagService_CRO(self):
+        ccp = CCPLeader(c=None)
+
+        CTR = 0x44
+        diag_service_num = 0x08
+
+        expected = bytes('\x20\x44\x08\x90\x90\x90\x90\x90')
+        msg = ccp._diag_service_CRO(CTR, diag_service_num)
+
+        self.assertEqual(msg, expected)
+
+    def test_GetDaqSize_CRO(self):
+        ccp = CCPLeader(c=None)
+
+        CTR = 0x45
+        daq_list_number = 0x3
+        can_identifier = 0x01020304
+
+        expected = bytes('\x14\x45\x03\x90\x01\x02\x03\x04')
+        msg = ccp._get_daq_size_CRO(CTR, daq_list_number, can_identifier)
+
+        self.assertEqual(msg, expected)
+
+    def test_SetDaqPtr_CRO(self):
+        ccp = CCPLeader(c=None)
+
+        CTR = 0x46
+
+        daq_list_number = 0x3
+        odt_number = 0x5
+        odt_element_number = 0x2
+
+        expected = bytes('\x15\x46\x03\x05\x02\x90\x90\x90')
+        msg = ccp._set_daq_ptr_CRO(CTR, daq_list_number, odt_number, odt_element_number)
+
+        self.assertEqual(msg, expected)
+
+    def test_WriteDaq_CRO(self):
+        ccp = CCPLeader(c=None)
+
+        CTR = 0x47
+
+        daq_element_size = 0x2
+        daq_element_addr_extension = 0x1
+        daq_element_addr = 0x20004200
+
+        expected = bytes('\x16\x47\x02\x01\x20\x00\x42\x00')
+        msg = ccp._write_daq_CRO(CTR, daq_element_size, daq_element_addr_extension, daq_element_addr)
+
+        self.assertEqual(msg, expected)
+
+    def test_StartStop_CRO(self):
+        ccp = CCPLeader(c=None)
+
+        CTR = 0x48
+
+        mode = 0x1  # mode =  start
+        daq_list_number = 0x3
+        last_odt_num = 0x7
+        event_chan_num = 0x2
+        transmission_rate_prescaler = 0x1
+
+        expected = bytes('\x06\x48\x01\x03\x07\x02\x00\x01')
+        msg = ccp._start_stop_CRO(CTR, mode, daq_list_number, last_odt_num, event_chan_num, transmission_rate_prescaler)
+
+        self.assertEqual(msg, expected)
+
+    def testStartStopAll_CRO(self):
+        ccp = CCPLeader(c=None)
+
+        CTR = 0x49
+
+        start_or_stop = 0x01
+
+        expected = bytes('\x08\x49\x01\x90\x90\x90\x90\x90')
+        msg = ccp._start_stop_all_CRO(CTR, start_or_stop)
+
         self.assertEqual(msg, expected)
 
     def test_sanity(self):
@@ -495,6 +606,108 @@ class TestCcpMessageParsing(unittest.TestCase):
         expected = {'CRC': 'acknowledge / no error', 'CTR': 0x33, \
                     'session_status': 0x83, 'addl_info_bool': 'true',
                     'addl_info': 'not implemented yet'}
+        self.assertEqual(parsed, expected)
+
+    def test_parse_select_cal_page_CRM(self):
+        ccp = CCPLeader(c=None)
+
+        SelectCalPage_CRM = bytes('\xff\x00\x33\x90\x90\x90\x90\x90')
+
+        parsed = ccp._parse_select_cal_page_CRM(SelectCalPage_CRM)
+        expected = {'CRC': 'acknowledge / no error', 'CTR': 0x33, \
+                   }
+
+        self.assertEqual(parsed, expected)
+
+    def test_parse_get_active_cal_page_CRM(self):
+        ccp = CCPLeader(c=None)
+
+        GetActiveCalPage_CRM = bytes('\xff\x00\x34\x01\xde\xad\xbe\xef')
+
+        parsed = ccp._parse_get_active_cal_page_CRM(GetActiveCalPage_CRM)
+        expected = {'CRC': 'acknowledge / no error', 'CTR': 0x34, \
+                    'address_ext': 1, 'address': '0xdeadbeef'
+                   }
+
+        self.assertEqual(parsed, expected)
+
+    def test_parse_diag_service_CRM(self):
+        ccp = CCPLeader(c=None)
+
+        DiagService_CRM = bytes('\xff\x00\x35\x20\x00\x90\x90\x90')
+
+        parsed = ccp._parse_diag_service_CRM(DiagService_CRM)
+        expected = {'CRC': 'acknowledge / no error', 'CTR': 0x35, \
+                    'length_of_return_info': 0x20, 'data_type_qual': 0
+                    }
+
+        self.assertEqual(parsed, expected)
+
+    def test_parse_action_service_CRM(self):
+        ccp = CCPLeader(c=None)
+
+        ActionService_CRM = bytes('\xff\x00\x36\x20\x00\x90\x90\x90')
+
+        parsed = ccp._parse_action_service_CRM(ActionService_CRM)
+        expected = {'CRC': 'acknowledge / no error', 'CTR': 0x36, \
+                    'length_of_return_info': 0x20, 'data_type_qual': 0}
+
+        self.assertEqual(parsed, expected)
+
+    def test_parse_get_daq_size_CRM(self):
+        ccp = CCPLeader(c=None)
+
+        GetDaqSize_CRM = bytes('\xff\x00\x37\x10\x08\x90\x90\x90')
+
+        parsed = ccp._parse_get_daq_size_CRM(GetDaqSize_CRM)
+        expected = {'CRC': 'acknowledge / no error', 'CTR': 0x37, \
+                    'daq_list_size': 0x10, 'first_pid': 0x8
+                    }
+
+        self.assertEqual(parsed, expected)
+
+    def test_parse_set_daq_ptr_CRM(self):
+        ccp = CCPLeader(c=None)
+
+        SetDaqPtr_CRM = bytes('\xff\x00\x38\x90\x90\x90\x90\x90')
+
+        parsed = ccp._parse_set_daq_ptr_CRM(SetDaqPtr_CRM)
+        expected = {'CRC': 'acknowledge / no error', 'CTR': 0x38, \
+                   }
+
+        self.assertEqual(parsed, expected)
+
+    def test_parse_write_daq_CRM(self):
+        ccp = CCPLeader(c=None)
+
+        WriteDaq_CRM = bytes('\xff\x00\x39\x90\x90\x90\x90\x90')
+
+        parsed = ccp._parse_write_daq_CRM(WriteDaq_CRM)
+        expected = {'CRC': 'acknowledge / no error', 'CTR': 0x39, \
+                   }
+
+        self.assertEqual(parsed, expected)
+
+    def test_parse_start_stop_CRM(self):
+        ccp = CCPLeader(c=None)
+
+        StartStop_CRM = bytes('\xff\x00\x40\x90\x90\x90\x90\x90')
+
+        parsed = ccp._parse_start_stop_CRM(StartStop_CRM)
+        expected = {'CRC': 'acknowledge / no error', 'CTR': 0x40, \
+                   }
+
+        self.assertEqual(parsed, expected)
+
+    def test_parse_start_stop_all_CRM(self):
+        ccp = CCPLeader(c=None)
+
+        StartStopAll_CRM = bytes('\xff\x00\x41\x90\x90\x90\x90\x90')
+
+        parsed = ccp._parse_start_stop_all_CRM(StartStopAll_CRM)
+        expected = {'CRC': 'acknowledge / no error', 'CTR': 0x41, \
+                   }
+
         self.assertEqual(parsed, expected)
 
 if __name__ == '__main__':
