@@ -10,6 +10,54 @@ from cancat.uds import UDS
 from cancat.utils import log
 from cancat.utils.types import ECUAddress, _range_func
 
+
+def get_uds_29bit_srcid(arbid):
+    consts = uds.ARBID_CONSTS['29bit']
+    return arbid & consts['srcid_mask']
+
+
+def get_uds_29bit_destid(arbid):
+    consts = uds.ARBID_CONSTS['29bit']
+    return (arbid & consts['destid_mask']) >> consts['destid_shift']
+
+
+def gen_uds_resp_range(arbid)
+    if tx_arbid > uds.ARBID_CONSTS['29bit']['prefix']:
+        # Normally if a request is sent to 0x18DA01F1, the response should have 
+        # an arbitration ID of 0x18DAF101, but not all ECUs do things in 
+        # a "normal" way, so generate a range of possible response IDs.
+
+        # The src from the request will be come the destination in the response
+        dest_id = get_uds_29bit_srcid(tx_arbid)
+        base_id = uds.ARBID_CONSTS['29bit']['prefix'] & (dest_id << uds.ARBID_CONSTS['29bit']['destid_shift'])
+
+        return _range_func(base_id, base_id + 0x100)
+    else:
+        # Assume this is an 11-bit request
+        #
+        # Normally if a request is sent to 0x710, the response should have an 
+        # arbitration ID of 0x718, but not all ECUs do things in a "normal" way, 
+        # so generate a range of possible response IDs.
+        return _range_func(0x700, 0x800)
+
+
+def gen_arbids(idx, ext=0):
+    if ext:
+        prefix = uds.ARBID_CONSTS['29bit']['prefix']
+        tester = uds.ARBID_CONSTS['29bit']['tester']
+        dest_shift = uds.ARBID_CONSTS['29bit']['destid_shift']
+
+        arb_id = prefix + (idx i< dest_shift) + tester
+        resp_id = prefix + (tester << dest_shift) + idx
+    else:
+        prefix = uds.ARBID_CONSTS['11bit']['prefix']
+
+        arb_id = prefix + idx
+        resp_id = prefix + idx + uds.ARBID_CONSTS['11bit']['resp_offset']
+
+    return (arb_id, resp_id)
+
+
 def enter_session(u, session, prereq_sessions=None):
     # Enter any required preq sessions
     if prereq_sessions:
@@ -65,14 +113,8 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
         err = 'Unable to find tx arbid {} starting at index {}'.format(hex(tx_arbid), start_index)
         raise RangeError(err)
 
-    # Determine the proper rx_arbid range to look for
-    if tx_arbid > 0x18db0000:
-        base_arbid = tx_arbid & 0xFFFF00FF
-        rx_range = _range_func(base_arbid, base_arbid + 0x10000, 0x100)
-    else:
-        rx_range = _range_func(0x700, 0x800)
-
-    err_match = b'\x7F' + struct.pack('>B', service)
+    rx_range = gen_uds_resp_range(tx_arbid)
+    err_match = bytes(uds.SVC_NEGATIVE_RESPONSE) + struct.pack('>B', service)
 
     for idx, _, arbid, msg in u.c.genCanMsgs(start=tx_index+1, arbids=rx_range, maxsecs=timeout):
         ftype = ord(msg[0]) >> 4
@@ -121,23 +163,19 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
     ecus = []
     possible_ecus = []
     for i in arb_id_range:  
-        if ext and i == 0xF1:
+        if ext and i == uds.ARBID_CONSTS['29bit']['tester']:
             # Skip i == 0xF1 because in that case the sender and receiver IDs 
             # are the same
-            log.detail('Skipping 0xF1 on ext ECU scan: invalid ECU address')
+            log.detail('Skipping 0xF1 in ext ECU scan: invalid ECU address')
             continue
-        elif ext == False and i >= 0xF8:
+        elif ext == False and i > uds.ARBID_CONSTS['11bit']['max_req_id']:
             # For non-extended scans the valid range goes from 0x00 to 0xFF, but 
             # stop the scan at 0xf7 because at that time the response is the 
             # largest possible valid value
-            log.detail('Stopping std ECU scan at 0xf7: last valid ECU address')
+            log.detail('Stopping std ECU scan at 0xF7: last valid ECU address')
             break
-        elif ext:
-            arb_id = 0x18da00f1 + (i << 8)
-            resp_id = 0x18daf100 + i
-        else:
-            arb_id = 0x700 + i
-            resp_id = 0x700 + i + 8
+
+        arb_id, resp_id = gen_arbids(i, ext)
 
         addr = ECUAddress(arb_id, resp_id, ext)
 
@@ -211,21 +249,19 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
     ecus = []
     possible_ecus = []
     for i in arb_id_range:  
-        if ext and i == 0xF1:
+        if ext and i == uds.ARBID_CONSTS['29bit']['tester']:
             # Skip i == 0xF1 because in that case the sender and receiver IDs 
             # are the same
+            log.detail('Skipping 0xF1 in ext ECU scan: invalid ECU address')
             continue
-        elif ext == False and i >= 0xF8:
+        elif ext == False and i > uds.ARBID_CONSTS['11bit']['max_req_id']:
             # For non-extended scans the valid range goes from 0x00 to 0xFF, but 
-            # stop the scan at 0xF7 because at that time the response is the 
+            # stop the scan at 0xf7 because at that time the response is the 
             # largest possible valid value
+            log.detail('Stopping std ECU scan at 0xF7: last valid ECU address')
             break
-        elif ext:
-            arb_id = 0x18da00f1 + (i << 8)
-            resp_id = 0x18daf100 + i
-        else:
-            arb_id = 0x700 + i
-            resp_id = 0x700 + i + 8
+
+        arb_id, resp_id = gen_arbids(i, ext)
 
         addr = ECUAddress(arb_id, resp_id, ext)
         u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag, verbose=verbose_flag, timeout=timeout)

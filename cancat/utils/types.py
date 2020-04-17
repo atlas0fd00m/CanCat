@@ -73,9 +73,6 @@ class ECUAddress(object):
     def __repr__(self):
         return 'ECU({}, {}, {})'.format( hex(self.tx_arbid), hex(self.rx_arbid), self.extflag)
 
-    def __str__(self):
-        return 'ECU({}, {}, {})'.format( hex(self.tx_arbid), hex(self.rx_arbid), self.extflag)
-
     def __iter__(self):
         return iter((self.tx_arbid, self.rx_arbid, self.extflag))
 
