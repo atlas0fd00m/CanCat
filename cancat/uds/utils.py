@@ -21,14 +21,14 @@ def get_uds_29bit_destid(arbid):
     return (arbid & consts['destid_mask']) >> consts['destid_shift']
 
 
-def gen_uds_resp_range(arbid)
-    if tx_arbid > uds.ARBID_CONSTS['29bit']['prefix']:
+def gen_uds_resp_range(arbid):
+    if arbid > uds.ARBID_CONSTS['29bit']['prefix']:
         # Normally if a request is sent to 0x18DA01F1, the response should have 
         # an arbitration ID of 0x18DAF101, but not all ECUs do things in 
         # a "normal" way, so generate a range of possible response IDs.
 
         # The src from the request will be come the destination in the response
-        dest_id = get_uds_29bit_srcid(tx_arbid)
+        dest_id = get_uds_29bit_srcid(arbid)
         base_id = uds.ARBID_CONSTS['29bit']['prefix'] & (dest_id << uds.ARBID_CONSTS['29bit']['destid_shift'])
 
         return _range_func(base_id, base_id + 0x100)
@@ -47,7 +47,7 @@ def gen_arbids(idx, ext=0):
         tester = uds.ARBID_CONSTS['29bit']['tester']
         dest_shift = uds.ARBID_CONSTS['29bit']['destid_shift']
 
-        arb_id = prefix + (idx i< dest_shift) + tester
+        arb_id = prefix + (idx << dest_shift) + tester
         resp_id = prefix + (tester << dest_shift) + idx
     else:
         prefix = uds.ARBID_CONSTS['11bit']['prefix']
@@ -110,8 +110,9 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
             tx_msg = msg
             break
     else:
-        err = 'Unable to find tx arbid {} starting at index {}'.format(hex(tx_arbid), start_index)
-        raise RangeError(err)
+        # error case handling, if 0 messages are generated
+        tx_index = 0
+        tx_msg = None
 
     rx_range = gen_uds_resp_range(tx_arbid)
     err_match = bytes(uds.SVC_NEGATIVE_RESPONSE) + struct.pack('>B', service)

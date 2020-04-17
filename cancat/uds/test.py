@@ -29,6 +29,9 @@ class CanInterface(object):
         self.msg_count += 1
         return count
 
+    def genCanMsgs(self, start=0, stop=None, arbids=None, tail=False, maxsecs=None):
+        return []
+
 
 class TestUDS(ScanClass):
     DIDs = {
@@ -78,7 +81,9 @@ class TestUDS(ScanClass):
             raise NegativeResponseException(
                         0x31, 0x22, struct.pack('>BHB', 0x27, did, 0x31))
         else:
-            time.sleep(self.timeout)
+            # Using this timeout makes the test appear more realistic, but that 
+            # is silly for testing
+            #time.sleep(self.timeout)
             return None
 
     def WriteDID(self, did, data):
@@ -99,7 +104,9 @@ class TestUDS(ScanClass):
             raise NegativeResponseException(
                     0x12, 0x10, struct.pack('>BBB', 0x10, session, 0x12))
         else:
-            time.sleep(self.timeout)
+            # Using this timeout makes the test appear more realistic, but that 
+            # is silly for testing
+            #time.sleep(self.timeout)
             return None
 
     def RequestDownload(self, addr, data, data_format = 0x00, addr_format = 0x44):
@@ -137,5 +144,7 @@ class TestUDS(ScanClass):
             raise NegativeResponseException(
                     0x12, 0x27, struct.pack('>BBB', 0x27, level, 0x12))
         else:
-            time.sleep(self.timeout)
+            # Using this timeout makes the test appear more realistic, but that 
+            # is silly for testing
+            #time.sleep(self.timeout)
             return None

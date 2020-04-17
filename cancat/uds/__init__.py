@@ -23,7 +23,7 @@ ARBID_CONSTS = {
         'resp_offset': 8,  # rxid is normally the txid + 8
         'max_req_id': 0xF7,
         'obd2_broadcast': 0x7DF,
-    }
+    },
     '29bit': {
         'prefix': 0x18DA0000,
         'prefix_mask': 0xFFFF0000,
