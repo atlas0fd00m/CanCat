@@ -454,6 +454,12 @@ but can be disabled with the `-n` (`--no-recursive-session-scanning`) option.
 Depending on the ECU behavior, session scanning can take a varying amount of 
 time and/or produce strange error conditions.
 
+## Unit Tests
+Unit tests can be run with:
+```
+python -m unittest discover -v
+```
+
 ## Acknowledgments
 This project is made possible through collaboration with researchers at GRIMM (SMFS, Inc.), most notably Matt Carpenter and Tim Brom.
 

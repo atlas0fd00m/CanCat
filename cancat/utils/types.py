@@ -82,5 +82,10 @@ class ECUAddress(object):
     def __len__(self):
         return len(self.__dict__)
 
+    def __eq__(self, other):
+        return self.tx_arbid == other.tx_arbid and \
+                self.rx_arbid == other.rx_arbid and \
+                self.extflag == other.extflag
+
     def keys(self):
         return iter(('tx_arbid', 'rx_arbid', 'extflag'))
