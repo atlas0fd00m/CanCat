@@ -268,7 +268,8 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
         u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag, verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
         try:
-            with new_session(u, sess) as msg:
+            start_index = u.c.getCanMsgCount()
+            with new_session(u, session) as msg:
                 if msg is not None:
                     log.debug('{} session {}: {}'.format(addr, session, repr(msg)))
                     log.msg('found {}'.format(addr))
