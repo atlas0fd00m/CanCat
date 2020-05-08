@@ -4,8 +4,7 @@ import struct
 from J1939db import *
 from cancat import *
 
-import vstruct
-from vstruct.bitfield import *
+from cancat.vstruct.bitfield import *
 
 PF_RQST =       0xea
 PF_TP_DT =      0xeb
