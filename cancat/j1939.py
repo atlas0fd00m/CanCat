@@ -90,9 +90,9 @@ def pf_eb(idx, ts, arbtup, data, j1939):
     if len(data) < 1:
         return 'TP ERROR: NO DATA!'
 
-    idx = ord(data[0])
+    tpidx = ord(data[0])
 
-    msgdata = 'TP.DT idx: %.x' % idx
+    msgdata = 'TP.DT idx: %.x' % tpidx
     nextline = ''
     extmsgs = j1939.getExtMsgs(sa, da)
     extmsgs['msgs'].append((arbtup, data))
@@ -100,6 +100,7 @@ def pf_eb(idx, ts, arbtup, data, j1939):
     if len(extmsgs['msgs']) >= extmsgs['length']:
         j1939.clearExtMsgs(sa, da)
         nextline = '  %3.3f: %s' % (extmsgs['ts'], reprExtMsgs(extmsgs))
+        j1939._last_extmsgs = idx, extmsgs
 
     if j1939.skip_TPDT:
         if not len(nextline):
@@ -466,6 +467,9 @@ class J1939(cancat.CanInterface):
         self._RealExtMsgParts = {}
         self.skip_TPDT = False
         self._last_recv_idx = -1
+        self._repr_spns_by_pgn = {}
+        self._repr_all_spns = False
+        self._last_extmsgs = None
 
         self._threads = []
         self.mquelock = threading.Lock()
@@ -489,15 +493,23 @@ class J1939(cancat.CanInterface):
         prio, edp, dp, pf, ps, sa = arbtup
 
         # give name priority to the Handler, then the manual name (this module), then J1939PGNdb
-        pfmeaning, handler = pgn_pfs.get(pf, ('',None))
+        pfmeaning, handler = pgn_pfs.get(pf, ('', None))
+
+        # prepopulate these as they will be checked in a couple places
+        if pf < 0xec:
+            pgn = pf << 8
+        else:
+            pgn = (pf << 8) | ps
+        res = J1939PGNdb.get(pgn)
+
         nextline = ''
 
-        if handler != None:
+        if handler is not None:
             enhanced = handler(idx, ts, arbtup, data, self)
             if enhanced == cancat.DONT_PRINT_THIS_MESSAGE:
                 return enhanced
 
-            if enhanced != None:
+            if enhanced is not None:
                 if type(enhanced) in (list, tuple) and len(enhanced):
                     pfmeaning = enhanced[0]
                     if len(enhanced) > 1:
@@ -514,16 +526,41 @@ class J1939(cancat.CanInterface):
                     pfmeaning = enhanced
 
         elif not len(pfmeaning):
-            pgn = (pf<<8) | ps
-            res = J1939PGNdb.get(pgn)
-            if res == None:
-                res = J1939PGNdb.get(pf<<8)
-            if res != None:
+            if res is not None:
                 pfmeaning = res.get("Name")
+
+        # msg will be sent in for SPN parsing, if appropriate
+        msg = data
+
+        # hack to see if this message completed a long message)
+        #if self._last_extmsgs is not None: print idx, self._last_extmsgs[0], self._last_extmsgs
+        if self._last_extmsgs is not None and self._last_extmsgs[0] == idx:
+            #print "   DEBUG: SAME INDEX!", self._last_extmsgs
+            midx, extmsgs = self._last_extmsgs
+            if extmsgs['totsize'] > 0:
+                msg = [msg for arbtup, msg in extmsgs['msgs']]
+                pgn2 = extmsgs['pgn2']
+                pgn1 = extmsgs['pgn1']
+                if pgn2 < 240:
+                    pgn = pgn2 << 8
+                else:
+                    pgn = (pgn2 << 8) | pgn1
+                res = J1939PGNdb.get(pgn)
+
+                #print "changing pgn: 0x%x" % pgn
+
+
+        if (pgn < 0xeb00 or pgn > 0xecff) and res and (self._repr_all_spns or self._repr_spns_by_pgn.get(pgn)):
+            spnlines = None
+            spns = res.get("SPNs")
+            if spns is not None:
+                spnlines = reprSPNdata(spns, msg)
+
+            if spnlines is not None:
+                nextline = "\n\t" + '\n\t'.join(spnlines)
 
         return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Data: %-18s  %s\t\t%s%s" % \
                 (idx, ts, prio, edp, dp, pf, ps, sa, data.encode('hex'), pfmeaning, comment, nextline)
-
 
     def _getLocals(self, idx, ts, arbid, data):
         prio, edp, dp, pf, ps, sa = parseArbid(arbid)
@@ -558,7 +595,7 @@ class J1939(cancat.CanInterface):
         prio, edp, dp, pf, ps, sa = arbtup
 
         pfhandler = pfhandlers.get(pf)
-        if pfhandler != None:
+        if pfhandler is not None:
             self.queueMessageHandlerEvent(pfhandler, idx, ts, arbtup, data)
             #pfhandler(self, idx, ts, arbtup, data)
 
@@ -663,13 +700,14 @@ class J1939(cancat.CanInterface):
         store a TP message.
         '''
         # FIXME: do we need thread-safety wrappers here?
-        msglist = self._RealExtMsgs.get((sa,da))
-        if msglist == None:
+        msglist = self._RealExtMsgs.get((sa, da))
+        if msglist is None:
             msglist = []
-            self._RealExtMsgs[(sa,da)] = msglist
+            self._RealExtMsgs[(sa, da)] = msglist
 
         msglist.append((idx, ts, sa, da, pgn, msg, tptype, lastidx))
-        if self.verbose: print "-=-= saving sa:%x da:%x" % (sa,da)
+        if self.verbose: 
+            print "-=-= saving sa:%x da:%x" % (sa, da)
 
     # This is for the pretty printing stuff...
     def getExtMsgs(self, sa, da):
@@ -679,12 +717,12 @@ class J1939(cancat.CanInterface):
         if no list exists for this pairing, one is created and an empty list is returned
         '''
         msglists = self.extMsgs.get(sa)
-        if msglists == None:
+        if msglists is None:
             msglists = {}
             self.extMsgs[sa] = msglists
 
         mlist = msglists.get(da)
-        if mlist == None:
+        if mlist is None or not len(mlist):
             mlist = {'msgs':[], 
                     'type' : -1, 
                     'adminmsgs' : [],
@@ -728,6 +766,21 @@ class J1939(cancat.CanInterface):
             msglists = {}
             self.extMsgs[sa] = msglists
         return exists
+
+    def setReprVerbosePGNs(self, pgnlist):
+        '''
+        provide a list of s which should be printed
+        '''
+        if pgnlist == 'ON':
+            self._repr_all_spns = True
+        elif pgnlist == 'OFF':
+            self._repr_all_spns = False
+        elif type(pgnlist) == list:
+            self._repr_spns_by_pgn = {pgn:True for pgn in pgnlist}
+        elif pgnlist is None:
+            self._repr_spns_by_pgn = {}
+            self._repr_all_spns = False
+
 
     def addID(self, newid):
         if newid not in self.myIDs:
@@ -904,4 +957,93 @@ class J1939(cancat.CanInterface):
 
         '''
 
+MAX_WORD = 64
+bu_masks = [(2 ** (i)) - 1 for i in range(8*MAX_WORD+1)]
+
+def reprSPNdata(spnlist, msg):
+    spnlines = []
+    # loop through the SPNs listed for this PGN
+    for spnum in spnlist:
+        spn = J1939SPNdb.get(spnum)
+        if spn is None:
+            continue
+
+        # graciously refactored code from TruckDevil (hey LBD!)
+        spnlen = spn.get('SPNLength')
+        pgnlen = spn.get('PGNLength')
+        spnName = spn.get('Name')
+        spnData = ''
+
+        # skip variable-length PGNs for now
+        if (type(pgnlen) == str and 'ariable' in pgnlen):
+            pass
+
+        else:
+            startBit = spn.get('StartBit')
+            endBit = spn.get('EndBit')
+
+            startByte = startBit / 8
+            startBitO = startBit % 8
+            endByte = (endBit + 7) / 8
+            endBitO = endBit % 8
+
+            datablob = msg[startByte:endByte]
+            #print "sb: %d\t eb: %d\t sB:%d\t SBO:%d\t eB:%d\t eBO:%d\t %r" % (startBit, endBit, startByte, startBitO, endByte, endBitO, datablob)
+
+            units = spn.get("Units")
+            if units == 'ASCII':
+                spnData = repr(datablob)
+
+            else:
+                try:
+                    # carve out the number
+                    datanum = 0
+                    numbytes = struct.unpack('%dB' % len(datablob), datablob)
+                    for n in numbytes:
+                        datanum <<= 8
+                        datanum |= n
+
+                    datanum >>= (7 - endBitO)
+                    #print "datanum: %x" % datanum
+                    mask = bu_masks[endBit - startBit + 1]
+                    datanum &= mask
+                    #print "datanum: %x (mask: %x)" % (datanum, mask)
+
+                    if units == 'bit':
+                        meaning = ''
+                        bitdecode = J1939BitDecodings.get(spnum)
+                        if bitdecode is not None:
+                            meaning = bitdecode.get(datanum)
+
+                        spnData = '0x%x (%s)' % (datanum, meaning)
+
+                    elif units == 'binary':
+                        spnData = bin(datanum)
+
+                    else:
+                        # some other unit with a resolution
+                        datanum = 0
+                        numbytes = struct.unpack('%dB' % len(datablob), datablob)
+                        for n in numbytes:
+                            datanum <<= 8
+                            datanum |= n
+
+                        datanum >> (7 - endBitO)
+
+                        resolution = spn.get('Resolution')
+                        if resolution is not None:
+                            datanum *= resolution
+
+                        offset = spn.get('Offset')
+                        if offset is not None:
+                            datanum + offset
+
+                        spnData = '%.3f %s' % (datanum, units)
+                except Exception as e:
+                    spnData = "ERROR"
+                    print e
+
+        spnlines.append('      SPN(%d): %-20s\t %s' % (spnum, spnData, spnName))
+
+    return spnlines
 
