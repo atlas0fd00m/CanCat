@@ -10,8 +10,6 @@ import cPickle as pickle
 
 from cancat import iso_tp
 
-# defaults for Linux:
-serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
 baud = 4000000
 
 
@@ -173,7 +171,7 @@ class SPECIAL_CASE(object):
 DONT_PRINT_THIS_MESSAGE = SPECIAL_CASE
 
 class CanInterface(object):
-    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
+    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
         '''
         CAN Analysis Workspace
         This can be subclassed by vendor to allow more vendor-specific code 
@@ -189,16 +187,17 @@ class CanInterface(object):
         self._messages = {}
         self._msg_events = {}
         self._queuelock = threading.Lock()
-        self._max_msgs = max_msgs
+        self._config = {}
 
-        self._shutdown = False
-        self.verbose = verbose
-        self.port = port
-        self._baud = baud
+        self._config['shutdown'] = False
+        self._max_msgs = self._config['max_msgs'] = max_msgs
+        self.verbose = self._config['verbose'] = verbose
+        self.port = self._config['port'] = port
+        self._baud = self._config['baud'] = baud
+        self.name = self._config['name'] = 'CanCat'
         self._io = None
         self._in_lock = None
         self._out_lock = None
-        self.name = port
         self._commsthread = None
         self._last_can_msg = None
 
@@ -285,7 +284,7 @@ class CanInterface(object):
         if isinstance(self._io, serial.Serial):
             print "shutting down serial connection"
             self._io.close()
-        self._shutdown = True
+        self._config['shutdown'] = True
         if self._commsthread != None:
             self._commsthread.wait()
 
@@ -306,7 +305,7 @@ class CanInterface(object):
         '''
         self._rxtx_state = RXTX_SYNC
 
-        while not self._shutdown:
+        while not self._config['shutdown']:
             try:    
                 if not self._go:
                     time.sleep(.04)
@@ -957,6 +956,7 @@ class CanInterface(object):
         self.bookmarks = me.get('bookmarks')
         self.bookmark_info = me.get('bookmark_info')
         self.comments = me.get('comments')
+        self._config = me.get('config')
 
     def saveSessionToFile(self, filename=None):
         '''
@@ -989,6 +989,9 @@ class CanInterface(object):
                 'bookmarks' : self.bookmarks,
                 'bookmark_info' : self.bookmark_info,
                 'comments' : self.comments,
+                'file_version' : 1.0,
+                'class' : self.__class__,
+                'config' : self._config,
                 }
         return savegame
 
@@ -1494,7 +1497,7 @@ class GMInterface(CanInterface):
         self.setCanBaud(CAN_33KBPS)
 
 class CanInTheMiddleInterface(CanInterface):
-    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
+    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         '''
         CAN in the middle. Allows the user to determine what CAN messages are being
         sent by a device by isolating a device from the CAN network and using two
@@ -2001,6 +2004,9 @@ class CanInTheMiddleInterface(CanInterface):
                 'bookmarks_iso' : self.bookmarks_iso,
                 'bookmark_info_iso' : self.bookmark_info_iso,
                 'comments' : self.comments,
+                'file_version' : 1.0,
+                'class' : self.__class__,
+                'config' : self._config,
                 }
         return savegame
 
@@ -2024,13 +2030,15 @@ devlocs = [
         '/dev/tty.usbmodem1411',
         '/dev/tty.usbmodem1421',
         '/dev/tty.usbmodem1431',
-        '/dev/ttyACM0',
+        '/dev/ttyUSB0',
         ]
 
 def getDeviceFile():
-    for devloc in devlocs:
-        if os.path.exists(devloc):
-            return devloc
+    import serial.tools.list_ports
+
+    for n, (port, desc, hwid) in enumerate(sorted(serial.tools.list_ports.comports()), 1):
+        if os.path.exists(port):
+            return port
 
 def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
     global c
