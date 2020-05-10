@@ -782,6 +782,21 @@ class J1939(cancat.CanInterface):
             self._repr_all_spns = False
 
 
+    def setReprVerbosePGNs(self, pgnlist):
+        '''
+        provide a list of s which should be printed
+        '''
+        if pgnlist == 'ON':
+            self._repr_all_spns = True
+        elif pgnlist == 'OFF':
+            self._repr_all_spns = False
+        elif type(pgnlist) == list:
+            self._repr_spns_by_pgn = {pgn:True for pgn in pgnlist}
+        elif pgnlist is None:
+            self._repr_spns_by_pgn = {}
+            self._repr_all_spns = False
+
+
     def addID(self, newid):
         if newid not in self.myIDs:
             self.myIDs.append(newid)

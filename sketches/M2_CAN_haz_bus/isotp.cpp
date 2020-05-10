@@ -43,14 +43,14 @@ void IsoTP_cb(CAN_FRAME *frame, CANRaw *device)
             log("Received ABORT from ISOTP TX", 28);
             if (mode != CMD_CAN_MODE_CITM)
             {
-                device->setRXFilter(0, 0, 0x7FF, false);
+                device->mailbox_set_mode(0, 0); // Disable ISOTP Mailbox
                 device->detachCANInterrupt(0);
             }
             else
             {
-                Can0.setRXFilter(0, 0, 0x7FF, false);
+                Can0.mailbox_set_mode(0, 0); // Disable ISOTP Mailbox
                 Can0.detachCANInterrupt(0);
-                Can1.setRXFilter(0, 0, 0x7FF, false);
+                Can1.mailbox_set_mode(0, 0); // Disable ISOTP Mailbox
                 Can1.detachCANInterrupt(0);
             }
             isotp_tx_index = 0;
@@ -69,14 +69,14 @@ void IsoTP_cb(CAN_FRAME *frame, CANRaw *device)
             log("Block size specified, which is unimplemented", 67);
             if (mode != CMD_CAN_MODE_CITM)
             {
-                device->setRXFilter(0, 0, 0x7FF, false);
+                device->mailbox_set_mode(0, 0); // Disable ISOTP Mailbox
                 device->detachCANInterrupt(0);
             }
             else
             {
-                Can0.setRXFilter(0, 0, 0x7FF, false);
+                Can0.mailbox_set_mode(0, 0); // Disable ISOTP Mailbox
                 Can0.detachCANInterrupt(0);
-                Can1.setRXFilter(0, 0, 0x7FF, false);
+                Can1.mailbox_set_mode(0, 0); // Disable ISOTP Mailbox
                 Can1.detachCANInterrupt(0);
             }
             isotp_tx_index = 0;
@@ -238,13 +238,16 @@ uint8_t SendIsoTPFrame(uint8_t serial_buffer[], uint16_t serial_buf_count)
         {
             device->setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
             device->setCallback(0, (mode == CMD_CAN_MODE_SNIFF_CAN0) ? IsoTP_Can0_cb : IsoTP_Can1_cb);
+            device->mailbox_set_mode(0, CAN_MB_RX_MODE); // Enable mailbox
         }
         else if(mode == CMD_CAN_MODE_CITM)
         {
             Can0.setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
             Can0.setCallback(0, IsoTP_Can0_cb);
+            Can0.mailbox_set_mode(0, CAN_MB_RX_MODE); // Enable mailbox
             Can1.setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
             Can1.setCallback(0, IsoTP_Can1_cb);
+            Can1.mailbox_set_mode(0, CAN_MB_RX_MODE); // Enable mailbox
         }
         isotp_tx_go = 0;
         isotp_tx_index = 6;
@@ -280,15 +283,16 @@ uint8_t RecvIsoTPFrame(uint8_t serial_buffer[])
     {
         device->setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
         device->setCallback(0, (mode == CMD_CAN_MODE_SNIFF_CAN0) ? IsoTP_Can0_cb : IsoTP_Can1_cb);
+        device->mailbox_set_mode(0, CAN_MB_RX_MODE); // Enable mailbox
     }
     else if(mode == CMD_CAN_MODE_CITM)
     {
         Can0.setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
         Can0.setCallback(0, IsoTP_Can0_cb);
+        Can0.mailbox_set_mode(0, CAN_MB_RX_MODE); // Enable mailbox
         Can1.setRXFilter(0, isotp_rx_arbid, (isotp_tx_extended) ? 0x1FFFFFFF : 0x7FF, isotp_tx_extended);
         Can1.setCallback(0, IsoTP_Can1_cb);
+        Can1.mailbox_set_mode(0, CAN_MB_RX_MODE); // Enable mailbox
     }
     return 0; //TODO: Error checking
 }
-
-

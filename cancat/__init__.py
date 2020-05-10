@@ -6,6 +6,7 @@ import serial
 import select
 import struct
 import threading
+import math   
 import cPickle as pickle
 
 from cancat import iso_tp
@@ -30,6 +31,7 @@ CMD_CAN_SEND_ISOTP_RESULT   = 0x38
 CMD_CAN_RECV_ISOTP_RESULT   = 0x39
 CMD_CAN_SENDRECV_ISOTP_RESULT = 0x3A
 CMD_SET_FILT_MASK_RESULT    = 0x3B
+CMD_PRINT_CAN_REGS          = 0x3C
 
 CMD_PING                    = 0x41
 CMD_CHANGE_BAUD             = 0x42
@@ -86,6 +88,7 @@ RXTX_GO         = 1
 TIMING_FAST         = 0
 TIMING_REAL         = 1
 TIMING_INTERACTIVE  = 2
+TIMING_SEARCH       = 3 
 
 # constants for VIEW settings:
 VIEW_ASCII =        1<<0
@@ -692,12 +695,23 @@ class CanInterface(object):
                     were received
         timing = TIMING_INTERACTIVE: wait for the user to press Enter between each
                     message being transmitted
+        timing = TIMING_SEARCH: wait for the user to respond (binary search) 
         '''
         if start_bkmk != None:
             start_msg = self.getMsgIndexFromBookmark(start_bkmk)
 
         if stop_bkmk != None:
             stop_msg = self.getMsgIndexFromBookmark(stop_bkmk)
+
+        if timing == TIMING_SEARCH: 
+                diff = stop_msg - start_msg
+                if diff == 1:
+                    mid_msg = stop_msg
+                    start_tmp = start_msg 
+                else:
+                    mid_msg = int(start_msg + math.floor((stop_msg - start_msg) / 2))
+                    start_tmp = start_msg
+                    start_msg = mid_msg
 
         last_time = -1
         newstamp = time.time()
@@ -711,6 +725,24 @@ class CanInterface(object):
 
                 if char is not None and len(char) > 0 and char[0] == 'n':
                     return
+
+            elif timing == TIMING_SEARCH:    
+                self.CANreplay(start_msg=mid_msg, stop_msg=stop_msg)   
+                char = raw_input("Expected outcome?  start_msg = %s, stop_msg = %s (Y/n/q)" % (mid_msg, stop_msg))
+                if char is not None and len(char) > 0 and char[0] == 'q':
+                    return 
+                if diff > 1:
+                    if char is not None and len(char) > 0 and char[0] == 'y':
+                        return self.CANreplay(start_msg=mid_msg, stop_msg=stop_msg, timing=TIMING_SEARCH) 
+                    elif char is not None and len(char) > 0 and char[0] == 'n': 
+                        return self.CANreplay(start_msg=start_tmp, stop_msg=mid_msg, timing=TIMING_SEARCH)
+                else: 
+                    if char is not None and len(char) > 0 and char[0] == 'y':
+                        print "Target message: %s" % (stop_msg)
+                        return 
+                    elif char is not None and len(char) > 0 and char[0] == 'n':  
+                        print "Target message: %s" % (start_tmp)
+                        return  
 
             elif timing == TIMING_REAL:
                 if last_time != -1:
@@ -787,7 +819,9 @@ class CanInterface(object):
         if start == None:
             start = self.getCanMsgCount()
 
-        if stop == None or tail:
+        if messages == None:
+            stop = 0
+        elif stop == None or tail:
             stop = len(messages)
         else:
             stop = stop + 1 # This makes the stop index inclusive if specified
@@ -800,38 +834,46 @@ class CanInterface(object):
             # placed here to ensure checking whether we're receiving messages or not
             if maxsecs != None and time.time() > maxsecs+starttime:
                 return
+
+            # If we start sniffing before we receive any messages, 
+            # messages will be "None". In this case, each time through
+            # this loop, check to see if we have messages, and if so,
+            # re-create the messages handle
+            if messages == None:
+                messages = self._messages.get(CMD_CAN_RECV, None)
         
             # if we're off the end of the original request, and "tailing"
-            if tail and idx >= stop:
-                msglen = len(messages) 
-                self.log("stop=%d  len=%d" % (stop, msglen), 3)
+            if messages != None:
+                if tail and idx >= stop:
+                    msglen = len(messages) 
+                    self.log("stop=%d  len=%d" % (stop, msglen), 3)
 
-                if stop == msglen:
-                    self.log("waiting for messages", 3)
-                    # wait for trigger event so we're not constantly polling
-                    self._msg_events[CMD_CAN_RECV].wait(1)
-                    self._msg_events[CMD_CAN_RECV].clear()
-                    self.log("received 'new messages' event trigger", 3)
+                    if stop == msglen:
+                        self.log("waiting for messages", 3)
+                        # wait for trigger event so we're not constantly polling
+                        self._msg_events[CMD_CAN_RECV].wait(1)
+                        self._msg_events[CMD_CAN_RECV].clear()
+                        self.log("received 'new messages' event trigger", 3)
 
-                # we've gained some messages since last check...
-                stop = len(messages)
-                continue    # to the big message loop.
+                    # we've gained some messages since last check...
+                    stop = len(messages)
+                    continue    # to the big message loop.
 
-            # now actually handle messages
-            ts, msg = messages[idx]
+                # now actually handle messages
+                ts, msg = messages[idx]
 
-            # make ts an offset instead of the real time.
-            ts -= startts
+                # make ts an offset instead of the real time.
+                ts -= startts
 
-            arbid, data = self._splitCanMsg(msg)
+                arbid, data = self._splitCanMsg(msg)
 
-            if arbids != None and arbid not in arbids:
-                # allow filtering of arbids
+                if arbids != None and arbid not in arbids:
+                    # allow filtering of arbids
+                    idx += 1
+                    continue
+
+                yield((idx, ts, arbid, data))
                 idx += 1
-                continue
-
-            yield((idx, ts, arbid, data))
-            idx += 1
 
 
     def _splitCanMsg(self, msg):
@@ -1315,7 +1357,7 @@ class CanInterface(object):
 
         for datalen,arbid,msgs in arbids:
             print self.reprCanMsgs(arbids=[arbid], advfilters=advfilters)
-            cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, Q)uit: ").upper()
+            cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, S)earchReplay, Q)uit: ").upper()
             while len(cmd) and cmd != 'N':
                 if cmd == 'R':
                     self.CANreplay(arbids=[arbid], timing=TIMING_REAL)
@@ -1326,10 +1368,13 @@ class CanInterface(object):
                 elif cmd == 'I':
                     self.CANreplay(arbids=[arbid], timing=TIMING_INTERACTIVE)
 
+                elif cmd == 'S':
+                    self.CANreplay(arbids=[arbid], timing=TIMING_SEARCH)
+                
                 elif cmd == 'Q':
                     return
 
-                cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, Q)uit: ").upper()
+                cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, S)earchReplay, Q)uit: ").upper()
             print 
 
     def printBookmarks(self):
@@ -1401,6 +1446,100 @@ class CanInterface(object):
         '''
         msg = struct.pack('>IIIIIIII', 0, 0, 0, 0, 0, 0, 0, 0)
         return self._send(CMD_SET_FILT_MASK, msg)
+
+    def _test_throughput(self):
+        '''
+        Use in conjuction with the M2_TEST_FW to test throughput
+
+        Connect one CanCat up to another M2 or Arduino DUE device runing the M2_TEST_FW firmware
+        and run this function to perform a throughput test. No other device should be connected
+        to allow the test to run unimpeded by other CAN traffic.
+        '''
+        self.clearCanMsgs()
+        self.CANxmit(0x0010, "TEST")
+        for i in range(6, 3, -1):
+            print "Time remaining: ", i*10, " seconds"
+            time.sleep(10)
+        self.CANxmit(0x810, "TEST", extflag=True)
+        for i in range(3, 0, -1):
+            print "Time remaining: ", i*10, " seconds"
+            time.sleep(10)
+                
+        out_of_order_count = 0
+        msg_count = 0
+        prev_val = 0xFF
+        for foo in self.genCanMsgs(arbids=[0x00]):
+            msg_count += 1
+            prev_val += 1
+            if prev_val > 0xff:
+                prev_val = 0
+            if prev_val != ord(foo[3]):
+                out_of_order_count += 1
+                prev_val = ord(foo[3])
+        if (out_of_order_count > 0):
+            print "ERROR: 11 bit IDs, 1 byte messages, ", out_of_order_count, " Messages received out of order"
+        elif (msg_count != 181810):
+            print "ERROR: Received ", msg_count, " out of expected 181810 message"
+        else:
+            print "PASS: 11 bit IDs, 1 byte messages"
+        
+        out_of_order_count = 0
+        msg_count = 0
+        prev_val = 0xFF
+        for foo in self.genCanMsgs(arbids=[0x01]):
+            msg_count += 1
+            prev_val += 1
+            if prev_val > 0xff:
+                prev_val = 0
+            if prev_val != ord(foo[3][0]):
+                out_of_order_count += 1
+                prev_val = ord(foo[3][0])
+        if (out_of_order_count > 0):
+            print "ERROR: 11 bit IDs, 8 byte messages, ", out_of_order_count, " Messages received out of order"
+        elif (msg_count != 90090):
+            print "ERROR: Received ", msg_count, " out of expected 90090 message"
+        else:
+            print "PASS: 11 bit IDs, 8 byte messages"
+        
+        out_of_order_count = 0
+        msg_count = 0
+        prev_val = 0xFF
+        for foo in self.genCanMsgs(arbids=[0x800]):
+            msg_count += 1
+            prev_val += 1
+            if prev_val > 0xff:
+                prev_val = 0
+            if prev_val != ord(foo[3]):
+                out_of_order_count += 1
+                prev_val = ord(foo[3])
+        if (out_of_order_count > 0):
+            print "ERROR: 29 bit IDs, 1 byte messages, ", out_of_order_count, " Messages received out of order"
+        elif (msg_count != 133330):
+            print "ERROR: Received ", msg_count, " out of expected 133330 message"
+        else:
+            print "PASS: 29 bit IDs, 1 byte messages"
+        
+        out_of_order_count = 0
+        msg_count = 0
+        prev_val = 0xFF
+        for foo in self.genCanMsgs(arbids=[0x801]):
+            msg_count += 1
+            prev_val += 1
+            if prev_val > 0xff:
+                prev_val = 0
+            if prev_val != ord(foo[3][0]):
+                out_of_order_count += 1
+                prev_val = ord(foo[3][0])
+        if (out_of_order_count > 0):
+            print "ERROR: 29 bit IDs, 8 byte messages, ", out_of_order_count, " Messages received out of order"
+        elif (msg_count != 76330):
+            print "ERROR: Received ", msg_count, " out of expected 76330 message"
+        else:
+            print "PASS: 29 bit IDs, 8 byte messages"
+
+    def _printCanRegs(self):
+        self._send(CMD_PRINT_CAN_REGS, "")
+
 
 
 def getAscii(msg, minbytes=3):

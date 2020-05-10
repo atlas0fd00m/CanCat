@@ -2,7 +2,7 @@ import sys
 import os
 from distutils.core import setup, Extension
 
-packages = ['cancat']
+packages = ['cancat','cancat/vstruct']
 mods = []
 pkgdata = {}
 scripts = ['CanCat.py']
