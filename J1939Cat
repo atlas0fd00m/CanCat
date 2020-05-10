@@ -6,6 +6,7 @@ import rlcompleter
 readline.parse_and_bind("tab: complete")
 import os
 
+import cancat.j1939stack
 from cancat import *
 
 
@@ -48,7 +49,7 @@ if __name__ == "__main__":
 
     ifo = parser.parse_args()
 
-    interface = CanInterface
+    interface = j1939stack.J1939Interface
 
     if ifo.interface:
         ifacename = ifo.interface + "Interface"
@@ -56,7 +57,7 @@ if __name__ == "__main__":
         if interface == None:
             raise Exception("Invalid interface: %s.  Must use one of the following: %s" % (ifo.interface, interface_names))
 
-    baud_val = CAN_500KBPS
+    baud_val = CAN_250KBPS
     if ifo.baud:
         baud_val = globals().get("CAN_%sBPS" % ifo.baud)
         if baud_val == None:

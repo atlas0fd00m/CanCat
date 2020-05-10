@@ -2,7 +2,7 @@ from cancat.j1939 import *
 # we can move things into here if we decide this replaces the exiting j1939 modules
 
 ''' 
-This is a J1939 Stack modules.
+This is a J1939 Stack module.
 It's purpose is to provide a J1939-capable object which extends (consumes) CanCat's CanInterface module, and provides a J1939 interface.
 In the original J1939 module, extended messages were treated like oddities.  This module will work on the premise that all messages (except TP messages) are created equal, and are available in the same queue.  TP messages will be the "specialty" messages which create new, arbitrary sized messages from smaller ones.  If they don't make it through, they don't.  This module is intended to make J1939 attack clients easier to work with, whereas the first module was focused on reverse engineering.  Let's see if we can't come up with something awesome, then possible merge them together in the future.
 
@@ -12,19 +12,18 @@ This module focuses around PGNs.  All messages are handled and sorted by their P
 J1939MSGS = 1939
 
 class J1939Interface(cancat.CanInterface):
-    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
+    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         self.myIDs = []
         self._last_recv_idx = -1
         self._threads = []
         self._j1939_filters = []
-        #self._j1939_messages = {}
         self._j1939_msg_events = {}
         self._j1939queuelock = threading.Lock()
         self._TPmsgParts = {}
         self.maxMsgsPerPGN = 0x200
         self._j1939_msg_listeners = []
         self.promisc = False
-        self._msg_source_idx = J1939MSGS    # FIXME: take us back to using standard _messages with this as the key
+        #self._msg_source_idx = J1939MSGS    # FIXME: take us back to using standard _messages with this as the key
 
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
 
@@ -54,14 +53,14 @@ class J1939Interface(cancat.CanInterface):
     def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
         if len(data) < 8:
             arbid = emitArbid(prio, edp, dp, pf, ps, sa)
-            print "TX: %x : %r" % (arbid, data.encode('hex'))
+            # print "TX: %x : %r" % (arbid, data.encode('hex'))
             self.CANxmit(arbid, data, extflag=1)
             return
 
         self._j1939xmit_tp(pf, ps, sa, data, prio, edp, dp)
 
     def _j1939xmit_tp(self, pf, ps, sa, message, prio=6, edp=0, dp=0):
-        pgn2 = (edp<<1) | dp
+        pgn2 = (edp << 1) | dp
         pgn1 = pf
         if pgn1 < 240:
             pgn0 = 0
@@ -74,9 +73,9 @@ class J1939Interface(cancat.CanInterface):
 
         cm_msg = struct.pack('<BHBBBBB', CM_RTS, len(message), len(msgs), 0xff, 
                 pgn2, pgn1, pgn0)
-        #self.J1939xmit(PF_TP_CM, ps, sa, cm_msg, prio=prio)
+
         arbid = emitArbid(prio, edp, dp, PF_TP_CM, ps, sa)
-        print "TXe: %x : %r" % (arbid, cm_msg.encode('hex'))
+        # print "TXe: %x : %r" % (arbid, cm_msg.encode('hex'))
         self.CANxmit(arbid, cm_msg, extflag=1)
         time.sleep(.01)  # hack: should watch for CM_CTS
         for msg in msgs:

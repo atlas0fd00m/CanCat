@@ -4,8 +4,7 @@ import struct
 from J1939db import *
 from cancat import *
 
-import vstruct
-from vstruct.bitfield import *
+from cancat.vstruct.bitfield import *
 
 PF_RQST =       0xea
 PF_TP_DT =      0xeb
@@ -460,7 +459,7 @@ class TimeoutException(Exception):
     pass
 
 class J1939(cancat.CanInterface):
-    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
+    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         self.myIDs = []
         self.extMsgs = {}
         self._RealExtMsgs = {}
@@ -472,7 +471,6 @@ class J1939(cancat.CanInterface):
         self._last_extmsgs = None
 
         self._threads = []
-        self.mquelock = threading.Lock()
 
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
 
@@ -538,13 +536,13 @@ class J1939(cancat.CanInterface):
             #print "   DEBUG: SAME INDEX!", self._last_extmsgs
             midx, extmsgs = self._last_extmsgs
             if extmsgs['totsize'] > 0:
-                msg = [msg for arbtup, msg in extmsgs['msgs']]
-                pgn2 = extmsgs['pgn2']
+                msg = ''.join([msg for arbtup, msg in extmsgs['msgs']])
                 pgn1 = extmsgs['pgn1']
-                if pgn2 < 240:
-                    pgn = pgn2 << 8
+                pgn0 = extmsgs['pgn0']
+                if pgn1 < 240:
+                    pgn = pgn1 << 8
                 else:
-                    pgn = (pgn2 << 8) | pgn1
+                    pgn = (pgn1 << 8) | pgn0
                 res = J1939PGNdb.get(pgn)
 
                 #print "changing pgn: 0x%x" % pgn
@@ -621,6 +619,8 @@ class J1939(cancat.CanInterface):
                 print "MsgHandler ERROR: %r (%r)" % (e, worktup)
                 if self.verbose:
                     sys.excepthook(*sys.exc_info())
+
+
         
     # functions to support the J1939TP Stack (real stuff, not just repr)
     def getRealExtMsgs(self, sa, da):
@@ -1041,7 +1041,7 @@ def reprSPNdata(spnlist, msg):
                         spnData = '%.3f %s' % (datanum, units)
                 except Exception as e:
                     spnData = "ERROR"
-                    print e
+                    print "SPN: %r %r (%r)" % (e, msg, spn)
 
         spnlines.append('      SPN(%d): %-20s\t %s' % (spnum, spnData, spnName))
 

@@ -212,6 +212,8 @@ class CanInterface(object):
         if load_filename != None:
             self.loadFromFile(load_filename)
 
+        #### FIXME: make this a connection cycle, not just a "pick the first one" thing...
+        #### Prove that it's a CanCat... and that it's not in use by something else...
         # If we specify a file and no port, assume we just want to read the file, only try to guess
         # ports if there is no file specified
         if self.port == None and load_filename == None:
@@ -728,6 +730,7 @@ class CanInterface(object):
         '''
         self._send(CMD_CAN_BAUD, chr(baud_const))
         response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
+        self._config['can_baud'] = baud_const
 
         while(response[1] != '\x01'):
             print "CAN INIT FAILED: Retrying"
@@ -751,6 +754,9 @@ class CanInterface(object):
             while(response[1] != '\x01'):
                 print "CAN INIT FAILED: Retrying"
                 response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
+
+        self._config['can_mode'] = mode
+        return response
 
     def ping(self, buf='ABCDEFGHIJKL'):
         '''
@@ -1397,15 +1403,6 @@ class CanInterface(object):
         return self._send(CMD_SET_FILT_MASK, msg)
 
 
-class CanControl(cmd.Cmd):
-    '''
-    Command User Interface (as if ipython wasn't enough!)
-    '''
-    def __init__(self, serialdev=serialdev, baud=baud):
-        cmd.Cmd.__init__(self)
-        self.serialdev = serialdev
-        self.canbuf = CanBuffer(self.serialdev, self._baud)
-
 def getAscii(msg, minbytes=3):
     '''
     if strict, every character has to be clean ASCII
@@ -2023,16 +2020,6 @@ def cleanupInteractiveAtExit():
         except:
             pass
 
-devlocs = [
-        '/dev/ttyACM0',
-        '/dev/ttyACM1',
-        '/dev/ttyACM2',
-        '/dev/tty.usbmodem1411',
-        '/dev/tty.usbmodem1421',
-        '/dev/tty.usbmodem1431',
-        '/dev/ttyUSB0',
-        ]
-
 def getDeviceFile():
     import serial.tools.list_ports
 
@@ -2056,11 +2043,11 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     gbls = globals()
     lcls = locals()
 
+    print intro
     try:
         import IPython.Shell
         ipsh = IPython.Shell.IPShell(argv=[''], user_ns=lcls, user_global_ns=gbls)
-        print intro
-        ipsh.mainloop(intro)
+        ipsh.mainloop()
 
     except ImportError, e:
         try:
@@ -2069,7 +2056,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
             ipsh.user_global_ns.update(gbls)
             ipsh.user_global_ns.update(lcls)
             ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!
-            ipsh.mainloop(intro)
+            ipsh.mainloop()
         except ImportError, e:
             try:
                 from IPython.frontend.terminal.interactiveshell import TerminalInteractiveShell
@@ -2077,9 +2064,9 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
                 ipsh.user_global_ns.update(gbls)
                 ipsh.user_global_ns.update(lcls)
                 ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!
-                ipsh.mainloop(intro)
+                ipsh.mainloop()
             except ImportError, e:
                 print e
                 shell = code.InteractiveConsole(gbls)
-                shell.interact(intro)
+                shell.interact()
 
