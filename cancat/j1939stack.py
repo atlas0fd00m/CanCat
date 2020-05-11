@@ -12,8 +12,7 @@ This module focuses around PGNs.  All messages are handled and sorted by their P
 J1939MSGS = 1939
 
 class J1939Interface(cancat.CanInterface):
-    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
-        self.myIDs = []
+    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, process_can_msgs=True, promisc=True):
         self._last_recv_idx = -1
         self._threads = []
         self._j1939_filters = []
@@ -22,8 +21,8 @@ class J1939Interface(cancat.CanInterface):
         self._TPmsgParts = {}
         self.maxMsgsPerPGN = 0x200
         self._j1939_msg_listeners = []
-        self.promisc = False
-        #self._msg_source_idx = J1939MSGS    # FIXME: take us back to using standard _messages with this as the key
+        self.promisc = promisc
+        self._msg_source_idx = J1939MSGS    # FIXME: take us back to using standard _messages with this as the key
 
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
 
@@ -36,19 +35,31 @@ class J1939Interface(cancat.CanInterface):
 
         self.register_handler(CMD_CAN_RECV, self._j1939_can_handler)
 
+        if self._config.get('myIDs') is None:
+            self._config['myIDs'] = []
+
+        if process_can_msgs:
+            self.processCanMessages()
+
+        # restore other config items
+
+    def processCanMessages(self, delete=True):
+        for msg in self.recvall(CMD_CAN_RECV):
+            self._j1939_can_handler(msg, None)
+
     def setPromiscuous(self, promisc=True):
         '''
-        Determines whether messages not destined for an ID I currently own (self.myIDs) are kept/handled or discarded
+        Determines whether messages not destined for an ID I currently own (self._config['myIDs'] are kept/handled or discarded
         '''
         self.promisc = promisc
 
     def addID(self, newid):
-        if newid not in self.myIDs:
-            self.myIDs.append(newid)
+        if newid not in self._config['myIDs']:
+            self._config['myIDs'].append(newid)
 
     def delID(self, curid):
-        if curid in self.myIDs:
-            self.myIDs.remove(curid)
+        if curid in self._config['myIDs']:
+            self._config['myIDs'].remove(curid)
 
     def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
         if len(data) < 8:
@@ -136,62 +147,69 @@ class J1939Interface(cancat.CanInterface):
         return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Data: %-18s  %s\t\t%s%s" % \
                 (idx, ts, prio, edp, dp, pf, ps, sa, data.encode('hex'), pfmeaning, comment, nextline)
 
-    def _j1939_can_handler(self, message, none):
+    def _j1939_can_handler(self, tsmsg, none):
         '''
         this function is run for *Every* received CAN message... and is executed from the 
         XMIT/RECV thread.  it *must* be fast!
         '''
-        #print repr(self), repr(cmd), repr(message)
+        #print repr(self), repr(cmd), repr(tsmsg)
+        ts, message = tsmsg
         arbid, data = self._splitCanMsg(message)
         arbtup = parseArbid(arbid)
         prio, edp, dp, pf, ps, sa = arbtup
 
         # if i don't care about this message... bail. (0xef+ is multicast)
-        if pf < 0xef and ps not in self.myIDs and not self.promisc:
+        if pf < 0xef and ps not in self._config['myIDs'] and not self.promisc:
             return
 
         if pf == 0xeb:
-            self.queueMessageHandlerEvent(self.eb_handler, arbtup, data)
+            self.queueMessageHandlerEvent(self.eb_handler, arbtup, data, ts)
         elif pf == 0xec:
-            self.queueMessageHandlerEvent(self.ec_handler, arbtup, data)
+            self.queueMessageHandlerEvent(self.ec_handler, arbtup, data, ts)
         else:
-            self.queueMessageHandlerEvent(self._submitJ1939Message, arbtup, data)
+            self.queueMessageHandlerEvent(self._submitJ1939Message, arbtup, data, ts)
 
         #print "submitted message: %r" % (message.encode('hex'))
 
 
-    def queueMessageHandlerEvent(self, pfhandler, arbtup, data):
+    def queueMessageHandlerEvent(self, pfhandler, arbtup, data, ts):
         ''' 
         this is run in the XMIT/RECV thread and is intended to handle offloading the data fast
         '''
-        self._mhe_queue.put((pfhandler, arbtup, data))
+        self._mhe_queue.put((pfhandler, arbtup, data, ts))
 
     def _mhe_runner(self):
         ''' 
         runs the mhe thread, which is offloaded so that the message-handling thread can keep going
         '''
-        while self._go:
-            worktup = None
-            try:
-                worktup = self._mhe_queue.get(1)
-                if worktup == None:
-                    continue
+        while not self._config.get('shutdown'):
+            while self._config['go']:
+                worktup = None
+                try:
+                    worktup = self._mhe_queue.get(1)
+                    if worktup == None:
+                        continue
 
-                pfhandler, arbtup, data = worktup
-                pfhandler(arbtup, data)
+                    pfhandler, arbtup, data, ts = worktup
+                    pfhandler(arbtup, data, ts)
 
-            except Exception, e:
-                print "MsgHandler ERROR: %r (%r)" % (e, worktup)
-                if self.verbose:
-                    sys.excepthook(*sys.exc_info())
+                except Exception, e:
+                    print "MsgHandler ERROR: %r (%r)" % (e, worktup)
+                    if self.verbose:
+                        sys.excepthook(*sys.exc_info())
 
-    def _submitJ1939Message(self, arbtup, message):
+            time.sleep(1)
+
+    def _submitJ1939Message(self, arbtup, message, timestamp=None):
         '''
         submits a message to the cmd mailbox.  creates mbox if doesn't exist.
         *threadsafe*
         often runs in the MHE thread
         '''
-        timestamp = time.time()
+        print "_submitJ1939Message"
+        if timestamp is None:
+            timestamp = time.time()
+
         prio, edp, dp, pf, ps, sa = arbtup
         pgn = (pf<<8) | ps
         datarange = (edp<<1) | dp
@@ -275,7 +293,7 @@ class J1939Interface(cancat.CanInterface):
         if msg_handler in self._j1939_msg_listeners:
             self._j1939_msg_listeners.remove(msg_handler)
 
-    def ec_handler(j1939, arbtup, data):
+    def ec_handler(j1939, arbtup, data, ts):
         '''
         special handler for TP_CM messages
         '''
@@ -288,13 +306,15 @@ class J1939Interface(cancat.CanInterface):
             # check for old stuff
             extmsgs = j1939.getTPmsgParts(da, sa)
             if extmsgs != None and len(extmsgs['msgs']):
-                extmsgs['sa'] = sa
-                extmsgs['da'] = da
-                j1939.saveTPmsgs(sa, da, (0,0,0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN)
+                pgn2 = extmsgs['pgn2']
+                pgn1 = extmsgs['pgn1']
+                pgn0 = extmsgs['pgn0']
+                j1939.saveTPmsg(sa, da, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN)
                 j1939.clearTPmsgParts(da, sa)
 
             # store extended message information for other stuff...
             extmsgs = j1939.getTPmsgParts(da, sa, create=True)
+            extmsgs['ts'] = ts
             extmsgs['sa'] = sa
             extmsgs['da'] = da
             extmsgs['pgn2'] = pgn2
@@ -307,7 +327,7 @@ class J1939Interface(cancat.CanInterface):
             extmsgs['adminmsgs'].append((arbtup, data))
 
             # RESPOND!
-            if da in j1939.myIDs:
+            if da in j1939._config['myIDs']:
                 response = struct.pack('<BBBHBBB', CM_CTS, pktct, 1, 0, pgn2, pgn1, pgn0)
                 j1939.J1939xmit(0xec, sa, da, response, prio)
 
@@ -352,14 +372,16 @@ class J1939Interface(cancat.CanInterface):
             # check for old stuff
             extmsgs = j1939.getTPmsgParts(da, sa)
             if extmsgs != None and len(extmsgs['msgs']):
-                extmsgs['sa'] = sa
-                extmsgs['da'] = da
-                j1939.saveTPmsgs(sa, da, (0,0,0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN)
+                pgn2 = extmsgs['pgn2']
+                pgn1 = extmsgs['pgn1']
+                pgn0 = extmsgs['pgn0']
+                j1939.saveTPmsg(sa, da, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN)
 
             j1939.clearTPmsgParts(da, sa)
 
             # store extended message information for other stuff...
             extmsgs = j1939.getTPmsgParts(sa, da, create=True)
+            extmsgs['ts'] = ts
             extmsgs['sa'] = sa
             extmsgs['da'] = da
             extmsgs['pgn2'] = pgn2
@@ -390,7 +412,7 @@ class J1939Interface(cancat.CanInterface):
             if cb_handler != None:
                 cb_handler(arbtup, data, j1939)
 
-    def eb_handler(j1939, arbtup, data):
+    def eb_handler(j1939, arbtup, data, ts):
         '''
         special handler for TP_DT messages
         '''
@@ -413,11 +435,11 @@ class J1939Interface(cancat.CanInterface):
             pgn0 = extmsgs['pgn0']
             mtype = extmsgs['type']
 
-            j1939.saveTPmsgs(sa, da, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), mtype)
+            j1939.saveTPmsg(sa, da, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), mtype)
             j1939.clearTPmsgParts(da, sa)
 
             # if this is the end of a message to *me*, reply accordingly
-            if da in j1939.myIDs:
+            if da in j1939._config['myIDs']:
                 if mtype == None:
                     j1939.log("TP_DT_handler: missed beginning of message, not sending EOM: %r" % \
                             repr(extmsgs), 1)
@@ -463,7 +485,7 @@ class J1939Interface(cancat.CanInterface):
                     'type':None, 
                     'adminmsgs':[], 
                     'pgn0':None, 
-                    'pgn1':pf, 
+                    'pgn1':None, 
                     'pgn2':None,   
                     'totsize':0,
                     'maxct':0xff,
@@ -506,14 +528,14 @@ class J1939Interface(cancat.CanInterface):
         # functions to support the J1939TP Stack (real stuff, not just repr)
         store a TP message.
         '''
-        # FIXME: do we need thread-safety wrappers here?
-        #msglist = self._TPmsgs.get((sa,da))
-        #if msglist == None:
-        #    msglist = []
-        #    self._TPmsgs[(sa,da)] = msglist
-        #
-        #msglist.append((idx, ts, sa, da, pgn, msg, tptype, lastidx))
-        arbtup = prio, edp, dp, pf, ps, sa = arbtup
+        pgn2, pf, ps = pgn
+        prio = pgn2 >> 2
+        edp = (pgn2 >> 1) & 1
+        dp = pgn2 & 1
+        if da != ps:
+            print "saveTPmsg: WARNING: da: 0x%x  but ps: 0x%x.  using da" % (da, ps)
+            ps = da
+        arbtup = prio, edp, dp, pf, ps, sa
         self._submitJ1939Message(arbtup, msg)
 
     def getCanMsgQueue(self):

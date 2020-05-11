@@ -5,7 +5,7 @@ from distutils.core import setup, Extension
 packages = ['cancat','cancat/vstruct']
 mods = []
 pkgdata = {}
-scripts = ['CanCat.py']
+scripts = ['CanCat.py', 'J1939Cat']
 
 setup  (name        = 'cancat',
         version     = '1.0',

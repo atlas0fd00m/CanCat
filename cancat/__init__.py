@@ -144,8 +144,8 @@ def handleLogHexToScreen(message, canbuf):
     print('LOG: %x' % num)
 
 def handleCanMsgsDuringSniff(message, canbuf, arbids=None):
-    idx, ts = canbuf._submitMessage(CMD_CAN_RECV, message)
     ts = time.time()
+    idx = canbuf._submitMessage(CMD_CAN_RECV, (ts, message))
     arbid, data = canbuf._splitCanMsg(message)
 
     if arbids:
@@ -184,7 +184,9 @@ class CanInterface(object):
             self._consumeInterface(orig_iface)
             return
 
-        self._go = False
+        self.init(port, baud, verbose, cmdhandlers, comment, load_filename, orig_iface, max_msgs)
+
+    def init(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
         self._inbuf = ''
         self._trash = []
         self._messages = {}
@@ -193,6 +195,7 @@ class CanInterface(object):
         self._config = {}
 
         self._config['shutdown'] = False
+        self._config['go'] = False
         self._max_msgs = self._config['max_msgs'] = max_msgs
         self.verbose = self._config['verbose'] = verbose
         self.port = self._config['port'] = port
@@ -228,10 +231,12 @@ class CanInterface(object):
 
         if self.port != None:
             self._reconnect()
-            self._startRxThread()
+
+        # just start the receive thread, it's lightweight and you never know when you may want it.
+        self._startRxThread()
 
     def _startRxThread(self):
-        self._go = True
+        self._config['go'] = True
         self._commsthread = threading.Thread(target=self._rxtx)
         self._commsthread.setDaemon(True)
         self._commsthread.start()
@@ -243,7 +248,7 @@ class CanInterface(object):
         self._cmdhandlers[cmd] = None
 
     def _consumeInterface(self, other):
-        other._go = False
+        other._config['go'] = False
 
         for k,v in vars(other).items():
             setattr(self, k, v)
@@ -312,7 +317,7 @@ class CanInterface(object):
 
         while not self._config['shutdown']:
             try:    
-                if not self._go:
+                if not self._config['go']:
                     time.sleep(.04)
                     continue
 
@@ -392,14 +397,18 @@ class CanInterface(object):
                         finally:
                             self._queuelock.release()
 
+                        # generate the timestamp here
+                        timestamp = time.time()
+                        tsmsg = (timestamp, message)
+
                         #if we have a handler, use it
                         cmdhandler = self._cmdhandlers.get(cmd)
                         if cmdhandler != None:
-                            cmdhandler(message, self)
+                            cmdhandler(tsmsg, self)
 
                         # otherwise, file it
                         else:
-                            self._submitMessage(cmd, message)
+                            self._submitMessage(cmd, tsmsg)
                         self._rxtx_state = RXTX_SYNC
 
                 
@@ -407,12 +416,11 @@ class CanInterface(object):
                 if self.verbose:
                     sys.excepthook(*sys.exc_info())
 
-    def _submitMessage(self, cmd, message):
+    def _submitMessage(self, cmd, tsmsg):
         '''
         submits a message to the cmd mailbox.  creates mbox if doesn't exist.
         *threadsafe*
         '''
-        timestamp = time.time()
 
         mbox = self._messages.get(cmd)
         if mbox == None:
@@ -422,7 +430,7 @@ class CanInterface(object):
 
         try:
             self._queuelock.acquire()
-            mbox.append((timestamp, message))
+            mbox.append(tsmsg)
             self._msg_events[cmd].set()
 
         except Exception, e:
@@ -430,7 +438,7 @@ class CanInterface(object):
 
         finally:
             self._queuelock.release()
-        return len(mbox)-1, timestamp
+        return len(mbox)-1
 
     def log(self, message, verbose=2):
         '''
@@ -456,6 +464,7 @@ class CanInterface(object):
                     self._queuelock.release()
 
                 return timestamp, message
+
             time.sleep(.01)
         return None, None
 
@@ -1004,7 +1013,11 @@ class CanInterface(object):
         self.bookmarks = me.get('bookmarks')
         self.bookmark_info = me.get('bookmark_info')
         self.comments = me.get('comments')
-        self._config = me.get('config')
+
+        # handle previous versions
+        ver = me.get('file_version')
+        if ver is not None:
+            self._config = me.get('config')
 
     def saveSessionToFile(self, filename=None):
         '''
