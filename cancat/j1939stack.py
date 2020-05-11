@@ -404,7 +404,7 @@ class J1939Interface(cancat.CanInterface):
                 j1939.clearTPmsgParts(da, sa)
 
             # store extended message information for other stuff...
-            extmsgs = j1939.getTPmsgParts(sa, da, create=True)
+            extmsgs = j1939.getTPmsgParts(da, sa, create=True)
             extmsgs['ts'] = ts
             extmsgs['sa'] = sa
             extmsgs['da'] = da
@@ -445,7 +445,7 @@ class J1939Interface(cancat.CanInterface):
             j1939.log('pf=0xeb: TP ERROR: NO DATA!')
             return
 
-        extmsgs = j1939.getTPmsgParts(sa, da)
+        extmsgs = j1939.getTPmsgParts(da, sa)
         if extmsgs is None:
             j1939.log("TP_DT: haven't received TP_CM control setup, skipping")
             return
@@ -458,7 +458,6 @@ class J1939Interface(cancat.CanInterface):
             pgn1 = extmsgs['pgn1']
             pgn0 = extmsgs['pgn0']
             mtype = extmsgs['type']
-            da = pgn2
 
             j1939.saveTPmsg(da, sa, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), mtype)
             j1939.clearTPmsgParts(da, sa)
@@ -566,12 +565,32 @@ class J1939Interface(cancat.CanInterface):
 
         if da != ps:
             print "saveTPmsg: WARNING: da: 0x%x  but ps: 0x%x.  using ps" % (da, ps)
-            print sa, da, pgn, repr(msg)
+            print da, sa, pgn, repr(msg)
         arbtup = prio, edp, dp, pf, ps, sa
         self._submitJ1939Message(arbtup, msg)
 
     def getCanMsgQueue(self):
         return self._messages.get(J1939MSGS)
+
+    def _getLocals(self, idx, ts, arbtup, data):
+        #print "getLocals:",idx, ts, arbtup, data
+        prio, edp, dp, pf, ps, sa = arbtup
+        pgn = (pf << 8) | ps
+        lcls = {'idx': idx,
+                'ts': ts,
+                'data': data,
+                'priority': prio,
+                'edp': edp,
+                'dp': dp,
+                'pf': pf,
+                'ps': ps,
+                'sa': sa,
+                'pgn': pgn,
+                'da': ps,
+                'ge': ps,
+                }
+
+        return lcls
 
     def genCanMsgs(self, start=0, stop=None, arbids=None, tail=False, maxsecs=None):
         '''
@@ -627,7 +646,7 @@ class J1939Interface(cancat.CanInterface):
 
             # now actually handle messages
             # here's where we get J1939 specific...
-            print messages[idx]
+            #print messages[idx]
             ts, arbtup, data = messages[idx]
             #datatup = self._splitCanMsg(msg)
 
