@@ -825,3 +825,116 @@ class J1939Interface(cancat.CanInterface):
 
         '''
 
+MAX_WORD = 64
+bu_masks = [(2 ** (i)) - 1 for i in range(8*MAX_WORD+1)]
+
+def reprSPNdata(spnlist, msg):
+    spnlines = []
+    # loop through the SPNs listed for this PGN
+
+def parsePGNData(pf, ps, msg):
+
+    # piece the correct PGN together from PF/PS
+    if pf < 0xec:
+        pgn = pf << 8
+    else:
+        pgn = (pf << 8) | ps
+
+    # grab the PGN data
+    res = J1939PGNdb.get(pgn)
+    out = {'pgn': pgn, 'pgndata': res}
+
+    spnlist = res.get('SPNs')
+    spndata = []
+
+    for spnum in spnlist:
+        # get SPN data
+        spn = J1939SPNdb.get(spnum)
+        if spn is None:
+            continue
+
+        # graciously refactored code from TruckDevil (hey LBD!)
+        spnlen = spn.get('SPNLength')
+        pgnlen = spn.get('PGNLength')
+        spnName = spn.get('Name')
+        spnRepr = ''
+        datanum = -1
+        units = spn.get("Units")
+
+        # skip variable-length PGNs for now
+        if (type(pgnlen) == str and 'ariable' in pgnlen):
+            datablob = msg
+
+        else:
+            startBit = spn.get('StartBit')
+            endBit = spn.get('EndBit')
+
+            startByte = startBit / 8
+            startBitO = startBit % 8
+            endByte = (endBit + 7) / 8
+            endBitO = endBit % 8
+
+            datablob = msg[startByte:endByte]
+
+        #print "sb: %d\t eb: %d\t sB:%d\t SBO:%d\t eB:%d\t eBO:%d\t %r" % (startBit, endBit, startByte, startBitO, endByte, endBitO, datablob)
+
+        if units == 'ASCII':
+            spnRepr = repr(datablob)
+            datanum = datablob
+
+        else:
+            try:
+                # carve out the number
+                datanum = 0
+                numbytes = struct.unpack('%dB' % len(datablob), datablob)
+                for n in numbytes:
+                    datanum <<= 8
+                    datanum |= n
+
+                datanum >>= (7 - endBitO)
+                #print "datanum: %x" % datanum
+                mask = bu_masks[endBit - startBit + 1]
+                datanum &= mask
+                #print "datanum: %x (mask: %x)" % (datanum, mask)
+
+                # make sense of the number based on units
+                if units == 'bit':
+                    meaning = ''
+                    bitdecode = J1939BitDecodings.get(spnum)
+                    if bitdecode is not None:
+                        meaning = bitdecode.get(datanum)
+
+                    spnData = '0x%x (%s)' % (datanum, meaning)
+
+                elif units == 'binary':
+                    spnData = bin(datanum)
+
+                else:
+                    # some other unit with a resolution
+                    datanum = 0
+                    numbytes = struct.unpack('%dB' % len(datablob), datablob)
+                    for n in numbytes:
+                        datanum <<= 8
+                        datanum |= n
+
+                    datanum >> (7 - endBitO)
+
+                    resolution = spn.get('Resolution')
+                    if resolution is not None:
+                        datanum *= resolution
+
+                    offset = spn.get('Offset')
+                    if offset is not None:
+                        datanum + offset
+
+                    spnData = '%.3f %s' % (datanum, units)
+
+            except Exception as e:
+                spnData = "ERROR"
+                print "SPN: %r %r (%r)" % (e, msg, spn)
+
+        spndata.append((spnum, spn, units, datanum, spnRepr))
+
+    out['spns'] = spndata
+    return out
+
