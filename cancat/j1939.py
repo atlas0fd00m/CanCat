@@ -604,7 +604,7 @@ class J1939(cancat.CanInterface):
         self._mhe_queue.put((pfhandler, idx, ts, arbtup, data))
 
     def _mhe_runner(self):
-        while self._go:
+        while self._config['go']:
             worktup = None
             try:
                 worktup = self._mhe_queue.get(1)

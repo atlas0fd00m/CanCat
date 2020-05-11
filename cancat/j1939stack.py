@@ -11,6 +11,32 @@ This module focuses around PGNs.  All messages are handled and sorted by their P
 
 J1939MSGS = 1939
 
+
+def parseArbid(arbid):
+    (prioPlus,
+        pf,
+        ps,
+        sa) = struct.unpack('BBBB', struct.pack(">I", arbid))
+
+    prio = prioPlus >> 2
+    edp = (prioPlus >> 1) & 1
+    dp = prioPlus & 1
+
+    return prio, edp, dp, pf, ps, sa
+
+
+def meldExtMsgs(msgs):
+    out = []
+    length = msgs.get('totsize')
+    for arbtup, msg in msgs.get('msgs'):
+        out.append(msg[1:])
+
+    outval = ''.join(out)
+    outval = outval[:length]
+
+    return outval
+
+
 class J1939Interface(cancat.CanInterface):
     def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, process_can_msgs=True, promisc=True):
         self._last_recv_idx = -1
@@ -27,6 +53,9 @@ class J1939Interface(cancat.CanInterface):
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
 
         # setup the message handler event offload thread
+        if self._config.get('myIDs') is None:
+            self._config['myIDs'] = []
+
         self._mhe_queue = Queue.Queue()
         mhethread = threading.Thread(target=self._mhe_runner)
         mhethread.setDaemon(True)
@@ -34,9 +63,6 @@ class J1939Interface(cancat.CanInterface):
         self._threads.append(mhethread)
 
         self.register_handler(CMD_CAN_RECV, self._j1939_can_handler)
-
-        if self._config.get('myIDs') is None:
-            self._config['myIDs'] = []
 
         if process_can_msgs:
             self.processCanMessages()
@@ -97,18 +123,12 @@ class J1939Interface(cancat.CanInterface):
 
         # hack: should watch for CM_EOM
 
-    #def _reprCanMsg(self, idx, ts, arbid, data, comment=None):
-    def _reprCanMsg(self, *args, **kwargs):
-        '''
-        FIXME later
-        '''
-        print "_reprCanMsg: %r   %r" % (args, kwargs)
-        return
+    def _reprCanMsg(self, idx, ts, arbtup, data, comment=None):
+        #print "_reprCanMsg: %r   %r" % (args, kwargs)
 
         if comment == None:
             comment = ''
 
-        arbtup = parseArbid(arbid)
         prio, edp, dp, pf, ps, sa = arbtup
 
         # give name priority to the Handler, then the manual name (this module), then J1939PGNdb
@@ -137,11 +157,11 @@ class J1939Interface(cancat.CanInterface):
                     pfmeaning = enhanced
 
         elif not len(pfmeaning):
-            pgn = (pf<<8) | ps
+            pgn = (pf << 8) | ps
             res = J1939PGNdb.get(pgn)
-            if res == None:
-                res = J1939PGNdb.get(pf<<8)
-            if res != None:
+            if res is None:
+                res = J1939PGNdb.get(pf << 8)
+            if res is not None:
                 pfmeaning = res.get("Name")
 
         return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Data: %-18s  %s\t\t%s%s" % \
@@ -296,6 +316,10 @@ class J1939Interface(cancat.CanInterface):
     def ec_handler(j1939, arbtup, data, ts):
         '''
         special handler for TP_CM messages
+
+        pgn2 is PS/DA
+        pgn1 is PF
+        pgn0 is prio/edp/dp
         '''
         def tp_cm_10(arbtup, data, j1939):     # RTS
             (prio, edp, dp, pf, da, sa) = arbtup
@@ -309,7 +333,7 @@ class J1939Interface(cancat.CanInterface):
                 pgn2 = extmsgs['pgn2']
                 pgn1 = extmsgs['pgn1']
                 pgn0 = extmsgs['pgn0']
-                j1939.saveTPmsg(sa, da, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN)
+                j1939.saveTPmsg(da, sa, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN)
                 j1939.clearTPmsgParts(da, sa)
 
             # store extended message information for other stuff...
@@ -375,9 +399,9 @@ class J1939Interface(cancat.CanInterface):
                 pgn2 = extmsgs['pgn2']
                 pgn1 = extmsgs['pgn1']
                 pgn0 = extmsgs['pgn0']
-                j1939.saveTPmsg(sa, da, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN)
+                j1939.saveTPmsg(da, sa, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN)
 
-            j1939.clearTPmsgParts(da, sa)
+                j1939.clearTPmsgParts(da, sa)
 
             # store extended message information for other stuff...
             extmsgs = j1939.getTPmsgParts(sa, da, create=True)
@@ -434,8 +458,9 @@ class J1939Interface(cancat.CanInterface):
             pgn1 = extmsgs['pgn1']
             pgn0 = extmsgs['pgn0']
             mtype = extmsgs['type']
+            da = pgn2
 
-            j1939.saveTPmsg(sa, da, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), mtype)
+            j1939.saveTPmsg(da, sa, (pgn2, pgn1, pgn0), meldExtMsgs(extmsgs), mtype)
             j1939.clearTPmsgParts(da, sa)
 
             # if this is the end of a message to *me*, reply accordingly
@@ -508,33 +533,40 @@ class J1939Interface(cancat.CanInterface):
         * otherwise, if the list 
         '''
         exists = False
-        if da != None:
+        if da is None:
             msglists = self._TPmsgParts.get(sa)
-            exists = bool(msglists != None and len(msglists))
+            exists = bool(msglists is not None and len(msglists))
             self._TPmsgParts[sa] = {}
             return exists
 
         msglists = self._TPmsgParts.get(sa)
-        if msglists == None:
+        if msglists is None:
             msglists = {}
             self._TPmsgParts[sa] = msglists
 
-        mlist = msglists.get(da, {'length':0})
-        msglists[da] = {'length':0, 'msgs':[], 'type':None, 'adminmsgs':[]}
-        return bool(mlist['length'])
+        if da in msglists:
+            msglists.pop(da)
+            return True
 
-    def saveTPmsg(self, sa, da, pgn, msg, tptype):
+        return False
+
+    def saveTPmsg(self, da, sa, pgn, msg, tptype):
         '''
         # functions to support the J1939TP Stack (real stuff, not just repr)
         store a TP message.
         '''
-        pgn2, pf, ps = pgn
-        prio = pgn2 >> 2
-        edp = (pgn2 >> 1) & 1
-        dp = pgn2 & 1
+        pgn2, pgn1, pgn0 = pgn
+
+        ps = pgn2
+        pf = pgn1
+
+        prio = pgn0 >> 2
+        edp = (pgn0 >> 1) & 1
+        dp = pgn0 & 1
+
         if da != ps:
-            print "saveTPmsg: WARNING: da: 0x%x  but ps: 0x%x.  using da" % (da, ps)
-            ps = da
+            print "saveTPmsg: WARNING: da: 0x%x  but ps: 0x%x.  using ps" % (da, ps)
+            print sa, da, pgn, repr(msg)
         arbtup = prio, edp, dp, pf, ps, sa
         self._submitJ1939Message(arbtup, msg)
 

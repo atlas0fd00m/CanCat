@@ -232,11 +232,11 @@ class CanInterface(object):
         if self.port != None:
             self._reconnect()
 
-        # just start the receive thread, it's lightweight and you never know when you may want it.
-        self._startRxThread()
+            # just start the receive thread, it's lightweight and you never know when you may want it.
+            self._startRxThread()
+        self._config['go'] = True
 
     def _startRxThread(self):
-        self._config['go'] = True
         self._commsthread = threading.Thread(target=self._rxtx)
         self._commsthread.setDaemon(True)
         self._commsthread.start()
@@ -318,7 +318,7 @@ class CanInterface(object):
         while not self._config['shutdown']:
             try:    
                 if not self._config['go']:
-                    time.sleep(.04)
+                    time.sleep(.4)
                     continue
 
                 if self.verbose > 4:
