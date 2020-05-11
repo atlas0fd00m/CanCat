@@ -1,6 +1,13 @@
-from cancat.j1939 import *
+#from cancat.j1939 import *
 # we can move things into here if we decide this replaces the exiting j1939 modules
+import cancat
+import struct
+from J1939db import *
+from cancat import *
+from cancat.vstruct.bitfield import *
 
+import Queue
+import threading
 ''' 
 This is a J1939 Stack module.
 It's purpose is to provide a J1939-capable object which extends (consumes) CanCat's CanInterface module, and provides a J1939 interface.
@@ -11,6 +18,50 @@ This module focuses around PGNs.  All messages are handled and sorted by their P
 
 J1939MSGS = 1939
 
+PF_RQST =       0xea
+PF_TP_DT =      0xeb
+PF_TP_CM =      0xec
+PF_ADDRCLAIM =  0xee
+PF_PROPRIETRY=  0xef
+PF_KWP1 =       0xdb
+PF_KWP2 =       0xda
+PF_KWP3 =       0xce
+PF_KWP4 =       0xcd
+
+CM_RTS   =       0x10
+CM_CTS   =       0x11
+CM_EOM   =       0x13
+CM_ABORT =       0xff
+CM_BAM   =       0x20
+
+TP_BAM = 20
+TP_DIRECT = 10
+TP_DIRECT_BROKEN=9
+
+class NAME(VBitField):
+    def __init__(self):
+        VBitField.__init__(self)
+        self.arbaddrcap = v_bits(1)
+        self.ind_group = v_bits(3)
+        self.vehicle_system_instance = v_bits(4)
+        self.vehicle_system = v_bits(7)
+        self.reserved = v_bits(1)
+        self.function = v_bits(8)
+        self.function_instance = v_bits(5)
+        self.ecu_instance = v_bits(3)
+        self.mfg_code = v_bits(11)
+        self.identity_number = v_bits(21)
+
+    def minrepr(self):
+        mfgname = mfg_lookup.get(self.mfg_code)
+        return "id: 0x%x mfg: %s" % (self.identity_number, mfgname)
+
+
+def parseName(name):
+    namebits= NAME()
+    rname = name[::-1]
+    namebits.vsParse(rname)
+    return namebits
 
 def parseArbid(arbid):
     (prioPlus,
@@ -36,9 +87,54 @@ def meldExtMsgs(msgs):
 
     return outval
 
+### renderers for specific PF numbers
+def pf_c9(idx, ts, arbtup, data, j1939):
+    b4 = data[3]
+    req = "%.2x %.2x %.2x" % ([ord(d) for d in data[:3]])
+    usexferpfn = ('', 'Use_Transfer_PGN', 'undef', 'NA')[b4 & 3]
+    
+    return "Request2: %s %s" % (req,  usexferpgn)
+
+def pf_ea(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+    return "Request: %s" % (data[:3].encode('hex'))
+
+# no pf_eb or pf_ec since those are handled at a lower-level in this stack
+
+def pf_ee(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+    if ps == 255 and sa == 254:
+        return 'CANNOT CLAIM ADDRESS'
+    
+    addrinfo = parseName(data).minrepr()
+    return "Address Claim: %s" % addrinfo
+
+def pf_ef(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+    if dp:
+        return 'Proprietary A2'
+
+    return 'Proprietary A1'
+    
+def pf_ff(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+    pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, data.encode('hex'))
+    return "Proprietary B %s" % pgn
+
+pgn_pfs = {
+        0x93:   ("Name Management", None),
+        0xc9:   ("Request2",        pf_c9),
+        0xca:   ('Transfer',        None),
+        0xe8:   ("ACK        ",     None),
+        0xea:   ("Request      ",   pf_ea),
+        0xeb:   ("TP.DT (WTF?)",    None),
+        0xec:   ("TP.CM (WTF?)",    None),
+        0xee:   ("Address Claim",   pf_ee),
+        0xef:   ("Proprietary",     pf_ef),
+        #0xfe:   ("Command Address", None),
+        0xff:   ("Proprietary B",   pf_ff),
+        }
+
 
 class J1939Interface(cancat.CanInterface):
-    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, process_can_msgs=True, promisc=True):
+    _msg_source_idx = J1939MSGS
+    def __init__(self, port=None, baud=cancat.baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, process_can_msgs=True, promisc=True):
         self._last_recv_idx = -1
         self._threads = []
         self._j1939_filters = []
@@ -48,9 +144,8 @@ class J1939Interface(cancat.CanInterface):
         self.maxMsgsPerPGN = 0x200
         self._j1939_msg_listeners = []
         self.promisc = promisc
-        self._msg_source_idx = J1939MSGS    # FIXME: take us back to using standard _messages with this as the key
 
-        CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
+        cancat.CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
 
         # setup the message handler event offload thread
         if self._config.get('myIDs') is None:
@@ -569,9 +664,6 @@ class J1939Interface(cancat.CanInterface):
         arbtup = prio, edp, dp, pf, ps, sa
         self._submitJ1939Message(arbtup, msg)
 
-    def getCanMsgQueue(self):
-        return self._messages.get(J1939MSGS)
-
     def _getLocals(self, idx, ts, arbtup, data):
         #print "getLocals:",idx, ts, arbtup, data
         prio, edp, dp, pf, ps, sa = arbtup
@@ -628,6 +720,13 @@ class J1939Interface(cancat.CanInterface):
             if maxsecs != None and time.time() > maxsecs+starttime:
                 return
         
+            # If we start sniffing before we receive any messages, 
+            # messages will be "None". In this case, each time through
+            # this loop, check to see if we have messages, and if so,
+            # re-create the messages handle
+            if messages == None:
+                messages = self.getCanMsgQueue()
+        
             # if we're off the end of the original request, and "tailing"
             if tail and idx >= stop:
                 msgqlen = len(messages) 
@@ -636,8 +735,8 @@ class J1939Interface(cancat.CanInterface):
                 if stop == msgqlen:
                     self.log("waiting for messages", 3)
                     # wait for trigger event so we're not constantly polling
-                    self._msg_events[CMD_CAN_RECV].wait(1)
-                    self._msg_events[CMD_CAN_RECV].clear()
+                    self._msg_events[self._msg_source_idx].wait(1)
+                    self._msg_events[self._msg_source_idx].clear()
                     self.log("received 'new messages' event trigger", 3)
 
                 # we've gained some messages since last check...
@@ -869,9 +968,9 @@ def parsePGNData(pf, ps, msg):
             startBit = spn.get('StartBit')
             endBit = spn.get('EndBit')
 
-            startByte = startBit / 8
+            startByte = startBit // 8
             startBitO = startBit % 8
-            endByte = (endBit + 7) / 8
+            endByte = (endBit + 7) // 8
             endBitO = endBit % 8
 
             datablob = msg[startByte:endByte]
@@ -895,6 +994,10 @@ def parsePGNData(pf, ps, msg):
                 #print "datanum: %x" % datanum
                 mask = bu_masks[endBit - startBit + 1]
                 datanum &= mask
+
+                offset = spn.get('Offset')
+                if offset is not None:
+                    datanum += offset
                 #print "datanum: %x (mask: %x)" % (datanum, mask)
 
                 # make sense of the number based on units
@@ -909,23 +1012,14 @@ def parsePGNData(pf, ps, msg):
                 elif units == 'binary':
                     spnData = bin(datanum)
 
+                elif units == '%':
+                    spnData = "%d%%" % datanum
+
                 else:
                     # some other unit with a resolution
-                    datanum = 0
-                    numbytes = struct.unpack('%dB' % len(datablob), datablob)
-                    for n in numbytes:
-                        datanum <<= 8
-                        datanum |= n
-
-                    datanum >> (7 - endBitO)
-
                     resolution = spn.get('Resolution')
                     if resolution is not None:
                         datanum *= resolution
-
-                    offset = spn.get('Offset')
-                    if offset is not None:
-                        datanum + offset
 
                     spnData = '%.3f %s' % (datanum, units)
 

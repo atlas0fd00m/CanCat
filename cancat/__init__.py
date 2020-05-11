@@ -174,6 +174,7 @@ class SPECIAL_CASE(object):
 DONT_PRINT_THIS_MESSAGE = SPECIAL_CASE
 
 class CanInterface(object):
+    _msg_source_idx = CMD_CAN_RECV
     def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
         '''
         CAN Analysis Workspace
@@ -305,7 +306,7 @@ class CanInterface(object):
 
         returns a list of the messages
         '''
-        return self.recvall(CMD_CAN_RECV)
+        return self.recvall(self._msg_source_idx)
 
     def _rxtx(self):
         '''
@@ -817,7 +818,7 @@ class CanInterface(object):
         for use with tail
         '''
 
-        messages = self._messages.get(CMD_CAN_RECV, None)
+        messages = self.getCanMsgQueue()
 
         # get the ts of the first received message
         if messages != None and len(messages):
@@ -849,7 +850,7 @@ class CanInterface(object):
             # this loop, check to see if we have messages, and if so,
             # re-create the messages handle
             if messages == None:
-                messages = self._messages.get(CMD_CAN_RECV, None)
+                messages = self._messages.get(self._msg_source_idx, None)
         
             # if we're off the end of the original request, and "tailing"
             if messages != None:
@@ -860,8 +861,8 @@ class CanInterface(object):
                     if stop == msglen:
                         self.log("waiting for messages", 3)
                         # wait for trigger event so we're not constantly polling
-                        self._msg_events[CMD_CAN_RECV].wait(1)
-                        self._msg_events[CMD_CAN_RECV].clear()
+                        self._msg_events[self._msg_source_idx].wait(1)
+                        self._msg_events[self._msg_source_idx].clear()
                         self.log("received 'new messages' event trigger", 3)
 
                     # we've gained some messages since last check...
@@ -897,11 +898,18 @@ class CanInterface(object):
         data = msg[4:]
         return arbid, data
 
+    def getCanMsgQueue(self):
+        '''
+        returns the list of interface/CAN messages for this object
+        for CanInterface, this is self._messages[CMD_CAN_RECV]
+        '''
+        return self._messages.get(self._msg_source_idx)
+
     def getCanMsgCount(self):
         '''
         the number of CAN messages we've received this session
         '''
-        canmsgs = self._messages.get(CMD_CAN_RECV, [])
+        canmsgs = self._messages.get(self._msg_source_idx, [])
         return len(canmsgs)
 
     def printSessionStatsByBookmark(self, start=None, stop=None):
@@ -1065,7 +1073,7 @@ class CanInterface(object):
 
         DON'T USE CANrecv or recv(CMD_CAN_RECV) with Bookmarks or Snapshots!!
         '''
-        mbox = self._messages.get(CMD_CAN_RECV)
+        mbox = self._messages.get(self._msg_source_idx)
         if mbox == None:
             msg_index = 0
         else:

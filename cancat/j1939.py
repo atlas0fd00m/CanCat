@@ -22,6 +22,10 @@ CM_EOM   =       0x13
 CM_ABORT =       0xff
 CM_BAM   =       0x20
 
+TP_BAM = 20
+TP_DIRECT = 10
+TP_DIRECT_BROKEN=9
+
 class NAME(VBitField):
     def __init__(self):
         VBitField.__init__(self)
@@ -451,10 +455,6 @@ pfhandlers = {
         PF_TP_CM : ec_handler,
         PF_TP_DT : eb_handler,
         }
-TP_BAM = 20
-TP_DIRECT = 10
-TP_DIRECT_BROKEN=9
-
 class TimeoutException(Exception):
     pass
 
