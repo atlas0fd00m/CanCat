@@ -1,3 +1,5 @@
+import traceback
+
 #from cancat.j1939 import *
 # we can move things into here if we decide this replaces the exiting j1939 modules
 import cancat
@@ -221,7 +223,7 @@ class J1939Interface(cancat.CanInterface):
     def _reprCanMsg(self, idx, ts, arbtup, data, comment=None):
         #print "_reprCanMsg: %r   %r" % (args, kwargs)
 
-        if comment == None:
+        if comment is None:
             comment = ''
 
         prio, edp, dp, pf, ps, sa = arbtup
@@ -230,12 +232,12 @@ class J1939Interface(cancat.CanInterface):
         pfmeaning, handler = pgn_pfs.get(pf, ('',None))
         nextline = ''
 
-        if handler != None:
+        if handler is not None:
             enhanced = handler(idx, ts, arbtup, data, self)
             if enhanced == cancat.DONT_PRINT_THIS_MESSAGE:
                 return enhanced
 
-            if enhanced != None:
+            if enhanced is not None:
                 if type(enhanced) in (list, tuple) and len(enhanced):
                     pfmeaning = enhanced[0]
                     if len(enhanced) > 1:
@@ -252,12 +254,17 @@ class J1939Interface(cancat.CanInterface):
                     pfmeaning = enhanced
 
         elif not len(pfmeaning):
-            pgn = (pf << 8) | ps
-            res = J1939PGNdb.get(pgn)
-            if res is None:
-                res = J1939PGNdb.get(pf << 8)
-            if res is not None:
-                pfmeaning = res.get("Name")
+            pgndata = parsePGNData(pf, ps, data)
+            pfmeaning = pgndata.get('pgndata').get('Name')
+            lines = []
+
+            if self.verbose:
+                for spnum, spdict, spunit, spdata, sprepr in pgndata.get('spns'):
+                    spnName = spdict.get('Name')
+                    lines.append('      SPN(%d): %-20s \t %s' % (spnum, sprepr, spnName))
+
+                if len(lines):
+                    nextline = '\n' + '\n'.join(lines)
 
         return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Data: %-18s  %s\t\t%s%s" % \
                 (idx, ts, prio, edp, dp, pf, ps, sa, data.encode('hex'), pfmeaning, comment, nextline)
@@ -302,7 +309,7 @@ class J1939Interface(cancat.CanInterface):
                 worktup = None
                 try:
                     worktup = self._mhe_queue.get(1)
-                    if worktup == None:
+                    if worktup is None:
                         continue
 
                     pfhandler, arbtup, data, ts = worktup
@@ -353,29 +360,36 @@ class J1939Interface(cancat.CanInterface):
                 except Exception, e:
                     self.log('_submitJ1939Message: ERROR: %r' % e)
             
-            if handled:
+            # check for any J1939 registered handlers (using the default system handlers):
+            cmdhandler = self._cmdhandlers.get(J1939MSGS)
+            if cmdhandler is not None:
+                handled2 = cmdhandler(tsmsg, self)
+
+            if handled and handled2:
+                #print "handled"
                 return
 
             ##::: TODO, make this a listener.  if at all...
             #dr = self._messages.get(datarange)
-            #if dr == None:
+            #if dr is None:
                 #dr = {}
                 #self._messages[datarange] = dr
             #
             ## factor in multicast vs. unicast...
             #mbox = dr.get(pf)
-            #if mbox == None:
+            #if mbox is None:
                 #mbox = []
                 #dr[pf] = mbox
                 #self._j1939_msg_events[pf] = threading.Event()
 
+            # file in the mailbox
             mbox = self._messages.get(J1939MSGS)
-            if mbox == None:
+            if mbox is None:
                 mbox = []
                 self._messages[J1939MSGS] = mbox
 
             msgevt = self._j1939_msg_events.get(J1939MSGS)
-            if msgevt == None:
+            if msgevt is None:
                 msgevt = threading.Event()
                 self._j1939_msg_events[J1939MSGS] = msgevt
 
@@ -424,7 +438,7 @@ class J1939Interface(cancat.CanInterface):
             
             # check for old stuff
             extmsgs = j1939.getTPmsgParts(da, sa)
-            if extmsgs != None and len(extmsgs['msgs']):
+            if extmsgs is not None and len(extmsgs['msgs']):
                 pgn2 = extmsgs['pgn2']
                 pgn1 = extmsgs['pgn1']
                 pgn0 = extmsgs['pgn0']
@@ -490,7 +504,7 @@ class J1939Interface(cancat.CanInterface):
 
             # check for old stuff
             extmsgs = j1939.getTPmsgParts(da, sa)
-            if extmsgs != None and len(extmsgs['msgs']):
+            if extmsgs is not None and len(extmsgs['msgs']):
                 pgn2 = extmsgs['pgn2']
                 pgn1 = extmsgs['pgn1']
                 pgn0 = extmsgs['pgn0']
@@ -525,10 +539,10 @@ class J1939Interface(cancat.CanInterface):
         #print "ec: %.2x%.2x %.2x" % (arbtup[3], arbtup[4], cb)
 
         htup = tp_cm_handlers.get(cb)
-        if htup != None:
+        if htup is not None:
             subname, cb_handler = htup
 
-            if cb_handler != None:
+            if cb_handler is not None:
                 cb_handler(arbtup, data, j1939)
 
     def eb_handler(j1939, arbtup, data, ts):
@@ -559,7 +573,7 @@ class J1939Interface(cancat.CanInterface):
 
             # if this is the end of a message to *me*, reply accordingly
             if da in j1939._config['myIDs']:
-                if mtype == None:
+                if mtype is None:
                     j1939.log("TP_DT_handler: missed beginning of message, not sending EOM: %r" % \
                             repr(extmsgs), 1)
                     return
@@ -592,12 +606,12 @@ class J1939Interface(cancat.CanInterface):
         if no list exists for this pairing, one is created and an empty list is returned
         '''
         msglists = self._TPmsgParts.get(sa)
-        if msglists == None:
+        if msglists is None:
             msglists = {}
             self._TPmsgParts[sa] = msglists
 
         mlist = msglists.get(da)
-        if mlist == None and create:
+        if mlist is None and create:
             # create something new
             mlist = {'length':0, 
                     'msgs':[], 
@@ -620,10 +634,10 @@ class J1939Interface(cancat.CanInterface):
         # functions to support the J1939TP Stack (real stuff, not just repr)
         clear out extended messages metadata.
 
-        if da == None, this clears *all* message data for a given source address
+        if da is None, this clears *all* message data for a given source address
 
         returns whether the thing deleted exists previously
-        * if da == None, returns whether the sa had anything previously
+        * if da is None, returns whether the sa had anything previously
         * otherwise, if the list 
         '''
         exists = False
@@ -694,19 +708,19 @@ class J1939Interface(cancat.CanInterface):
         '''
 
         messages = self.getCanMsgQueue()
-        if messages == None and not tail:
+        if messages is None and not tail:
             return
 
         # get the ts of the first received message
-        if messages != None and len(messages):
+        if messages is not None and len(messages):
             startts = messages[0][0]
         else:
             startts = time.time()
 
-        if start == None:
+        if start is None:
             start = self.getJ1939MsgCount()
 
-        if stop == None or tail:
+        if stop is None or tail:
             stop = len(messages)
         else:
             stop = stop + 1 # This makes the stop index inclusive if specified
@@ -717,14 +731,14 @@ class J1939Interface(cancat.CanInterface):
         while tail or idx < stop:
             # obey our time restrictions
             # placed here to ensure checking whether we're receiving messages or not
-            if maxsecs != None and time.time() > maxsecs+starttime:
+            if maxsecs is not None and time.time() > maxsecs+starttime:
                 return
         
             # If we start sniffing before we receive any messages, 
             # messages will be "None". In this case, each time through
             # this loop, check to see if we have messages, and if so,
             # re-create the messages handle
-            if messages == None:
+            if messages is None:
                 messages = self.getCanMsgQueue()
         
             # if we're off the end of the original request, and "tailing"
@@ -752,7 +766,7 @@ class J1939Interface(cancat.CanInterface):
             # make ts an offset instead of the real time.
             ts -= startts
 
-            #if arbids != None and arbid not in arbids:
+            #if arbids is not None and arbid not in arbids:
             #    # allow filtering of arbids
             #    idx += 1
             #    continue
@@ -764,7 +778,7 @@ class J1939Interface(cancat.CanInterface):
     def J1939recv(self, pf, ps, sa, msgcount=1, timeout=1, start_msg=None, update_last_recv=True):
         out = []
 
-        if start_msg == None:
+        if start_msg is None:
             start_msg = self._last_recv_idx
 
         #for msg in self.filterCanMsgs(start_msg=start_msg, advfilters=advfilters, tail=True, maxsecs=timeout):
@@ -803,7 +817,7 @@ class J1939Interface(cancat.CanInterface):
     def J1939recv_loose(self, pf=(), ps=None, sa=None, msgcount=1, timeout=1, start_msg=None, update_last_recv=True):
         out = []
 
-        if start_msg == None:
+        if start_msg is None:
             start_msg = self._last_recv_idx
 
         #for msg in self.filterCanMsgs(start_msg=start_msg, advfilters=advfilters, tail=True, maxsecs=timeout):
@@ -927,10 +941,6 @@ class J1939Interface(cancat.CanInterface):
 MAX_WORD = 64
 bu_masks = [(2 ** (i)) - 1 for i in range(8*MAX_WORD+1)]
 
-def reprSPNdata(spnlist, msg):
-    spnlines = []
-    # loop through the SPNs listed for this PGN
-
 def parsePGNData(pf, ps, msg):
 
     # piece the correct PGN together from PF/PS
@@ -946,6 +956,7 @@ def parsePGNData(pf, ps, msg):
     spnlist = res.get('SPNs')
     spndata = []
 
+    var_len_idx = 0
     for spnum in spnlist:
         # get SPN data
         spn = J1939SPNdb.get(spnum)
@@ -986,12 +997,14 @@ def parsePGNData(pf, ps, msg):
                 # carve out the number
                 datanum = 0
                 numbytes = struct.unpack('%dB' % len(datablob), datablob)
-                for n in numbytes:
-                    datanum <<= 8
-                    datanum |= n
+                for i, n in enumerate(numbytes):
+                    datanum |= (n << (8*i))
+                    #print "datanum (working): 0x%x   ::  0x%x" % (n, datanum)
+                    #datanum <<= 8
 
                 datanum >>= (7 - endBitO)
                 #print "datanum: %x" % datanum
+
                 mask = bu_masks[endBit - startBit + 1]
                 datanum &= mask
 
@@ -1007,13 +1020,13 @@ def parsePGNData(pf, ps, msg):
                     if bitdecode is not None:
                         meaning = bitdecode.get(datanum)
 
-                    spnData = '0x%x (%s)' % (datanum, meaning)
+                    spnRepr = '0x%x (%s)' % (datanum, meaning)
 
                 elif units == 'binary':
-                    spnData = bin(datanum)
+                    spnRepr = "%s (%x)" % (bin(int(datanum)), datanum)
 
                 elif units == '%':
-                    spnData = "%d%%" % datanum
+                    spnRepr = "%d%%" % datanum
 
                 else:
                     # some other unit with a resolution
@@ -1021,11 +1034,12 @@ def parsePGNData(pf, ps, msg):
                     if resolution is not None:
                         datanum *= resolution
 
-                    spnData = '%.3f %s' % (datanum, units)
+                    spnRepr = '%.3f %s' % (datanum, units)
 
             except Exception as e:
-                spnData = "ERROR"
+                spnRepr = "ERROR"
                 print "SPN: %r %r (%r)" % (e, msg, spn)
+                traceback.print_exc()
 
         spndata.append((spnum, spn, units, datanum, spnRepr))
 
