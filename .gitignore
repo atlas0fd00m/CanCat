@@ -1,2 +1,4 @@
+sketches/**/*.bin
+*.elf
 *.pyc
 build/
