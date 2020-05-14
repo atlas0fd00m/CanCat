@@ -1005,6 +1005,9 @@ class CanInterface(object):
         self.bookmark_info = me.get('bookmark_info')
         self.comments = me.get('comments')
 
+        for cmd in self._messages:
+            self._msg_events[cmd] = threading.Event()
+
     def saveSessionToFile(self, filename=None):
         '''
         Saves the current analysis session to the filename given
