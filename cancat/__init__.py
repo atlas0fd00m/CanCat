@@ -285,7 +285,7 @@ class CanInterface(object):
         '''
         Destructor, called when the CanInterface object is being garbage collected
         '''
-        if isinstance(self._io, serial.Serial):
+        if self._io and isinstance(self._io, serial.Serial):
             print "shutting down serial connection"
             self._io.close()
         self._shutdown = True
@@ -606,8 +606,8 @@ class CanInterface(object):
         if resval != 0:
             print "ISOTPxmit() failed: %s" % CAN_RESPS.get(resval)
 
-        msg = self._isotp_get_msg(rx_arbid, start_index = currIdx, service = service, timeout = timeout)
-        return msg
+        msg, idx = self._isotp_get_msg(rx_arbid, start_index = currIdx, service = service, timeout = timeout)
+        return msg, idx
 
     def _isotp_get_msg(self, rx_arbid, start_index=0, service=None, timeout=None):
         ''' 
@@ -618,6 +618,7 @@ class CanInterface(object):
         starttime = lasttime = time.time()
 
         while not complete and (not timeout or (lasttime-starttime < timeout)):
+            time.sleep(0.01)
             msgs = [msg for msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid])]
 
             if len(msgs):
@@ -631,25 +632,24 @@ class CanInterface(object):
                         # Check if this is the right service, or there was an error
                         if ord(msg[0]) == service or ord(msg[0]) == 0x7f:
                             msg_found = True
-                            return msg
+                            return msg, msgs[count-1][0]
 
                         print "Hey, we got here, wrong service code?"
-                        print msg.encode('hex')
                         start_index = msgs[count-1][0] + 1
                     else:
                         msg_found = True
-                        return msg
+                        return msg, msgs[count-1][0]
 
                 except iso_tp.IncompleteIsoTpMsg, e:
                     #print e # debugging only, this is expected
                     pass
 
-            time.sleep(0.1)
             lasttime = time.time()
             #print "_isotp_get_msg: status: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
 
-        print "_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
-        return None
+        if self.verbose:
+            print "_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout)
+        return None, start_index
 
     def CANsniff(self, start_msg=None, arbids=None, advfilters=[], maxmsgs=None):
         '''
@@ -2204,7 +2204,8 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     except ImportError, e:
         try:
             from IPython.terminal.interactiveshell import TerminalInteractiveShell
-            ipsh = TerminalInteractiveShell()
+            from IPython.terminal.ipapp import load_default_config
+            ipsh = TerminalInteractiveShell(config=load_default_config())
             ipsh.user_global_ns.update(gbls)
             ipsh.user_global_ns.update(lcls)
             ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!

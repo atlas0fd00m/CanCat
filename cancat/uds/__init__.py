@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import sys
 import time
 import cancat
@@ -7,48 +6,111 @@ import threading
 
 import cancat.iso_tp as cisotp
 
+# In 11-bit CAN, an OBD2 tester typically sends requests with an ID of 7DF, and 
+# can accept response messages on IDs 7E8 to 7EF, requests to a specific ECU can 
+# be sent from ID 7E0 to 7E7.  So the non-OBD2 range normally ends at 7D7, 
+# although I can't find a specific "standard" for this.
+#
+# In 29-bit CAN an OBD2 tester typically sends requests with an ID of 0x18DB33F1 
+# where 0x18DBxxxx indicates this is an OBD2 message, 0x33 indicates this 
+# message is for the OBD2 ECU(s), and 0xF1 is the tester.  Normal UDS messages 
+# use a prefix of 0x18DAxxxx.
+# 0xF1 is used as a tester address in normal UDS messaging as well.
+ARBID_CONSTS = {
+    '11bit': {
+        'prefix': 0x700,
+        'prefix_mask': 0xF00,
+        'resp_offset': 8,  # rxid is normally the txid + 8
+        'max_req_id': 0xF7,
+        'obd2_broadcast': 0x7DF,
+    },
+    '29bit': {
+        'prefix': 0x18DA0000,
+        'prefix_mask': 0xFFFF0000,
+        'destid_mask': 0x0000FF00,
+        'destid_shift': 8,
+        'srcid_mask': 0x000000FF,
+        'tester': 0xF1,
+        'obd2_broadcast': 0x18DA33F1,
+    }
+}
+
+ISO_14229_DIDS = {
+    0xF180: 'bootSoftwareIdentificationDataIdentifier',
+    0xF181: 'applicationSoftwareIdentificationDataIdentifier',
+    0xF182: 'applicationDataIdentificationDataIdentifier',
+    0xF183: 'bootSoftwareFingerprintDataIdentifier',
+    0xF184: 'applicationSoftwareFingerprintDataIdentifier',
+    0xF185: 'applicationDataFingerprintDataIdentifier',
+    0xF186: 'activeDiagnosticSessionDataIdentifier',
+    0xF187: 'vehicleManufacturerSparePartNumberDataIdentifier',
+    0xF188: 'vehicleManufacturerECUSoftwareNumberDataIdentifier',
+    0xF189: 'vehicleManufacturerECUSoftwareVersionNumberDataIdentifier',
+    0xF18A: 'systemSupplierIdentifierDataIdentifier',
+    0xF18B: 'ECUManufacturingDateDataIdentifier',
+    0xF18C: 'ECUSerialNumberDataIdentifier',
+    0xF18D: 'supportedFunctionalUnitsDataIdentifier',
+    0xF18E: 'vehicleManufacturerKitAssemblyPartNumberDataIdentifier',
+    0xF190: 'VINDataIdentifier',
+    0xF191: 'vehicleManufacturerECUHardwareNumberDataIdentifier',
+    0xF192: 'systemSupplierECUHardwareNumberDataIdentifier',
+    0xF193: 'systemSupplierECUHardwareVersionNumberDataIdentifier',
+    0xF194: 'systemSupplierECUSoftwareNumberDataIdentifier',
+    0xF195: 'systemSupplierECUSoftwareVersionNumberDataIdentifier',
+    0xF196: 'exhaustRegulationOrTypeApprovalNumberDataIdentifier',
+    0xF197: 'systemNameOrEngineTypeDataIdentifier',
+    0xF198: 'repairShopCodeOrTesterSerialNumberDataIdentifier',
+    0xF199: 'programmingDateDataIdentifier',
+    0xF19A: 'calibrationRepairShopCodeOrCalibrationEquipmentSerialNumberData-',
+    0xF19B: 'calibrationDateDataIdentifier',
+    0xF19C: 'calibrationEquipmentSoftwareNumberDataIdentifier',
+    0xF19D: 'ECUInstallationDateDataIdentifier',
+    0xF19E: 'ODXFileDataIdentifier',
+    0xF19F: 'entityDataIdentifier',
+}
+
 NEG_RESP_CODES = {
-        0x10:'GeneralReject',
-        0x11:'ServiceNotSupported',
-        0x12:'SubFunctionNotSupported',
-        0x13:'IncorrectMesageLengthOrInvalidFormat',
-        0x14:'ResponseTooLong',
-        0x21:'BusyRepeatRequest',
-        0x22:'ConditionsNotCorrect',
-        0x24:'RequestSequenceError',
-        0x25:'NoResponseFromSubnetComponent',
-        0x26:'FailurePreventsExecutionOfRequestedAction',
-        0x31:'RequestOutOfRange',
-        0x33:'SecurityAccessDenied',
-        0x35:'InvalidKey',
-        0x36:'ExceedNumberOfAttempts',
-        0x37:'RequiredTimeDelayNotExpired',
-        0x70:'UploadDownloadNotAccepted',
-        0x71:'TransferDataSuspended',
-        0x72:'GeneralProgrammingFailure',
-        0x73:'WrongBlockSequenceCounter',
-        0x78:'RequestCorrectlyReceived-ResponsePending',
-        0x7e:'SubFunctionNotSupportedInActiveSession',
-        0x7f:'ServiceNotSupportedInActiveSession',
-        0x81:'RpmTooHigh',
-        0x82:'RpmTooLow',
-        0x83:'EngineIsRunning',
-        0x84:'EngineIsNotRunning',
-        0x85:'EngineRunTimeTooLow',
-        0x86:'TemperatureTooHigh',
-        0x87:'TemperatureTooLow',
-        0x88:'VehicleSpeedTooHigh',
-        0x89:'VehicleSpeedTooLow',
-        0x8a:'ThrottlePedalTooHigh',
-        0x8b:'ThrottlePedalTooLow',
-        0x8c:'TransmissionRangeNotInNeutral',
-        0x8d:'TransmissionRangeNotInGear',
-        0x8f:'BrakeSwitchsNotClosed',
-        0x90:'ShifterLeverNotInPark',
-        0x91:'TorqueConverterClutchLocked',
-        0x92:'VoltageTooHigh',
-        0x93:'VoltageTooLow',
-        }
+    0x10:'GeneralReject',
+    0x11:'ServiceNotSupported',
+    0x12:'SubFunctionNotSupported',
+    0x13:'IncorrectMesageLengthOrInvalidFormat',
+    0x14:'ResponseTooLong',
+    0x21:'BusyRepeatRequest',
+    0x22:'ConditionsNotCorrect',
+    0x24:'RequestSequenceError',
+    0x25:'NoResponseFromSubnetComponent',
+    0x26:'FailurePreventsExecutionOfRequestedAction',
+    0x31:'RequestOutOfRange',
+    0x33:'SecurityAccessDenied',
+    0x35:'InvalidKey',
+    0x36:'ExceedNumberOfAttempts',
+    0x37:'RequiredTimeDelayNotExpired',
+    0x70:'UploadDownloadNotAccepted',
+    0x71:'TransferDataSuspended',
+    0x72:'GeneralProgrammingFailure',
+    0x73:'WrongBlockSequenceCounter',
+    0x78:'RequestCorrectlyReceived-ResponsePending',
+    0x7e:'SubFunctionNotSupportedInActiveSession',
+    0x7f:'ServiceNotSupportedInActiveSession',
+    0x81:'RpmTooHigh',
+    0x82:'RpmTooLow',
+    0x83:'EngineIsRunning',
+    0x84:'EngineIsNotRunning',
+    0x85:'EngineRunTimeTooLow',
+    0x86:'TemperatureTooHigh',
+    0x87:'TemperatureTooLow',
+    0x88:'VehicleSpeedTooHigh',
+    0x89:'VehicleSpeedTooLow',
+    0x8a:'ThrottlePedalTooHigh',
+    0x8b:'ThrottlePedalTooLow',
+    0x8c:'TransmissionRangeNotInNeutral',
+    0x8d:'TransmissionRangeNotInGear',
+    0x8f:'BrakeSwitchsNotClosed',
+    0x90:'ShifterLeverNotInPark',
+    0x91:'TorqueConverterClutchLocked',
+    0x92:'VoltageTooHigh',
+    0x93:'VoltageTooLow',
+}
 
 SVC_DIAGNOSTICS_SESSION_CONTROL =           0x10
 SVC_ECU_RESET =                             0x11
@@ -68,6 +130,7 @@ SVC_TRANSFER_DATA =                         0x36
 SVC_REQUEST_TRANSFER_EXIT =                 0x37
 SVC_WRITE_MEMORY_BY_ADDRESS =               0x3d
 SVC_TESTER_PRESENT =                        0x3e
+SVC_NEGATIVE_RESPONSE =                     0x7f
 SVC_CONTROL_DTC_SETTING =                   0x85
 
 UDS_SVCS = { v:k for k,v in globals().items() if k.startswith('SVC_') }
@@ -92,7 +155,7 @@ class NegativeResponseException(Exception):
 
     def __repr__(self):
         negresprepr = NEG_RESP_CODES.get(self.neg_code)
-        return "NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s" % \
+        return "NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s   \tmsg: %s" % \
             (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg.encode('hex'))
 
     def __str__(self):
@@ -102,10 +165,12 @@ class NegativeResponseException(Exception):
 
 
 class UDS(object):
-    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0):
+    def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0, timeout=3.0):
         self.c = c
+        self.t = None
         self.verbose = verbose
         self.extflag = extflag
+        self.timeout = timeout
 
         if rx_arbid == None:
             rx_arbid = tx_arbid + 8 # by UDS spec
@@ -113,8 +178,8 @@ class UDS(object):
         self.tx_arbid = tx_arbid
         self.rx_arbid = rx_arbid
 
-    def xmit_recv(self, data, extflag=0, timeout=3, count=1, service=None):
-        msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, extflag, timeout, count, service)
+    def xmit_recv(self, data, extflag=0, count=1, service=None):
+        msg, idx = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, extflag, self.timeout, count, service)
 
         # check if the response is something we know about and can help out
         if msg != None and len(msg):
@@ -132,16 +197,17 @@ class UDS(object):
             if negresprepr != None and svc_resp != svc + 0x40:
                 if self.verbose > 1: 
                     print negresprepr + "\n"
-                # TODO: Implement getting final message if ResponseCorrectlyReceivedResponsePending is received
+
                 if errcode != 0x78: # Don't throw an exception for ResponseCorrectlyReceivedResponsePending
                     raise NegativeResponseException(errcode, svc, msg)
-
+                else:
+                    # Try again but increment the start index
+                    msg, idx = self.c._isotp_get_msg(self.rx_arbid, start_index = idx+1, service = service, timeout = self.timeout)
 
         return msg
 
        
     def _do_Function(self, func, data=None, subfunc=None, service=None):
-
         omsg = chr(func)
         if subfunc != None:
             omsg += chr(subfunc)
@@ -169,11 +235,12 @@ class UDS(object):
 
     def StopTesterPresent(self):
         self.TesterPresent = False
-        self.t.join(5.0)
-        if self.t.isAlive():
-            print "Error killing Tester Present thread"
-        else:
-            del self.t
+        if self.t is not None:
+            self.t.join(5.0)
+            if self.t.isAlive():
+                if self.verbose: 
+                    print "Error killing Tester Present thread"
+            self.t = None
 
     def DiagnosticSessionControl(self, session):
         currIdx = self.c.getCanMsgCount()

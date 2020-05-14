@@ -1,0 +1,3 @@
+
+class DID(int):
+    pass
