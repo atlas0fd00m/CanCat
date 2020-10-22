@@ -4,3 +4,5 @@ sketches/**/*.bin
 build/
 *.bin
 *.elf
+*~
+.*.sw?
