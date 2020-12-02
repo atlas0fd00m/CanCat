@@ -16,7 +16,7 @@ Research Mode: enjoy the raw power of CanCat
 currently your environment has an object called "c" for CanCat.  this is how
 you interact with the CanCat tool:
     >>> c.ping()
-    >>> c.placeBookmark('')
+    >>> c.placeCanBookmark('')
     >>> c.snapshotCanMsgs()
     >>> c.printSessionStats()
     >>> c.printCanMsgs()
@@ -33,6 +33,7 @@ if __name__ == "__main__":
 
     # Make it easy to find modules in CWD
     sys.path.append('.')
+    sys.path.append("./cancat")
 
     interfaces = [iface[:-9] for iface in globals().keys() if iface.endswith('Interface')]
     interface_names = ', '.join(interfaces)

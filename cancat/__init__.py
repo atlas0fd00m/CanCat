@@ -8,6 +8,7 @@ import struct
 import threading
 import math
 import pickle
+import binascii
 
 from cancat import iso_tp
 
@@ -291,6 +292,7 @@ class CanInterface(object):
         if self._commsthread != None:
             self._commsthread.wait()
 
+    # JL - works but needs formatting help with bytearray(...) wrapper
     def clearCanMsgs(self):
         '''
         Clear out all messages currently received on the CAN bus, allowing for
@@ -443,6 +445,7 @@ class CanInterface(object):
         start = time.time()
         while (time.time() - start) < wait:
             mbox = self._messages.get(cmd)
+
             if mbox != None and len(mbox):
                 self._queuelock.acquire()
                 try:
@@ -483,26 +486,28 @@ class CanInterface(object):
             return 0
         return len(mbox)
 
-    def _int_to_bytes(self, x: int) -> bytes:
-        return x.to_bytes((x.bit_length() + 7) // 8, 'big')
-
     def _send(self, cmd, message):
         '''
         Send a message to the CanCat transceiver (not the CAN bus)
         '''
-
         msgchar = struct.pack(">H", len(message) + 3) # 2 byte Big Endian
 
-        # JL should message arrive as a byte array?  is utf-8 correct here?
-        msg = msgchar + self._int_to_bytes(cmd) + bytes(message, 'utf-8')
+        # JL - eventually want all messages coming in to be bytes
+        if isinstance(message, str):
+            message = bytes(message, 'raw_unicode_escape')
+
+        msg = msgchar + struct.pack('B', cmd) + message
         self.log("XMIT: %s" % repr(msg),  4)
 
-        self._out_lock.acquire()
         try:
-            self._io.write(msg)
-        finally:
-            self._out_lock.release()
-        # FIXME: wait for response?
+            self._out_lock.acquire()
+            try:
+                self._io.write(msg)
+            finally:
+                self._out_lock.release()
+            # FIXME: wait for response?
+        except:
+            print("Could not acquire lock. Are you trying interactive commands without an active connection?")
 
     def CANrecv(self, count=1):
         '''
@@ -521,7 +526,11 @@ class CanInterface(object):
         Transmit a CAN message on the attached CAN bus
         Currently returns the *last* result
         '''
-        msg = struct.pack('>I', arbid) + chr(extflag) + message
+
+        if isinstance(message, str):
+            message = bytes(message, 'raw_unicode_escape')
+
+        msg = struct.pack('>I', arbid) + struct.pack('B', extflag) + message
 
         for i in range(count):
             self._send(CMD_CAN_SEND, msg)
@@ -591,11 +600,18 @@ class CanInterface(object):
         tx_arbid is the arbid we're transmitting, and rx_arbid
         is the arbid we're listening for
         '''
+        print('ISOTPxmit_recv')
+
+        if isinstance(message, str):
+            message = bytes(message, 'raw_unicode_escape')
+
         currIdx = self.getCanMsgCount()
-        msg = struct.pack('>II', tx_arbid, rx_arbid) + chr(extflag) + message
+        msg = struct.pack('>II', tx_arbid, rx_arbid) + struct.pack('B', extflag) + message
         for i in range(count):
             self._send(CMD_CAN_SENDRECV_ISOTP, msg)
             ts, result = self.recv(CMD_CAN_SENDRECV_ISOTP_RESULT, timeout)
+
+        print("ts, result", ts, result)
 
         if result == None:
             print("ISOTPxmit: Return is None!?")
@@ -610,12 +626,17 @@ class CanInterface(object):
         '''
         Internal Method to piece together a valid ISO-TP message from received CAN packets.
         '''
+        print('_isotp_get_msg')
+
         found = False
         complete = False
         starttime = lasttime = time.time()
 
         while not complete and (not timeout or (lasttime-starttime < timeout)):
+            print('while not...', start_index, rx_arbid)
             msgs = [msg for msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid])]
+
+            print('msgs', msgs)
 
             if len(msgs):
                 try:
@@ -648,6 +669,7 @@ class CanInterface(object):
         print("_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout))
         return None
 
+    # JL - DONE but needs different keystop
     def CANsniff(self, start_msg=None, arbids=None, advfilters=[], maxmsgs=None):
         '''
         Print messages in real time.
@@ -680,7 +702,7 @@ class CanInterface(object):
         while True:
             if maxmsgs != None and maxmsgs < count:
                 return
-            line = msg_gen.next()
+            line = next(msg_gen)
             print(line)
 
             count += 1
@@ -721,14 +743,14 @@ class CanInterface(object):
             delta_correction = newstamp - laststamp
 
             if timing == TIMING_INTERACTIVE:
-                char = raw_input("Transmit this message? %s (Y/n)" % reprCanMsg(idx, ts, arbid, data))
+                char = input("Transmit this message? %s (Y/n)" % reprCanMsg(idx, ts, arbid, data))
 
                 if char is not None and len(char) > 0 and char[0] == 'n':
                     return
 
             elif timing == TIMING_SEARCH:
                 self.CANreplay(start_msg=mid_msg, stop_msg=stop_msg)
-                char = raw_input("Expected outcome?  start_msg = %s, stop_msg = %s (Y/n/q)" % (mid_msg, stop_msg))
+                char = input("Expected outcome?  start_msg = %s, stop_msg = %s (Y/n/q)" % (mid_msg, stop_msg))
                 if char is not None and len(char) > 0 and char[0] == 'q':
                     return
                 if diff > 1:
@@ -783,7 +805,7 @@ class CanInterface(object):
             self._send(CMD_CAN_MODE, chr(mode))
             response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
 
-            while(response[1] != '\x01'):
+            while(response[1] != b'\x01'):
                 print("CAN INIT FAILED: Retrying")
                 response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
 
@@ -807,6 +829,7 @@ class CanInterface(object):
         '''
 
         messages = self._messages.get(CMD_CAN_RECV, None)
+        # print("genCanMsgs messages: ", messages)
 
         # get the ts of the first received message
         if messages != None and len(messages):
@@ -873,7 +896,6 @@ class CanInterface(object):
                 yield((idx, ts, arbid, data))
                 idx += 1
 
-
     def _splitCanMsg(self, msg):
         '''
         takes in captured message
@@ -895,12 +917,14 @@ class CanInterface(object):
         canmsgs = self._messages.get(CMD_CAN_RECV, [])
         return len(canmsgs)
 
+    # JL - DONE
     def printSessionStatsByBookmark(self, start=None, stop=None):
         '''
         Prints session stats only for messages between two bookmarks
         '''
         print(self.getSessionStatsByBookmark(start, stop))
 
+    # JL - DONE
     def printSessionStats(self, start=0, stop=None):
         '''
         Print session stats by Arbitration ID (aka WID/PID/CANID/etc...)
@@ -925,6 +949,7 @@ class CanInterface(object):
 
         return(self.getSessionStats(start=start_msg, stop=stop_msg))
 
+    # JL - if this doesn't get called directly, can we change the name to have a _ prefix?
     def getArbitrationIds(self, start=0, stop=None, reverse=False):
         '''
         return a list of Arbitration IDs
@@ -944,6 +969,7 @@ class CanInterface(object):
 
         return arbid_list
 
+    # JL - if this doesn't get called directly, can we change the name to have a _ prefix?
     def getSessionStats(self, start=0, stop=None):
         out = []
 
@@ -982,6 +1008,7 @@ class CanInterface(object):
         out.append("Total Uniq IDs: %d\nTotal Messages: %d" % (len(arbid_list), msg_count))
         return '\n'.join(out)
 
+    # JL - decide on backwards compatibility for files
     def loadFromFile(self, filename, force=False):
         '''
         Load a previous analysis session from a saved file
@@ -989,6 +1016,7 @@ class CanInterface(object):
         '''
         loadedFile = open(filename, 'rb')
         me = pickle.load(loadedFile)
+        # JL - add a version to designate?
         self.restoreSession(me, force=force)
         self._filename = filename
 
@@ -1006,6 +1034,9 @@ class CanInterface(object):
         self.bookmark_info = me.get('bookmark_info')
         self.comments = me.get('comments')
 
+        for cmd in self._messages:
+            self._msg_events[cmd] = threading.Event()
+
     def saveSessionToFile(self, filename=None):
         '''
         Saves the current analysis session to the filename given
@@ -1022,7 +1053,7 @@ class CanInterface(object):
         savegame = self.saveSession()
         me = pickle.dumps(savegame)
 
-        outfile = file(filename, 'w') # TODO open?
+        outfile = open(filename, 'wb')
         outfile.write(me)
         outfile.close()
 
@@ -1097,12 +1128,11 @@ class CanInterface(object):
         DON'T USE CANrecv or recv(CMD_CAN_RECV) with Bookmarks or Snapshots!!
         '''
         start_bkmk = self.placeCanBookmark("Start_" + name, comment)
-        raw_input("Press Enter When Done...")
+        input("Press Enter When Done...")
         stop_bkmk = self.placeCanBookmark("Stop_" + name, comment)
 
     def filterCanMsgsByBookmark(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None,
                     arbids=None, ignore=[], advfilters=[]):
-
         if start_bkmk != None:
             start_msg = self.getMsgIndexFromBookmark(start_bkmk)
         else:
@@ -1217,7 +1247,7 @@ class CanInterface(object):
                     pidx += 1
 
                     if paginate != None and pidx % paginate == 0:
-                        inp = raw_input("PRESS ENTER TO CONTINUE")
+                        inp = input("PRESS ENTER TO CONTINUE")
 
         except StopIteration:
             pass
@@ -1355,7 +1385,7 @@ class CanInterface(object):
 
         for datalen,arbid,msgs in arbids:
             print(self.reprCanMsgs(arbids=[arbid], advfilters=advfilters))
-            cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, S)earchReplay, Q)uit: ").upper()
+            cmd = input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, S)earchReplay, Q)uit: ").upper()
             while len(cmd) and cmd != 'N':
                 if cmd == 'R':
                     self.CANreplay(arbids=[arbid], timing=TIMING_REAL)
@@ -1372,7 +1402,7 @@ class CanInterface(object):
                 elif cmd == 'Q':
                     return
 
-                cmd = raw_input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, S)earchReplay, Q)uit: ").upper()
+                cmd = input("\n[N]ext, R)eplay, F)astReplay, I)nteractiveReplay, S)earchReplay, Q)uit: ").upper()
             print
 
     def printBookmarks(self):
@@ -1605,8 +1635,8 @@ def reprCanMsg(idx, ts, arbid, data, comment=None):
     #TODO: make some repr magic that spits out known ARBID's and other subdata
     if comment == None:
         comment = ''
-    # JL format this so the 'bytearray(...)' wrapper is not printed
-    return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, arbid, len(data), data, comment)
+    # JL format this so the b'' is not printed
+    return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, arbid, len(data), binascii.hexlify(data), comment)
 
 class FordInterface(CanInterface):
     def setCanBaudHSCAN(self):
@@ -1858,7 +1888,7 @@ class CanInTheMiddleInterface(CanInterface):
         DON'T USE CANrecv or recv(CMD_CAN_RECV) with Bookmarks or Snapshots!!
         '''
         start_bkmk = self.placeCanBookmarkIso("Start_" + name, comment)
-        raw_input("Press Enter When Done...")
+        input("Press Enter When Done...")
         stop_bkmk = self.placeCanBookmarkIso("Stop_" + name, comment)
 
     def filterCanMsgsByBookmarkIso(self, start_bkmk=None, stop_bkmk=None, start_baseline_bkmk=None, stop_baseline_bkmk=None,
@@ -2078,7 +2108,7 @@ class CanInTheMiddleInterface(CanInterface):
             arbids = [arbdata for arbdata in self.getArbitrationIdsIso() if arbdata[1] in arbid_list]
         for datalen,arbid,msgs in arbids:
             print(self.reprCanMsgsIso(arbids=[arbid], advfilters=advfilters))
-            raw_input("\nPress Enter to review the next Session...")
+            input("\nPress Enter to review the next Session...")
             print
 
     def printBookmarksIso(self):
@@ -2195,7 +2225,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
 
     except ImportError as e:
         try:
-            from IPython.terminal.interactiveshell import TerminalInteractiveShell
+            from IPython.terminal.interactiveshell import TerminalInteractiveShell # JL - this probably doesn't work anymore?
             ipsh = TerminalInteractiveShell()
             ipsh.user_global_ns.update(gbls)
             ipsh.user_global_ns.update(lcls)

@@ -16,8 +16,6 @@ def msg_encode(data, verbose=False):
         olist.append( "%c%s" % (b0, data))
 
     else:
-
-
         # first frame
         ftype = 1
         size = dlen
@@ -50,6 +48,7 @@ class IncompleteIsoTpMsg(Exception):
 
 
 def msg_decode(msglist, offset=0, verbose=False, cancat=True):
+    print('msg_decode')
     output = []
 
     count = 0
@@ -65,7 +64,8 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
             msg = msglist[midx]
             narbid = 0
 
-        ctrl = ord(msg[0])
+        # ctrl = ord(msg[0])
+        ctrl = msg[0]
         ftype = (ctrl >> 4)
         if ftype == 0:
             data_len = ctrl # Number of bytes in message

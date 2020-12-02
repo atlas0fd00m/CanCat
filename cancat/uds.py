@@ -114,6 +114,11 @@ class UDS(object):
         self.rx_arbid = rx_arbid
 
     def xmit_recv(self, data, extflag=0, timeout=3, count=1, service=None):
+        print('xmit_recv')
+        print('data is ', data, ' type is ', type(data))
+        print('extflag is ', data, ' type is ', type(extflag))
+        print('data is ', service, ' type is ', type(service))
+
         msg = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, extflag, timeout, count, service)
 
         # check if the response is something we know about and can help out
@@ -141,8 +146,11 @@ class UDS(object):
 
 
     def _do_Function(self, func, data=None, subfunc=None, service=None):
+        print("func is ", func, " and type is ", type(func))
+        # omsg = chr(func)
+        omsg = bytearray(chr(func), 'raw_unicode_escape')
 
-        omsg = chr(func)
+        print("omsg is ", omsg, " and type is ", type(omsg))
         if subfunc != None:
             omsg += chr(subfunc)
 
@@ -190,6 +198,7 @@ class UDS(object):
 
         Returns: The response ISO-TP message as a string
         '''
+        print("did is ", did, " and type is ", type(did))
         msg = self._do_Function(SVC_READ_DATA_BY_IDENTIFIER, struct.pack('>H', did), service=0x62)
         #msg = self.xmit_recv("22".decode('hex') + struct.pack('>H', did), service=0x62)
         return msg
