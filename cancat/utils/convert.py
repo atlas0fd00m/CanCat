@@ -1,5 +1,4 @@
 # Utility functions for CanCat
-
 import pickle
 import cancat
 import struct

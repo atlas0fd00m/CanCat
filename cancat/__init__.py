@@ -1,3 +1,8 @@
+from __future__ import print_function
+from past.builtins import xrange
+from builtins import input, bytes
+import six
+
 import os
 import sys
 import cmd
@@ -187,7 +192,7 @@ class CanInterface(object):
             return
 
         self._go = False
-        self._inbuf = bytearray()
+        self._inbuf = bytes()
         self._trash = []
         self._messages = {}
         self._msg_events = {}
@@ -285,14 +290,13 @@ class CanInterface(object):
         '''
         Destructor, called when the CanInterface object is being garbage collected
         '''
-        if isinstance(self._io, serial.Serial):
+        if self._io and isinstance(self._io, serial.Serial):
             print("shutting down serial connection")
             self._io.close()
         self._shutdown = True
         if self._commsthread != None:
             self._commsthread.wait()
 
-    # JL - works but needs formatting help with bytearray(...) wrapper
     def clearCanMsgs(self):
         '''
         Clear out all messages currently received on the CAN bus, allowing for
@@ -300,7 +304,13 @@ class CanInterface(object):
 
         returns a list of the messages
         '''
-        return self.recvall(CMD_CAN_RECV)
+        allmsgs = self.recvall(CMD_CAN_RECV) 
+
+        # Clear the bookmarks as well because they are no longer meaningful
+        self.bookmarks = []
+        self.bookmark_info = {}
+
+        return allmsgs
 
     def _rxtx(self):
         '''
@@ -490,13 +500,11 @@ class CanInterface(object):
         '''
         Send a message to the CanCat transceiver (not the CAN bus)
         '''
-        msgchar = struct.pack(">H", len(message) + 3) # 2 byte Big Endian
+        msgchar = bytes(struct.pack(">H", len(message) + 3)) # 2 byte Big Endian
+        cmdByte = bytes(struct.pack('B', cmd))
+        message = self._bytesHelper(message)
 
-        # JL - eventually want all messages coming in to be bytes
-        if isinstance(message, str):
-            message = bytes(message, 'raw_unicode_escape')
-
-        msg = msgchar + struct.pack('B', cmd) + message
+        msg = msgchar + cmdByte + message
         self.log("XMIT: %s" % repr(msg),  4)
 
         try:
@@ -527,10 +535,7 @@ class CanInterface(object):
         Currently returns the *last* result
         '''
 
-        if isinstance(message, str):
-            message = bytes(message, 'raw_unicode_escape')
-
-        msg = struct.pack('>I', arbid) + struct.pack('B', extflag) + message
+        msg = struct.pack('>I', arbid) + struct.pack('B', extflag) + self._bytesHelper(message)
 
         for i in range(count):
             self._send(CMD_CAN_SEND, msg)
@@ -600,18 +605,12 @@ class CanInterface(object):
         tx_arbid is the arbid we're transmitting, and rx_arbid
         is the arbid we're listening for
         '''
-        print('ISOTPxmit_recv')
-
-        if isinstance(message, str):
-            message = bytes(message, 'raw_unicode_escape')
 
         currIdx = self.getCanMsgCount()
-        msg = struct.pack('>II', tx_arbid, rx_arbid) + struct.pack('B', extflag) + message
+        msg = struct.pack('>II', tx_arbid, rx_arbid) + struct.pack('B', extflag) + self._bytesHelper(message)
         for i in range(count):
             self._send(CMD_CAN_SENDRECV_ISOTP, msg)
             ts, result = self.recv(CMD_CAN_SENDRECV_ISOTP_RESULT, timeout)
-
-        print("ts, result", ts, result)
 
         if result == None:
             print("ISOTPxmit: Return is None!?")
@@ -619,24 +618,21 @@ class CanInterface(object):
         if resval != 0:
             print("ISOTPxmit() failed: %s" % CAN_RESPS.get(resval))
 
-        msg = self._isotp_get_msg(rx_arbid, start_index = currIdx, service = service, timeout = timeout)
-        return msg
+        msg, idx = self._isotp_get_msg(rx_arbid, start_index = currIdx, service = service, timeout = timeout)
+        return msg, idx
 
     def _isotp_get_msg(self, rx_arbid, start_index=0, service=None, timeout=None):
         '''
         Internal Method to piece together a valid ISO-TP message from received CAN packets.
         '''
-        print('_isotp_get_msg')
 
         found = False
         complete = False
         starttime = lasttime = time.time()
 
         while not complete and (not timeout or (lasttime-starttime < timeout)):
-            print('while not...', start_index, rx_arbid)
+            time.sleep(0.01)
             msgs = [msg for msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid])]
-
-            print('msgs', msgs)
 
             if len(msgs):
                 try:
@@ -649,27 +645,25 @@ class CanInterface(object):
                         # Check if this is the right service, or there was an error
                         if ord(msg[0]) == service or ord(msg[0]) == 0x7f:
                             msg_found = True
-                            return msg
+                            return msg, msgs[count-1][0]
 
                         print("Hey, we got here, wrong service code?")
-                        print(msg.encode('hex'))
                         start_index = msgs[count-1][0] + 1
                     else:
                         msg_found = True
-                        return msg
+                        return msg, msgs[count-1][0]
 
                 except iso_tp.IncompleteIsoTpMsg as e:
                     #print(e) # debugging only, this is expected
                     pass
 
-            time.sleep(0.1)
             lasttime = time.time()
             #print("_isotp_get_msg: status: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout))
 
-        print("_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout))
-        return None
+        if self.verbose:
+            print("_isotp_get_msg: Timeout: %r - %r (%r) > %r" % (lasttime, starttime, (lasttime-starttime),  timeout))
+        return None, start_index
 
-    # JL - DONE but needs different keystop
     def CANsniff(self, start_msg=None, arbids=None, advfilters=[], maxmsgs=None):
         '''
         Print messages in real time.
@@ -783,7 +777,9 @@ class CanInterface(object):
         connection from the computer to the tool
         '''
 
-        self._send(CMD_CAN_BAUD, chr(baud_const))
+        baud = struct.pack("B", baud_const)
+
+        self._send(CMD_CAN_BAUD, baud)
         response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
 
         while(response[1] != b'\x01'):
@@ -809,12 +805,22 @@ class CanInterface(object):
                 print("CAN INIT FAILED: Retrying")
                 response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
 
-    # JL - DONE
+    def _bytesHelper(self, msg): 
+        if isinstance(msg, six.string_types):
+            if sys.version_info < (3, 0):
+                msg = bytes(msg)
+            else:
+                msg = bytes(msg, 'raw_unicode_escape')
+        
+        return msg
+    
     def ping(self, buf='ABCDEFGHIJKL'):
         '''
         Utility function, only to send and receive data from the
         CanCat Transceiver.  Has no effect on the CAN bus
         '''
+        buf = self._bytesHelper(buf)
+
         self._send(CMD_PING, buf)
         response = self.recv(CMD_PING_RESPONSE, wait=3)
         return response
@@ -829,7 +835,6 @@ class CanInterface(object):
         '''
 
         messages = self._messages.get(CMD_CAN_RECV, None)
-        # print("genCanMsgs messages: ", messages)
 
         # get the ts of the first received message
         if messages != None and len(messages):
@@ -909,7 +914,6 @@ class CanInterface(object):
         data = msg[4:]
         return arbid, data
 
-    # JL - DONE
     def getCanMsgCount(self):
         '''
         the number of CAN messages we've received this session
@@ -917,14 +921,12 @@ class CanInterface(object):
         canmsgs = self._messages.get(CMD_CAN_RECV, [])
         return len(canmsgs)
 
-    # JL - DONE
     def printSessionStatsByBookmark(self, start=None, stop=None):
         '''
         Prints session stats only for messages between two bookmarks
         '''
         print(self.getSessionStatsByBookmark(start, stop))
 
-    # JL - DONE
     def printSessionStats(self, start=0, stop=None):
         '''
         Print session stats by Arbitration ID (aka WID/PID/CANID/etc...)
@@ -949,7 +951,6 @@ class CanInterface(object):
 
         return(self.getSessionStats(start=start_msg, stop=stop_msg))
 
-    # JL - if this doesn't get called directly, can we change the name to have a _ prefix?
     def getArbitrationIds(self, start=0, stop=None, reverse=False):
         '''
         return a list of Arbitration IDs
@@ -969,7 +970,6 @@ class CanInterface(object):
 
         return arbid_list
 
-    # JL - if this doesn't get called directly, can we change the name to have a _ prefix?
     def getSessionStats(self, start=0, stop=None):
         out = []
 
@@ -1008,7 +1008,7 @@ class CanInterface(object):
         out.append("Total Uniq IDs: %d\nTotal Messages: %d" % (len(arbid_list), msg_count))
         return '\n'.join(out)
 
-    # JL - decide on backwards compatibility for files
+    # TODO files still lacking compatibility between Python 2 and 3
     def loadFromFile(self, filename, force=False):
         '''
         Load a previous analysis session from a saved file
@@ -1016,7 +1016,7 @@ class CanInterface(object):
         '''
         loadedFile = open(filename, 'rb')
         me = pickle.load(loadedFile)
-        # JL - add a version to designate?
+
         self.restoreSession(me, force=force)
         self._filename = filename
 
@@ -1232,7 +1232,6 @@ class CanInterface(object):
 
         return self.reprCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters)
 
-    # JL - DONE
     def printCanMsgs(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, paginate=None, viewbits=VIEW_ALL):
 
         data = self.reprCanMsgsLines(start_msg, stop_msg, start_bkmk, stop_bkmk, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters, pretty, viewbits=viewbits)
@@ -1635,7 +1634,6 @@ def reprCanMsg(idx, ts, arbid, data, comment=None):
     #TODO: make some repr magic that spits out known ARBID's and other subdata
     if comment == None:
         comment = ''
-    # JL format this so the b'' is not printed
     return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, arbid, len(data), binascii.hexlify(data), comment)
 
 class FordInterface(CanInterface):
@@ -1998,7 +1996,7 @@ class CanInTheMiddleInterface(CanInterface):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         print(self.reprCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids, ignore, advfilters))
 
-    def reprCanMsgsIso(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], adfilters=[]):
+    def reprCanMsgsIso(self, start_msg=0, stop_msg=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[]):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         String representation of a set of CAN Messages.
@@ -2225,8 +2223,9 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
 
     except ImportError as e:
         try:
-            from IPython.terminal.interactiveshell import TerminalInteractiveShell # JL - this probably doesn't work anymore?
-            ipsh = TerminalInteractiveShell()
+            from IPython.terminal.interactiveshell import TerminalInteractiveShell
+            from IPython.terminal.ipapp import load_default_config
+            ipsh = TerminalInteractiveShell(config=load_default_config())
             ipsh.user_global_ns.update(gbls)
             ipsh.user_global_ns.update(lcls)
             ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!
