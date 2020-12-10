@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import sys
 
+
 class bcolors:
     ENDC        = '\033[0m'
     BLACK       = '\033[30m'

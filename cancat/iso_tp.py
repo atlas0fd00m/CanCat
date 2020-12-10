@@ -50,7 +50,6 @@ class IncompleteIsoTpMsg(Exception):
 
 
 def msg_decode(msglist, offset=0, verbose=False, cancat=True):
-    print('msg_decode')
     output = []
 
     count = 0
@@ -66,7 +65,6 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
             msg = msglist[midx]
             narbid = 0
 
-        # ctrl = ord(msg[0])
         ctrl = msg[0]
         ftype = (ctrl >> 4)
         if ftype == 0:

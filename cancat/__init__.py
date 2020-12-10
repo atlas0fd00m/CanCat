@@ -804,15 +804,6 @@ class CanInterface(object):
             while(response[1] != b'\x01'):
                 print("CAN INIT FAILED: Retrying")
                 response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
-
-    def _bytesHelper(self, msg): 
-        if isinstance(msg, six.string_types):
-            if sys.version_info < (3, 0):
-                msg = bytes(msg)
-            else:
-                msg = bytes(msg, 'raw_unicode_escape')
-        
-        return msg
     
     def ping(self, buf='ABCDEFGHIJKL'):
         '''
@@ -1566,6 +1557,15 @@ class CanInterface(object):
 
     def _printCanRegs(self):
         self._send(CMD_PRINT_CAN_REGS, "")
+
+    def _bytesHelper(self, msg): 
+        if isinstance(msg, six.string_types):
+            if sys.version_info < (3, 0):
+                msg = bytes(msg)
+            else:
+                msg = bytes(msg, 'raw_unicode_escape')
+        
+        return msg
 
 class CanControl(cmd.Cmd):
     '''
