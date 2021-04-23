@@ -119,9 +119,6 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
 
     for idx, _, arbid, msg in u.c.genCanMsgs(start=tx_index+1, arbids=rx_range, maxsecs=timeout):
         ftype = ord(msg[0]) >> 4
-            (msg[1:1+match_len] == rx_match_bytes),
-            (msg[1:3] == err_match),
-            (msg[2:2+match_len] == rx_match_bytes))
         # Check for frame types 0 (positive and negative responses) and 1
         if (ftype == 0 and msg[1:1+match_len] == rx_match_bytes) or \
                 (ftype == 0 and msg[1:3] == err_match) or \
