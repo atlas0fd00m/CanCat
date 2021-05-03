@@ -70,7 +70,7 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
         if ftype == 0:
             data_len = ctrl # Number of bytes in message
             if len(output):
-                msg = ''.join(output)
+                msg = b''.join(output)
                 print("Failed to reach length %d:  only got %d" % (length, len(msg)))
                 return arbid, msg, count
 
@@ -124,7 +124,7 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
     if length == None or length > 0:
         raise IncompleteIsoTpMsg(output, length)
 
-    return arbid, ''.join(output), count
+    return arbid, b''.join(output), count
 
 
 def msgs_decode(msglist, verbose=False):
@@ -134,7 +134,7 @@ def msgs_decode(msglist, verbose=False):
     nextidx = 0
     for msg in msglist:
 
-        ctrl = ord(msg[0])
+        ctrl = msg[0]
         ftype = (ctrl >> 4)
         if ftype == 0:
             # Single packet message
@@ -168,7 +168,7 @@ def msgs_decode(msglist, verbose=False):
             nextidx += 1
 
             if not length:
-                messages[-1] = ''.join(output)
+                messages[-1] = b''.join(output)
 
         elif ftype == 3:
             if verbose: print("Flow Control packet found: %r" % (msg.encode('hex')))

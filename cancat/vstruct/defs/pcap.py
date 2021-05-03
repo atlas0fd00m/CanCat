@@ -168,7 +168,7 @@ class PCAPNG_INTERFACE_DESCRIPTION_BLOCK(PCAPNG_BLOCK_PARENT):
         #sys.stderr.write('PCAPNG_INTERFACE_DESCRIPTION_BLOCK: searching options')
         for i, opt in self.options:
             if opt.code == OPT_IF_TSRESOL:
-                self.tsresol = ord(opt.bytes[0])
+                self.tsresol = opt.bytes[0]
                 #sys.stderr.write('Got tsresol: 0x%x\n' % self.tsresol)
             elif opt.code == OPT_IF_TSOFFSET:
                 fmt = '<Q'

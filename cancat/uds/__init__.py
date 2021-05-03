@@ -186,11 +186,11 @@ class UDS(object):
 
         # check if the response is something we know about and can help out
         if msg != None and len(msg):
-            svc = ord(data[0])
-            svc_resp = ord(msg[0])
+            svc = data[0]
+            svc_resp = msg[0]
             errcode = 0
             if len(msg) >= 3:
-                errcode = ord(msg[2])
+                errcode = msg[2]
 
             if svc_resp == svc + 0x40:
                 if self.verbose:
@@ -209,12 +209,11 @@ class UDS(object):
 
         return msg
 
-
     def _do_Function(self, func, data=None, subfunc=None, service=None):
-        omsg = bytes(chr(func), 'raw_unicode_escape')
-        
         if subfunc != None:
-            omsg += chr(subfunc)
+            omsg = struct.pack('>BB', func, subfunc)
+        else:
+            omsg = struct.pack('>B', func)
 
         if data != None:
             omsg += data
@@ -289,14 +288,14 @@ class UDS(object):
         msg = self.xmit_recv("\x34" + struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data)), extflag=self.extflag, service = 0x74)
 
         # Parse the response
-        if ord(msg[0]) != 0x74:
+        if msg[0] != 0x74:
             print("Error received: {}".format(msg.encode('hex')))
             return msg
-        max_txfr_num_bytes = ord(msg[1]) >> 4 # number of bytes in the max tranfer length parameter
+        max_txfr_num_bytes = msg[1] >> 4 # number of bytes in the max tranfer length parameter
         max_txfr_len = 0
         for i in range(2,2+max_txfr_num_bytes):
             max_txfr_len <<= 8
-            max_txfr_len += ord(msg[i])
+            max_txfr_len += msg[i]
 
         # Transfer data
         data_idx = 0
@@ -309,7 +308,7 @@ class UDS(object):
                 block_idx = 0
 
             # error checking
-            if msg is not None and ord(msg[0]) == 0x7f and ord(msg[2]) != 0x78:
+            if msg is not None and msg[0] == 0x7f and msg[2] != 0x78:
                 print("Error sending data: {}".format(msg.encode('hex')))
                 return None
             if msg is None:
@@ -441,7 +440,7 @@ class UDS(object):
         msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service = 0x67)
         if msg is None:
             return msg
-        if(ord(msg[0]) == 0x7f):
+        if msg[0] == 0x7f:
             print("Error getting seed:", msg.encode('hex'))
 
         else:
@@ -476,7 +475,7 @@ def printUDSSession(c, tx_arbid, rx_arbid=None, paginate=45):
     while msgs_idx < len(msgs):
         arbid, isotpmsg, count = cisotp.msg_decode(msgs, msgs_idx)
         #print("Message: (%s:%s) \t %s" % (count, msgs_idx, isotpmsg.encode('hex')))
-        svc = ord(isotpmsg[0])
+        svc = isotpmsg[0]
         mtype = (RESP_CODES, UDS_SVCS)[arbid==tx_arbid].get(svc, '')
 
         print("Message: (%s:%s) \t %-30s %s" % (count, msgs_idx, isotpmsg.encode('hex'), mtype))

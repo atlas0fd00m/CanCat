@@ -71,6 +71,9 @@ class ECUAddress(object):
         self.rx_arbid = rx_arbid
         self.extflag = extflag
 
+    def __hash__(self):
+        return hash((self.tx_arbid, self.rx_arbid, self.extflag))
+
     def __repr__(self):
         return 'ECU({}, {}, {})'.format( hex(self.tx_arbid), hex(self.rx_arbid), self.extflag)
 

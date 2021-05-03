@@ -171,7 +171,7 @@ class EncodedU32(v_number):
         self._vs_value = 0
         # this shit is *not* my fault... ;)
         for i in xrange(5):
-            b = ord(bytez[offset + i])
+            b = bytez[offset + i]
             self._vs_value |= (b & 0x7f) << (7 * i)
             if not b & 0x80:
                 break

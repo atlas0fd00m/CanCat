@@ -78,7 +78,7 @@ def meldExtMsgs(msgs):
 ### renderers for specific PF numbers
 def pf_c9(idx, ts, arbtup, data, j1939):
     b4 = data[3]
-    req = "%.2x %.2x %.2x" % ([ord(d) for d in data[:3]])
+    req = "%.2x %.2x %.2x" % ([d for d in data[:3]])
     usexferpfn = ('', 'Use_Transfer_PGN', 'undef', 'NA')[b4 & 3]
 
     return "Request2: %s %s" % (req,  usexferpgn)
@@ -91,7 +91,7 @@ def pf_eb(idx, ts, arbtup, data, j1939):
     if len(data) < 1:
         return 'TP ERROR: NO DATA!'
 
-    tpidx = ord(data[0])
+    tpidx = data[0]
 
     msgdata = 'TP.DT idx: %.x' % tpidx
     nextline = ''
@@ -223,7 +223,7 @@ def pf_ec(idx, ts, arbtup, data, j1939):
             CM_ABORT:   ('Abort',         None),
             }
 
-    cb = ord(data[0])
+    cb = data[0]
 
     htup = tp_cm_handlers.get(cb)
     if htup != None:
@@ -395,7 +395,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
             CM_ABORT:   ('Abort',         None),
             }
 
-    cb = ord(data[0])
+    cb = data[0]
     #print("ec: %.2x%.2x %.2x" % (arbtup[3], arbtup[4], cb))
 
     htup = tp_cm_handlers.get(cb)

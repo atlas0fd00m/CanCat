@@ -638,12 +638,12 @@ class CanInterface(object):
                 try:
                     # Check that the message is for the expected service, if specified
                     arbid, msg, count = iso_tp.msg_decode(msgs)
-                    if ord(msg[0]) == 0x7e:  # response for TesterPresent... ignore
+                    if msg[0] == 0x7e:  # response for TesterPresent... ignore
                         start_index = msgs[count-1][0] + 1
 
                     elif service is not None:
                         # Check if this is the right service, or there was an error
-                        if ord(msg[0]) == service or ord(msg[0]) == 0x7f:
+                        if msg[0] == service or msg[0] == 0x7f:
                             msg_found = True
                             return msg, msgs[count-1][0]
 
@@ -792,7 +792,7 @@ class CanInterface(object):
         does not change anything on the hardware, after changing the mode you must change
         the baud rate in order to properly configure the hardware
         '''
-        CAN_MODES = { v: k for k,v in globals().items() if k.startswith('CMD_CAN_MODE_') and k is not 'CMD_CAN_MODE_RESULT' }
+        CAN_MODES = { v: k for k,v in globals().items() if k.startswith('CMD_CAN_MODE_') and k != 'CMD_CAN_MODE_RESULT' }
         if mode not in CAN_MODES:
             print("{} is not a valid can mode. Valid modes are:".format(mode))
             for k in CAN_MODES:
@@ -1491,9 +1491,9 @@ class CanInterface(object):
             prev_val += 1
             if prev_val > 0xff:
                 prev_val = 0
-            if prev_val != ord(foo[3]):
+            if prev_val != foo[3]:
                 out_of_order_count += 1
-                prev_val = ord(foo[3])
+                prev_val = foo[3]
         if (out_of_order_count > 0):
             print("ERROR: 11 bit IDs, 1 byte messages, ", out_of_order_count, " Messages received out of order")
         elif (msg_count != 181810):
@@ -1509,9 +1509,9 @@ class CanInterface(object):
             prev_val += 1
             if prev_val > 0xff:
                 prev_val = 0
-            if prev_val != ord(foo[3][0]):
+            if prev_val != foo[3][0]:
                 out_of_order_count += 1
-                prev_val = ord(foo[3][0])
+                prev_val = foo[3][0]
         if (out_of_order_count > 0):
             print("ERROR: 11 bit IDs, 8 byte messages, ", out_of_order_count, " Messages received out of order")
         elif (msg_count != 90090):
@@ -1527,9 +1527,9 @@ class CanInterface(object):
             prev_val += 1
             if prev_val > 0xff:
                 prev_val = 0
-            if prev_val != ord(foo[3]):
+            if prev_val != foo[3]:
                 out_of_order_count += 1
-                prev_val = ord(foo[3])
+                prev_val = foo[3]
         if (out_of_order_count > 0):
             print("ERROR: 29 bit IDs, 1 byte messages, ", out_of_order_count, " Messages received out of order")
         elif (msg_count != 133330):
@@ -1545,9 +1545,9 @@ class CanInterface(object):
             prev_val += 1
             if prev_val > 0xff:
                 prev_val = 0
-            if prev_val != ord(foo[3][0]):
+            if prev_val != foo[3][0]:
                 out_of_order_count += 1
-                prev_val = ord(foo[3][0])
+                prev_val = foo[3][0]
         if (out_of_order_count > 0):
             print("ERROR: 29 bit IDs, 8 byte messages, ", out_of_order_count, " Messages received out of order")
         elif (msg_count != 76330):
