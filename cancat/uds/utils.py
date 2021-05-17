@@ -115,7 +115,7 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
         tx_msg = None
 
     rx_range = gen_uds_resp_range(tx_arbid)
-    err_match = bytes(uds.SVC_NEGATIVE_RESPONSE) + struct.pack('>B', service)
+    err_match = struct.pack('>BB', uds.SVC_NEGATIVE_RESPONSE, service)
 
     for idx, _, arbid, msg in u.c.genCanMsgs(start=tx_index+1, arbids=rx_range, maxsecs=timeout):
         ftype = ord(msg[0]) >> 4
@@ -124,6 +124,7 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
                 (ftype == 0 and msg[1:3] == err_match) or \
                 (ftype == 1 and msg[2:2+match_len] == rx_match_bytes):
             return tx_msg, (arbid, msg)
+
     return tx_msg, None 
 
 
@@ -475,7 +476,7 @@ def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=No
         for sess in sessions:
             # Only attempt this with sessions that we got a successful response 
             # for
-            if 'msg' in sessions['sess']:
+            if 'msg' in sessions[sess]:
                 log.debug('Scanning for sessions from session {} ({})'.format(sess, prereq_sessions))
                 prereqs = prereq_sessions + [sess]
                 subsessions.update(try_session_scan(u, session_range, prereqs, sessions.keys(),
