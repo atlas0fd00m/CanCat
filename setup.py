@@ -7,7 +7,7 @@ version = '1.0.1'
 packages = ['cancat','cancat/vstruct']
 mods = []
 pkgdata = {}
-scripts = ['CanCat.py']
+scripts = ['CanCat.py', 'J1939Cat']
 
 requirements = open('requirements.txt').read().split('\n')
 

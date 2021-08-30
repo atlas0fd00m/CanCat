@@ -11,8 +11,6 @@ import cPickle as pickle
 
 from cancat import iso_tp
 
-# defaults for Linux:
-serialdev = '/dev/ttyACM0'  # FIXME:  if Windows:  "COM10" is default
 baud = 4000000
 
 
@@ -146,8 +144,8 @@ def handleLogHexToScreen(message, canbuf):
     print('LOG: %x' % num)
 
 def handleCanMsgsDuringSniff(message, canbuf, arbids=None):
-    idx, ts = canbuf._submitMessage(CMD_CAN_RECV, message)
     ts = time.time()
+    idx = canbuf._submitMessage(CMD_CAN_RECV, (ts, message))
     arbid, data = canbuf._splitCanMsg(message)
 
     if arbids:
@@ -176,7 +174,8 @@ class SPECIAL_CASE(object):
 DONT_PRINT_THIS_MESSAGE = SPECIAL_CASE
 
 class CanInterface(object):
-    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
+    _msg_source_idx = CMD_CAN_RECV
+    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
         '''
         CAN Analysis Workspace
         This can be subclassed by vendor to allow more vendor-specific code 
@@ -186,22 +185,26 @@ class CanInterface(object):
             self._consumeInterface(orig_iface)
             return
 
-        self._go = False
+        self.init(port, baud, verbose, cmdhandlers, comment, load_filename, orig_iface, max_msgs)
+
+    def init(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
         self._inbuf = ''
         self._trash = []
         self._messages = {}
         self._msg_events = {}
         self._queuelock = threading.Lock()
-        self._max_msgs = max_msgs
+        self._config = {}
 
-        self._shutdown = False
-        self.verbose = verbose
-        self.port = port
-        self._baud = baud
+        self._config['shutdown'] = False
+        self._config['go'] = False
+        self._max_msgs = self._config['max_msgs'] = max_msgs
+        self.verbose = self._config['verbose'] = verbose
+        self.port = self._config['port'] = port
+        self._baud = self._config['baud'] = baud
+        self.name = self._config['name'] = 'CanCat'
         self._io = None
         self._in_lock = None
         self._out_lock = None
-        self.name = port
         self._commsthread = None
         self._last_can_msg = None
 
@@ -216,6 +219,8 @@ class CanInterface(object):
         if load_filename != None:
             self.loadFromFile(load_filename)
 
+        #### FIXME: make this a connection cycle, not just a "pick the first one" thing...
+        #### Prove that it's a CanCat... and that it's not in use by something else...
         # If we specify a file and no port, assume we just want to read the file, only try to guess
         # ports if there is no file specified
         if self.port == None and load_filename == None:
@@ -227,10 +232,12 @@ class CanInterface(object):
 
         if self.port != None:
             self._reconnect()
+
+            # just start the receive thread, it's lightweight and you never know when you may want it.
             self._startRxThread()
+        self._config['go'] = True
 
     def _startRxThread(self):
-        self._go = True
         self._commsthread = threading.Thread(target=self._rxtx)
         self._commsthread.setDaemon(True)
         self._commsthread.start()
@@ -242,7 +249,7 @@ class CanInterface(object):
         self._cmdhandlers[cmd] = None
 
     def _consumeInterface(self, other):
-        other._go = False
+        other._config['go'] = False
 
         for k,v in vars(other).items():
             setattr(self, k, v)
@@ -288,7 +295,7 @@ class CanInterface(object):
         if self._io and isinstance(self._io, serial.Serial):
             print "shutting down serial connection"
             self._io.close()
-        self._shutdown = True
+        self._config['shutdown'] = True
         if self._commsthread != None:
             self._commsthread.wait()
 
@@ -315,10 +322,10 @@ class CanInterface(object):
         '''
         self._rxtx_state = RXTX_SYNC
 
-        while not self._shutdown:
+        while not self._config['shutdown']:
             try:    
-                if not self._go:
-                    time.sleep(.04)
+                if not self._config['go']:
+                    time.sleep(.4)
                     continue
 
                 if self.verbose > 4:
@@ -397,14 +404,18 @@ class CanInterface(object):
                         finally:
                             self._queuelock.release()
 
+                        # generate the timestamp here
+                        timestamp = time.time()
+                        tsmsg = (timestamp, message)
+
                         #if we have a handler, use it
                         cmdhandler = self._cmdhandlers.get(cmd)
                         if cmdhandler != None:
-                            cmdhandler(message, self)
+                            cmdhandler(tsmsg, self)
 
                         # otherwise, file it
                         else:
-                            self._submitMessage(cmd, message)
+                            self._submitMessage(cmd, tsmsg)
                         self._rxtx_state = RXTX_SYNC
 
                 
@@ -412,21 +423,21 @@ class CanInterface(object):
                 if self.verbose:
                     sys.excepthook(*sys.exc_info())
 
-    def _submitMessage(self, cmd, message):
+    def _submitMessage(self, cmd, tsmsg):
         '''
         submits a message to the cmd mailbox.  creates mbox if doesn't exist.
         *threadsafe*
         '''
-        timestamp = time.time()
 
-        self._queuelock.acquire()
+        mbox = self._messages.get(cmd)
+        if mbox == None:
+            mbox = []
+            self._messages[cmd] = mbox
+            self._msg_events[cmd] = threading.Event()
+
         try:
-            mbox = self._messages.get(cmd)
-            if mbox == None:
-                mbox = []
-                self._messages[cmd] = mbox
-                self._msg_events[cmd] = threading.Event()
-            mbox.append((timestamp, message))
+            self._queuelock.acquire()
+            mbox.append(tsmsg)
             self._msg_events[cmd].set()
 
         except Exception, e:
@@ -434,7 +445,7 @@ class CanInterface(object):
 
         finally:
             self._queuelock.release()
-        return len(mbox)-1, timestamp
+        return len(mbox)-1
 
     def log(self, message, verbose=2):
         '''
@@ -460,6 +471,7 @@ class CanInterface(object):
                     self._queuelock.release()
 
                 return timestamp, message
+
             time.sleep(.01)
         return None, None
 
@@ -766,6 +778,7 @@ class CanInterface(object):
         '''
         self._send(CMD_CAN_BAUD, chr(baud_const))
         response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
+        self._config['can_baud'] = baud_const
 
         while(response[1] != '\x01'):
             print "CAN INIT FAILED: Retrying"
@@ -790,6 +803,9 @@ class CanInterface(object):
                 print "CAN INIT FAILED: Retrying"
                 response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
 
+        self._config['can_mode'] = mode
+        return response
+
     def ping(self, buf='ABCDEFGHIJKL'):
         '''
         Utility function, only to send and receive data from the 
@@ -808,7 +824,7 @@ class CanInterface(object):
         for use with tail
         '''
 
-        messages = self._messages.get(CMD_CAN_RECV, None)
+        messages = self.getCanMsgQueue()
 
         # get the ts of the first received message
         if messages != None and len(messages):
@@ -840,7 +856,7 @@ class CanInterface(object):
             # this loop, check to see if we have messages, and if so,
             # re-create the messages handle
             if messages == None:
-                messages = self._messages.get(CMD_CAN_RECV, None)
+                messages = self._messages.get(self._msg_source_idx, None)
         
             # if we're off the end of the original request, and "tailing"
             if messages != None:
@@ -851,8 +867,8 @@ class CanInterface(object):
                     if stop == msglen:
                         self.log("waiting for messages", 3)
                         # wait for trigger event so we're not constantly polling
-                        self._msg_events[CMD_CAN_RECV].wait(1)
-                        self._msg_events[CMD_CAN_RECV].clear()
+                        self._msg_events[self._msg_source_idx].wait(1)
+                        self._msg_events[self._msg_source_idx].clear()
                         self.log("received 'new messages' event trigger", 3)
 
                     # we've gained some messages since last check...
@@ -888,11 +904,18 @@ class CanInterface(object):
         data = msg[4:]
         return arbid, data
 
+    def getCanMsgQueue(self):
+        '''
+        returns the list of interface/CAN messages for this object
+        for CanInterface, this is self._messages[CMD_CAN_RECV]
+        '''
+        return self._messages.get(self._msg_source_idx)
+
     def getCanMsgCount(self):
         '''
         the number of CAN messages we've received this session
         '''
-        canmsgs = self._messages.get(CMD_CAN_RECV, [])
+        canmsgs = self._messages.get(self._msg_source_idx, [])
         return len(canmsgs)
 
     def printSessionStatsByBookmark(self, start=None, stop=None):
@@ -1005,9 +1028,14 @@ class CanInterface(object):
         self.bookmark_info = me.get('bookmark_info')
         self.comments = me.get('comments')
 
+        # handle previous versions
+        ver = me.get('file_version')
+        if ver is not None:
+            self._config = me.get('config')
+
         for cmd in self._messages:
             self._msg_events[cmd] = threading.Event()
-
+            
     def saveSessionToFile(self, filename=None):
         '''
         Saves the current analysis session to the filename given
@@ -1039,6 +1067,9 @@ class CanInterface(object):
                 'bookmarks' : self.bookmarks,
                 'bookmark_info' : self.bookmark_info,
                 'comments' : self.comments,
+                'file_version' : 1.0,
+                'class' : self.__class__,
+                'config' : self._config,
                 }
         return savegame
 
@@ -1051,7 +1082,7 @@ class CanInterface(object):
 
         DON'T USE CANrecv or recv(CMD_CAN_RECV) with Bookmarks or Snapshots!!
         '''
-        mbox = self._messages.get(CMD_CAN_RECV)
+        mbox = self._messages.get(self._msg_source_idx)
         if mbox == None:
             msg_index = 0
         else:
@@ -1541,15 +1572,6 @@ class CanInterface(object):
 
 
 
-class CanControl(cmd.Cmd):
-    '''
-    Command User Interface (as if ipython wasn't enough!)
-    '''
-    def __init__(self, serialdev=serialdev, baud=baud):
-        cmd.Cmd.__init__(self)
-        self.serialdev = serialdev
-        self.canbuf = CanBuffer(self.serialdev, self._baud)
-
 def getAscii(msg, minbytes=3):
     '''
     if strict, every character has to be clean ASCII
@@ -1641,7 +1663,7 @@ class GMInterface(CanInterface):
         self.setCanBaud(CAN_33KBPS)
 
 class CanInTheMiddleInterface(CanInterface):
-    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
+    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         '''
         CAN in the middle. Allows the user to determine what CAN messages are being
         sent by a device by isolating a device from the CAN network and using two
@@ -2148,6 +2170,9 @@ class CanInTheMiddleInterface(CanInterface):
                 'bookmarks_iso' : self.bookmarks_iso,
                 'bookmark_info_iso' : self.bookmark_info_iso,
                 'comments' : self.comments,
+                'file_version' : 1.0,
+                'class' : self.__class__,
+                'config' : self._config,
                 }
         return savegame
 
@@ -2164,20 +2189,12 @@ def cleanupInteractiveAtExit():
         except:
             pass
 
-devlocs = [
-        '/dev/ttyACM0',
-        '/dev/ttyACM1',
-        '/dev/ttyACM2',
-        '/dev/tty.usbmodem1411',
-        '/dev/tty.usbmodem1421',
-        '/dev/tty.usbmodem1431',
-        '/dev/ttyACM0',
-        ]
-
 def getDeviceFile():
-    for devloc in devlocs:
-        if os.path.exists(devloc):
-            return devloc
+    import serial.tools.list_ports
+
+    for n, (port, desc, hwid) in enumerate(sorted(serial.tools.list_ports.comports()), 1):
+        if os.path.exists(port):
+            return port
 
 def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
     global c
@@ -2195,11 +2212,11 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     gbls = globals()
     lcls = locals()
 
+    print intro
     try:
         import IPython.Shell
         ipsh = IPython.Shell.IPShell(argv=[''], user_ns=lcls, user_global_ns=gbls)
-        print intro
-        ipsh.mainloop(intro)
+        ipsh.mainloop()
 
     except ImportError, e:
         try:
@@ -2209,7 +2226,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
             ipsh.user_global_ns.update(gbls)
             ipsh.user_global_ns.update(lcls)
             ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!
-            ipsh.mainloop(intro)
+            ipsh.mainloop()
         except ImportError, e:
             try:
                 from IPython.frontend.terminal.interactiveshell import TerminalInteractiveShell
@@ -2217,9 +2234,9 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
                 ipsh.user_global_ns.update(gbls)
                 ipsh.user_global_ns.update(lcls)
                 ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!
-                ipsh.mainloop(intro)
+                ipsh.mainloop()
             except ImportError, e:
                 print e
                 shell = code.InteractiveConsole(gbls)
-                shell.interact(intro)
+                shell.interact()
 
