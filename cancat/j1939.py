@@ -24,6 +24,10 @@ CM_EOM   =       0x13
 CM_ABORT =       0xff
 CM_BAM   =       0x20
 
+TP_BAM = 20
+TP_DIRECT = 10
+TP_DIRECT_BROKEN=9
+
 class NAME(VBitField):
     def __init__(self):
         VBitField.__init__(self)
@@ -303,8 +307,9 @@ def ec_handler(j1939, idx, ts, arbtup, data):
                 pgn2, pgn1, pgn0) = struct.unpack('<BHBBBBB', data)
 
         # check for old stuff
-        extmsgs = j1939.getRealExtMsgs(sa, da)  # HAVE TO MAKE THIS SEPARATE FROM reprCanMsgs!
+        extmsgs = j1939.getRealExtMsgs(sa, da)
         if len(extmsgs['msgs']):
+            if j1939.verbose: print "clearing out old extmsgs: %r" % extmsgs
             extmsgs['sa'] = sa
             extmsgs['da'] = da
             j1939.saveRealExtMsg(idx-1, ts, sa, da, (0,0,0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN, idx-1)
@@ -325,6 +330,9 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         extmsgs['totsize'] = totsize
         extmsgs['type'] = TP_DIRECT
         extmsgs['adminmsgs'].append((arbtup, data))
+        if j1939.verbose: 
+            print "new TP_CM message: %r, %r\t\t%r" % (arbtup, data.encode('hex'), extmsgs)
+            print '==1  %x %x->%x' % (pf, sa, da), extmsgs
 
         # RESPOND!
         if da in j1939.myIDs:
@@ -337,6 +345,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         (cb, maxpkts, nextpkt, reserved,
                 pgn2, pgn1, pgn0) = struct.unpack('<BBBHBBB', data)
 
+        if j1939.verbose: print '==3  %x %x->%x' % (pf, sa, da), j1939.getRealExtMsgs(sa, da)
         # store extended message information for other stuff...
         extmsgs = j1939.getRealExtMsgs(sa, da)
         extmsgs['adminmsgs'].append((arbtup, data))
@@ -404,6 +413,8 @@ def ec_handler(j1939, idx, ts, arbtup, data):
 
         if cb_handler != None:
             cb_handler(arbtup, data, j1939, idx, ts)
+            da, sa = arbtup[-2:]
+            if j1939.verbose: print '==2  ', j1939.getRealExtMsgs(sa, da)
 
 def eb_handler(j1939, idx, ts, arbtup, data):
     (prio, edp, dp, pf, da, sa) = arbtup
@@ -414,7 +425,8 @@ def eb_handler(j1939, idx, ts, arbtup, data):
     extmsgs = j1939.getRealExtMsgs(sa, da)
     extmsgs['msgs'].append((arbtup, data))
     if len(extmsgs['msgs']) >= extmsgs['length']:
-        #print("eb_handler: saving: %r %r" % (len(extmsgs['msgs']) , extmsgs['length']))
+        if j1939.verbose: 
+            print "eb_handler: saving: %r->%r  %r %r" % (sa, da, len(extmsgs['msgs']) , extmsgs['length'])
         tidx = extmsgs['idx']
         pgn2 = extmsgs['pgn2']
         pgn1 = extmsgs['pgn1']
@@ -446,15 +458,11 @@ pfhandlers = {
         PF_TP_CM : ec_handler,
         PF_TP_DT : eb_handler,
         }
-TP_BAM = 20
-TP_DIRECT = 10
-TP_DIRECT_BROKEN=9
-
 class TimeoutException(Exception):
     pass
 
 class J1939(cancat.CanInterface):
-    def __init__(self, port=serialdev, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
+    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         self.myIDs = []
         self.extMsgs = {}
         self._RealExtMsgs = {}
@@ -531,13 +539,13 @@ class J1939(cancat.CanInterface):
             #print("   DEBUG: SAME INDEX!", self._last_extmsgs)
             midx, extmsgs = self._last_extmsgs
             if extmsgs['totsize'] > 0:
-                msg = [msg for arbtup, msg in extmsgs['msgs']]
-                pgn2 = extmsgs['pgn2']
+                msg = ''.join([msg for arbtup, msg in extmsgs['msgs']])
                 pgn1 = extmsgs['pgn1']
-                if pgn2 < 240:
-                    pgn = pgn2 << 8
+                pgn0 = extmsgs['pgn0']
+                if pgn1 < 240:
+                    pgn = pgn1 << 8
                 else:
-                    pgn = (pgn2 << 8) | pgn1
+                    pgn = (pgn1 << 8) | pgn0
                 res = J1939PGNdb.get(pgn)
 
                 #print("changing pgn: 0x%x" % pgn)
@@ -599,7 +607,7 @@ class J1939(cancat.CanInterface):
         self._mhe_queue.put((pfhandler, idx, ts, arbtup, data))
 
     def _mhe_runner(self):
-        while self._go:
+        while self._config['go']:
             worktup = None
             try:
                 worktup = self._mhe_queue.get(1)
@@ -607,6 +615,7 @@ class J1939(cancat.CanInterface):
                     continue
 
                 pfhandler, idx, ts, arbtup, data = worktup
+                #if self.verbose: print "_mhe_runner: %r %r %r %r %r" % (worktup)
                 pfhandler(self, idx, ts, arbtup, data)
 
             except Exception as e:
@@ -624,25 +633,38 @@ class J1939(cancat.CanInterface):
 
         if no list exists for this pairing, one is created and an empty list is returned
         '''
-        msglists = self._RealExtMsgParts.get(sa)
-        if msglists == None:
-            msglists = {}
-            self._RealExtMsgParts[sa] = msglists
 
-        mlist = msglists.get(da)
-        if mlist == None:
-            mlist = {'length':0,
-                    'msgs':[],
-                    'type':None,
-                    'adminmsgs':[],
-                    'pgn0':None,
-                    'pgn1':None,
-                    'pgn2':None,
-                    'totsize':0,
-                    'idx': -1,
-                    'maxct':0xff,
-                    }
-            msglists[da] = mlist
+        #if self.verbose: print 'getRealExtMsgs: %r' % (threading.current_thread())
+        self.mquelock.acquire()
+        try:
+            msglists = self._RealExtMsgParts.get(sa)
+            if msglists == None:
+                if self.verbose: print ".get(sa) returned None.  creating msglists"
+                msglists = {}
+                self._RealExtMsgParts[sa] = msglists
+
+            mlist = msglists.get(da)
+            if mlist == None:
+                if self.verbose: print "--mlist == None, creating for sa:%x da:%x" % (sa, da)
+                mlist = {'msgs':[], 
+                        'type' : -1, 
+                        'adminmsgs' : [],
+                        'sa': -1,
+                        'da': -1,
+                        'ts': -1,
+                        'idx': -1,
+                        'pgn2': -1,
+                        'pgn1': -1,
+                        'pgn0': -1,
+                        'maxct': -1,
+                        'length': 0,
+                        'totsize': 0,
+                }
+                msglists[da] = mlist
+        except Exception, e:
+            print "getRealExtMsgs: ERROR: %r" % e
+        finally:
+            self.mquelock.release()
 
         return mlist
 
@@ -657,13 +679,16 @@ class J1939(cancat.CanInterface):
         * if da == None, returns whether the sa had anything previously
         * otherwise, if the list
         '''
+        #if self.verbose: print 'clearRealExtMsgs: %r' % (threading.current_thread())
         exists = False
         if da != None:
+            if self.verbose: print "++clearing sa:%x da:%x" % (sa, da)
             msglists = self._RealExtMsgParts.get(sa)
             exists = bool(msglists != None and len(msglists))
             self._RealExtMsgParts[sa] = {}
             return exists
 
+        if self.verbose: print "++clearing sa:%x COMPLETELY!" % (sa)
         msglists = self._RealExtMsgParts.get(sa)
         if msglists == None:
             msglists = {}
@@ -731,20 +756,35 @@ class J1939(cancat.CanInterface):
         * otherwise, if the list
         '''
         exists = False
+        msglists = self.extMsgs.get(sa)
+
+        # if da is included, clear only the message
         if da != None:
-            msglists = self.extMsgs.get(sa)
             exists = bool(msglists != None and len(msglists))
-            self.extMsgs[sa] = {}
+            if msglists is not None:
+                msglists[da] = {}
             return exists
 
-        msglists = self.extMsgs.get(sa)
-        if msglists == None:
+        if msglists is not None:
+            exists = True
             msglists = {}
             self.extMsgs[sa] = msglists
+        return exists
 
-        mlist = msglists.get(da, {'length':0})
-        msglists[da] = {'length':0, 'msgs':[], 'type':None, 'adminmsgs':[]}
-        return bool(mlist['length'])
+    def setReprVerbosePGNs(self, pgnlist):
+        '''
+        provide a list of s which should be printed
+        '''
+        if pgnlist == 'ON':
+            self._repr_all_spns = True
+        elif pgnlist == 'OFF':
+            self._repr_all_spns = False
+        elif type(pgnlist) == list:
+            self._repr_spns_by_pgn = {pgn:True for pgn in pgnlist}
+        elif pgnlist is None:
+            self._repr_spns_by_pgn = {}
+            self._repr_all_spns = False
+
 
     def setReprVerbosePGNs(self, pgnlist):
         '''
@@ -796,54 +836,66 @@ class J1939(cancat.CanInterface):
 
         if start_msg == None, returns the next message since last J1939recv/tp
         '''
-        starttime = time.time()
         if start_msg == None:
             start_msg = self._last_recv_idx
             #print("resuming last recv'd index: %d" % start_msg)
 
         count = 0
+        starttime = time.time()
         while (count==0 or (block and time.time()-starttime < timeout)):
             #sys.stderr.write('.')
             count += 1
-            msgs = self._RealExtMsgs.get((sa, da))
-            if msgs == None or not len(msgs):
-                #print("no message for %.2x -> %.2x" % (sa, da))
-                continue
 
-            if msgs[-1][0] < start_msg:
-                self.log("last msg before start_msg %r  %r" % (msgs[-1][0],start_msg), 2)
-                #sys.stderr.write('.')
-                continue
-
-            for midx in range(len(msgs)):
-                msg = msgs[midx]
-                midx = msg[0]
-                mpgn = msg[4]
-                mlastidx = msg[7]
-                #print("     %r ?>= %r" % (midx, start_msg))
-                #print("     %r ?= %r" % (mpgn, (pgn2, pgn1, pgn0)))
-                if midx < start_msg:
-                    continue
-                if mpgn != (pgn2, pgn1, pgn0):
+            self.mquelock.acquire()
+            try:
+                msgs = self._RealExtMsgs.get((sa, da))
+                if msgs == None or not len(msgs):
+                    #print "no message for %.2x -> %.2x" % (sa, da)
                     continue
 
-                #print("success! %s" % repr(msg))
-                #print("setting last recv'd index: %d" % mlastidx)
-                self._last_recv_idx = mlastidx
-                ##FIXME:  make this threadsafe
-                #msgs.pop(midx)
-                return msg
+                if msgs[-1][0] < start_msg:
+                    self.log("last msg before start_msg %r  %r" % (msgs[-1][0],start_msg), 2)
+                    #sys.stderr.write('.')
+                    continue
+
+                # if we have messages, check each for the last idx.
+                for midx in range(len(msgs)):
+                    msg = msgs[midx]
+                    midx = msg[0]
+                    mpgn = msg[4]
+                    mlastidx = msg[7]
+                    #print "     %r ?>= %r" % (midx, start_msg)
+                    #print "     %r ?= %r" % (mpgn, (pgn2, pgn1, pgn0))
+                    if mlastidx < start_msg:
+                        continue
+                    if mpgn != (pgn2, pgn1, pgn0):
+                        continue
+
+                    #print "success! %s" % repr(msg)
+                    #print "setting last recv'd index: %d" % mlastidx
+                    self._last_recv_idx = mlastidx
+                    ##FIXME:  make this threadsafe
+                    #msgs.pop(midx)
+                    return msg
+
+            except Exception, e:
+                print "recvRealExtMsg: ERROR: %r" % e
+            finally:
+                self.mquelock.release()
+
+            time.sleep(.001)
 
 
-        raise TimeoutException('recvRealExtMsg: Timeout waiting for message from: 0x%.2x -> 0x%.2x PGN: %.2x%.2x%.2x' % \
-                (sa, da, pgn2,pgn1,pgn0))
+        raise TimeoutException('recvRealExtMsg: Timeout waiting for message from: 0x%.2x -> 0x%.2x PGN: %.2x%.2x%.2x (%d secs)' % \
+                (sa, da, pgn2,pgn1,pgn0, (time.time()-starttime)))
 
     def J1939recv_tp(self, pgn2, pgn1, pgn0, sa=0x0, da=0xf9, msgcount=1, timeout=1, advfilters=[], start_msg=None):
         if start_msg == None:
             start_msg = self._last_recv_idx
 
+
         print("J1939recv_tp: Searching for response at or after msg idx: %d" % start_msg)
-        msg = self.recvRealExtMsg(sa, da, pgn2, pgn1, pgn0, start_msg)
+        msg = self.recvRealExtMsg(sa, da, pgn2, pgn1, pgn0, start_msg, timeout=timeout)
         if msg == None:
             return None
 
@@ -1010,7 +1062,7 @@ def reprSPNdata(spnlist, msg):
                         spnData = '%.3f %s' % (datanum, units)
                 except Exception as e:
                     spnData = "ERROR"
-                    print(e)
+                    print("SPN: %r %r (%r)" % (e, msg, spn))
 
         spnlines.append('      SPN(%d): %-20s\t %s' % (spnum, spnData, spnName))
 

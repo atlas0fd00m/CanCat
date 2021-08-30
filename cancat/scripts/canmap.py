@@ -167,7 +167,7 @@ def udsmap_parse_args():
     #        help='Key Length range to test')
 
     parser.add_argument('-T', '--timeout', type=float, default=0.2,
-            help='UDS Timeout, 3 seconds is the ISO14229 standard, standard for this tool is 100 msec (0.2)')
+            help='UDS Timeout, 3 seconds is the ISO14229 standard, standard for this tool is 200 msec (0.2)')
     parser.add_argument('-w', '--startup-wait', type=float, nargs='?', const=2.0,
             help='Wait to receive CAN messages before starting the scan')
     parser.add_argument('-d', '--scan-delay', type=float, default=0.0,
@@ -181,11 +181,11 @@ def udsmap_parse_args():
     parser.add_argument('-v', '--verbose', action='count',
             help='Verbose logging, use -vv for extra verbosity')
     parser.add_argument('-l', '--log-file', nargs='?', const='canmap_%Y%m%d-%H%M%S.log',
-            help='Log filename to write to, log filename can contain "time.strftime" formatting like "canmap_%Y%m%d-%H%M%S.log"')
+            help='Log filename to write to, log filename can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.log"')
     parser.add_argument('-o', '--output-file', nargs='?', const='canmap_%Y%m%d-%H%M%S.yml',
-            help='Scan results output filename, can contain "time.strftime" formatting like "canmap_%Y%m%d-%H%M%S.yml"')
+            help='Scan results output filename, can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.yml"')
     parser.add_argument('-c', '--can-session-file', nargs='?', const='canmap_%Y%m%d-%H%M%S.sess',
-            help='Filename for saving raw cancat session, can contain "time.strftime" formatting like "canmap_%Y%m%d-%H%M%S.sess"')
+            help='Filename for saving raw cancat session, can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.sess"')
     parser.add_argument('-i', '--input-file',
             help='Input file containing previous scan results')
     parser.add_argument('-u', '--uds-class',
