@@ -1,2 +1,8 @@
+sketches/**/*.bin
+*.elf
 *.pyc
 build/
+*.bin
+*.elf
+*~
+.*.sw?

@@ -49,21 +49,30 @@ $ pip install --user ipython
 
 3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software).  
 
-4) (OPTIONAL) If you are using a [Macchina M2](https://www.macchina.cc/) follow the [getting started guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to install the M2 hardware definitions in the Arduino tool.
+4) (OPTIONAL) If you are using a [Macchina M2](https://www.macchina.cc/) follow 
+the [getting started 
+guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to 
+install the M2 hardware definitions in the Arduino tool.
 
-5) (OPTIONAL) If you are on a Linux system, you may choose to install the [arduino-builder](https://github.com/arduino/arduino-builder) for your platform. The arduino-builder tool can be used to compile and flash your CAN device without opening the Arudino IDE. 
+5) (OPTIONAL) If you are on a Linux system, you may choose to install the 
+[arduino-cli](https://github.com/arduino/arduino-cli) for your platform. The 
+arduino-cli tool can be used to compile and flash your CAN device without 
+opening the Arudino IDE. 
 
-6) Clone CanCat and build the desired firmware. If you are not using the arduino-builder tool, use the Arduino IDE as normal to build and flash the sketch onto your target device. 
+6) Clone CanCat and build the desired firmware. If you are not using the 
+arduino-cli tool, use the Arduino IDE as normal to build and flash the sketch 
+onto your target device. If you have installed the arguing-cli tool you can 
+compile and flash the CanCat firmware with the following steps:
 
 ```
+$ arduino-cli lib install due_can
 $ git clone https://github.com/atlas0fd00m/CanCat
 $ cd CanCat/sketches
-$ make m2
-$ make bootloader
-$ make flash
+$ make due
 ```
 
-7) Ensure that your CAN-transceiver is not in bootloader mode by unplugging its USB connector and then plugging it back in again.
+7) Ensure that your CAN-transceiver is not in bootloader mode by unplugging its 
+USB connector and then plugging it back in again.
 
 8) Connect to your CAN-transceiver with CanCat
 
@@ -338,6 +347,127 @@ $ citm.printCanMsgsIso() # prints all CAN messages received on the Isolation net
 ```
 
 Placing a bookmark places a bookmark simultaneously on both the Isolation information (Iso interface messages) and the aggregate information (standard CAN interface messages).
+
+##  canmap
+
+Canmap is a tool built on CanCat to scan a CAN bus for various UDS capabilities.  
+Canmap is built on top of the `cancat.uds.UDS` class.  Canmap has many different 
+options to control what type of scans are performed, and how the scans are 
+performed, but the basic information required is the type of scan to run, the 
+port the CanCat device is present on, and the bus speed:
+
+The most basic scan is an ECU scan to identify what ECUs are on the bus
+
+```bash
+$ ./canmap -p /dev/ttyACM0 -b 500K -sE
+```
+
+Additional scan modes are:
+- DIDs
+- Sessions
+
+All items can be scanned with this command:
+
+```bash
+$ ./canmap -p /dev/ttyACM0 -b 500K -sEDS
+```
+
+### Saving canmap scan output
+
+The results of a canmap scan can be saved as a configuration yaml file with the 
+`-o` (`--output-file`) option. This yaml file can be used as an input to future 
+scans with the `-i` (`--input-file`) option. If an input config file is provided 
+information that is already in the config will not be scanned again unless the 
+`-r` (`--rescan`) option is provided. For example an aborted DID scan can later 
+be resumed and any ECUs that DIDs were found for will not be searched for again:
+
+```bash
+$ ./canmap -p /dev/ttyACM0 -b 500K -sEDS -o scan_results.yml
+<output>
+^C
+$ ./canmap -p /dev/ttyACM0 -b 500K -sEDS -i scan_results.yml -o scan_results.yml
+```
+
+The configuration file saves some additional scan parameters such as the baud 
+rate, and timeout parameters. These parameters are re-used when the config file 
+is provided as an input config.
+
+The config file contain a `notes` field that indicates the command(s) used to 
+create that config file.
+
+The raw can messages can also be saved as a CanCat session with the `-c` 
+(`--can-sesison-file`) option. This can be useful to diagnose strange responses 
+found during the scanning:
+
+```bash
+$ ./canmap -p /dev/ttyACM0 -b 500K -sEDS -c scan_with_weird_errors.sess
+```
+
+The session can then be opened with the normal CanCat options:
+
+```bash
+$ ./CanCat.py -f scan_with_weird_errors.sess
+```
+
+### ECU Scanning
+
+The Range of ECUs to scan can be specified with the `-E` option, the default 
+range is `00-FF` for both standard (11-bit) and extended (29-bit) CAN 
+addressing. The bus mode can be set with the `-m` (`-bus-mode`) option.
+
+To scan only a subset of the ECU range in 11-bit mode the command would be:
+
+```bash
+$ ./canmap -p /dev/ttyACM0 -b 500K -sE -E 60-A0 -m std
+```
+
+ECU scanning works by sending a read DID request (`cancat.uds.UDS.ReadDID`) or 
+a session control request (`cancat.uds.UDS.DiagnosticSessionControl`) and 
+waiting for a timeout, a negative response or a positive response.  The default 
+method is to attempt to read the VIN from each UDS address   
+(`cancat.uds.UDS.ReadDID(0xF190)`). Different methods are available because 
+different methods have different degrees of success on different vehicles.
+
+The other factor that can affect the success rate is how quickly ECUs respond.  
+The UDS standard timeout is 3 seconds, scanning both bus modes with 3 second 
+timeouts could take up to 25 minutes. Instead the default timeout for ECU 
+scanning is 0.2 seconds, if fewer ECUs than expected are identified it may be 
+worth re-trying the scan with an increased timeout by setting the `-T` 
+(--timeout`) option.
+
+### DID Scanning
+
+DID scanning can take a while depending on the behavior of the ECUs. By default 
+only the UDS standard identification DIDs (`F180-F18E,F190-F1FF`) are searched 
+for.  Testing has shown that searching a range of `F000-FFFF` can take around 
+2 minutes for cooperative ECUs, but much much longer for ECUs which allow 
+requests to timeout rather than sending negative responses. A larger range can 
+be specified with the `-D` option:
+
+```bash
+$ ./canmap -p /dev/ttyACM0 -b 500K -sD -D F000-FFFF -i known_ecus.yml
+```
+
+DIDs are only scanned on ECUs that have already been identified. If a DID scan 
+is run and there are no known ECUs then no messages will be sent.
+
+### Session Scanning
+
+It is assumed that the default session for each ECU is session 1.  DIDs 
+identified through scanning are associated with session 1. By default the full 
+range of diagnostic sessions is searched (`02-7F`). I have found on some ECUs 
+that sessions can only be entered after already being in another prerequesite 
+session. Searching for these recursive diagnostic sessions is enabled by default 
+but can be disabled with the `-n` (`--no-recursive-session-scanning`) option.
+
+Depending on the ECU behavior, session scanning can take a varying amount of 
+time and/or produce strange error conditions.
+
+## Unit Tests
+Unit tests can be run with:
+```
+python -m unittest discover -v
+```
 
 ## Acknowledgments
 This project is made possible through collaboration with researchers at GRIMM (SMFS, Inc.), most notably Matt Carpenter and Tim Brom.
