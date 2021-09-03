@@ -1,0 +1,6 @@
+ipython
+#numpy
+#pyparsing
+pyserial
+pyusb
+#serial
