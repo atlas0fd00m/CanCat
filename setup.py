@@ -32,6 +32,7 @@ setuptools.setup  (name  = 'cancat',
                 "pyserial",
                 "pyusb",
                 "termcolor",
+                "future",
             ],
         classifiers      = [
                             'Development Status :: 5 - Production/Stable',
