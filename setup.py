@@ -3,7 +3,7 @@ import os
 import codecs
 import setuptools
 
-version = '1.9.0'
+version = '1.9.1'
 packages = ['cancat','cancat/vstruct']
 mods = []
 pkgdata = {}
@@ -51,7 +51,7 @@ setuptools.setup  (name  = 'cancat',
                             'Programming Language :: Python :: 3.7',
                             'Programming Language :: Python :: 3.8',
                             'Programming Language :: Python :: 3.9',
-                            'Operating System :: OS Indepentent',
+                            #'Operating System :: OS Indepentent',
                            ],
         python_requires  = '>=3.6'
         )
