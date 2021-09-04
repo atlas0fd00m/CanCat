@@ -276,7 +276,7 @@ class CanInterface(object):
 
         # SHIM to allow us to easily specify a Fake CanCat for testing
         if self.port == 'FakeCanCat':
-            import cancat.tests as testcat
+            import cancat.test as testcat
             self._io = testcat.FakeCanCat()
 
         else:
@@ -534,8 +534,9 @@ class CanInterface(object):
             finally:
                 self._out_lock.release()
             # FIXME: wait for response?
-        except:
-            print("Could not acquire lock. Are you trying interactive commands without an active connection?")
+        except Exception as e:
+            print("Exception: %r" % e)
+            #print("Could not acquire lock. Are you trying interactive commands without an active connection?")
 
     def CANrecv(self, count=1):
         '''
