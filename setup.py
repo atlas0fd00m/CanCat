@@ -20,6 +20,7 @@ setuptools.setup  (name  = 'cancat',
         version          = version,
         description      = "Multi-purpose tool for interacting with Controller Area Networks (CAN) and SAE J1939",
         long_description = readme(),
+        long_description_content_type='text/markdown',
         author           = 'atlas of d00m and the GRIMM CyPhy team',
         author_email     = 'atlas@r4780y.com',
         url              = 'https://github.com/atlas0fd00m/CanCat',
@@ -31,27 +32,15 @@ setuptools.setup  (name  = 'cancat',
         scripts          = scripts,
         install_requires = requirements,
         classifiers      = [
-                            # How mature is this project? Common values are
-                            #   3 - Alpha
-                            #   4 - Beta
-                            #   5 - Production/Stable
                             'Development Status :: 5 - Production/Stable',
-
-                            # Indicate who your project is intended for: See info here: https://pypi.org/classifiers
                             'Intended Audience :: Telecommunications Industry',
                             'Topic :: Communications',
-
-                            # Pick your license as you wish (should match "license" above)
                             'License :: OSI Approved :: BSD License',
-
-                            # Specify the Python versions you support here. In particular, ensure
-                            # that you indicate whether you support Python 2, Python 3 or both.
                             'Programming Language :: Python :: 3',
                             'Programming Language :: Python :: 3.6',
                             'Programming Language :: Python :: 3.7',
                             'Programming Language :: Python :: 3.8',
                             'Programming Language :: Python :: 3.9',
-                            #'Operating System :: OS Indepentent',
                            ],
         python_requires  = '>=3.6'
         )
