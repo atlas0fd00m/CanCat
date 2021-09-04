@@ -157,7 +157,7 @@ class v_number(v_prim):
         else:
             r = []
             for i in range(self._vs_length):
-                r.append( ord( fbytes[ offset + i ] ) )
+                r.append( fbytes[ offset + i ] )
 
             if not self._vs_bigend:
                 r.reverse()
@@ -380,7 +380,7 @@ class v_float(v_prim):
         else:
             r = []
             for i in range(self._vs_length):
-                r.append( ord( fbytes[ offset + i ] ) )
+                r.append( fbytes[ offset + i ] )
 
             if not self._vs_bigend:
                 r.reverse()

@@ -3,6 +3,8 @@
 VStruct builder!  Used to serialize structure definitions etc...
 
 '''
+from __future__ import print_function
+from past.builtins import xrange
 
 import copy
 import types
@@ -290,8 +292,8 @@ if __name__ == '__main__':
     e = parser._sym_enums.values()
     builder = VStructBuilder(defs=t, enums=e)
 
-    print '# Version: %d.%d' % (osmajor, osminor)
-    print '# Architecture: %s' % archname
+    print('# Version: %d.%d' % (osmajor, osminor))
+    print('# Architecture: %s' % archname)
     if vsver != None:
         keys = vsver.getVersionKeys()
         keys.sort()
@@ -299,6 +301,6 @@ if __name__ == '__main__':
             val = vsver.getVersionValue(k)
             if type(val) == unicode:
                 val = val.encode('ascii','ignore')
-            print '# %s: %s' % (k,val)
-    print builder.genVStructPyCode()
+            print('# %s: %s' % (k,val))
+    print(builder.genVStructPyCode())
 

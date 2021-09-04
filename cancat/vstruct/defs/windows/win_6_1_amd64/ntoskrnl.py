@@ -8,6 +8,8 @@
 # OriginalFilename: ntkrnlmp.exe
 # ProductName: Microsoft Windows Operating System
 # ProductVersion: 6.1.7601.17514
+from past.builtins import xrange
+
 import vstruct
 from vstruct.primitives import *
 

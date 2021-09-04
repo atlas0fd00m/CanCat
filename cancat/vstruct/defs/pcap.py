@@ -1,3 +1,5 @@
+from __future__ import print_function
+from io import open
 
 import vstruct
 import vstruct.defs.inet as vs_inet
@@ -166,7 +168,7 @@ class PCAPNG_INTERFACE_DESCRIPTION_BLOCK(PCAPNG_BLOCK_PARENT):
         #sys.stderr.write('PCAPNG_INTERFACE_DESCRIPTION_BLOCK: searching options')
         for i, opt in self.options:
             if opt.code == OPT_IF_TSRESOL:
-                self.tsresol = ord(opt.bytes[0])
+                self.tsresol = opt.bytes[0]
                 #sys.stderr.write('Got tsresol: 0x%x\n' % self.tsresol)
             elif opt.code == OPT_IF_TSOFFSET:
                 fmt = '<Q'
@@ -240,7 +242,7 @@ class PCAPNG_SIMPLE_PACKET_BLOCK(vstruct.VStruct):
         self.tvusec = 0
 
 def iterPcapFileName(filename, reuse=False):
-    fd = file(filename, 'rb')
+    fd = open(filename, 'rb')
     for x in iterPcapFile(fd, reuse=reuse):
         yield x
     
@@ -311,7 +313,7 @@ def _iterPcapFile(fd, reuse=False):
         elif linktype == PCAP_LINKTYPE_RAW:
             pass
 
-        #print eII.tree()
+        #print(eII.tree())
         if not reuse:
             ipv4 = vs_inet.IPv4()
 
@@ -370,7 +372,7 @@ def _iterPcapFile(fd, reuse=False):
 
         else:
             pass
-            #print 'UNHANDLED IP PROTOCOL: %d' % ipv4.proto
+            #print('UNHANDLED IP PROTOCOL: %d' % ipv4.proto)
 
 
 def _iterPcapNgFile(fd, reuse=False):
@@ -420,7 +422,7 @@ def _iterPcapNgFile(fd, reuse=False):
         #PCAPNG_BLOCKTYPE_NAME_RESOLUTION:
         #PCAPNG_BLOCKTYPE_INTERFACE_STATS:
         else:
-            #print 'Unknown block type: 0x%08x: 0x%08x 0x%08x bytes' % (roff, header.blocktype, header.blocksize)
+            #print('Unknown block type: 0x%08x: 0x%08x 0x%08x bytes' % (roff, header.blocktype, header.blocksize))
             pass
         curroff = fd.tell()
         b0 = fd.read(len(header))
@@ -491,5 +493,5 @@ def _parsePcapngPacketBytes(linktype, pkt):
         return pkt,ipv4,icmp_hdr,pdata
     else:
         pass
-        #print 'UNHANDLED IP PROTOCOL: %d' % ipv4.proto
+        #print('UNHANDLED IP PROTOCOL: %d' % ipv4.proto)
     return None

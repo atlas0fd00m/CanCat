@@ -1,6 +1,9 @@
 '''
 Structure definitions for the OSX MachO binary format.
 '''
+from __future__ import print_function
+from past.builtins import xrange
+
 import struct
 import vstruct
 
@@ -28,9 +31,9 @@ class mach_o(vstruct.VStruct):
             if vs.cmd != LC_SYMTAB:
                 continue
             strbytes = self._raw_bytes[vs.stroff:vs.stroff+vs.strsize]
-            #print repr(strbytes)
+            #print(repr(strbytes))
             strtab = strbytes.split('\x00')
-            #print strtab
+            #print(strtab)
             offset = vs.symoff
             for i in xrange(vs.nsyms):
                 n = nlist() # FIXME 64!
@@ -38,8 +41,8 @@ class mach_o(vstruct.VStruct):
                 #symstr = strtab[n.n_strx]
                 # FIXME this is slow!
                 symstr = strbytes[n.n_strx:].split('\x00', 1)[0]
-                #print n.tree()
-                #print symstr
+                #print(n.tree())
+                #print(symstr)
 
     def getLibDeps(self):
         '''
@@ -60,7 +63,7 @@ class mach_o(vstruct.VStruct):
         ret = []
         for fname, vs in self.load_commands:
             if vs.cmd != LC_SEGMENT:
-                #print hex(vs.cmd),hex(vs.cmdsize) # 2, 5, b, e
+                #print(hex(vs.cmd),hex(vs.cmdsize) # 2, 5, b, e)
                 continue
             # Slice the segment bytes from raw bytes
             fbytes = self._raw_bytes[ vs.fileoff: vs.fileoff + vs.filesize ]
@@ -73,7 +76,7 @@ class mach_o(vstruct.VStruct):
     def vsParse(self, bytes, offset=0):
         self._raw_bytes = bytes[offset:]
         offset = self.mach_header.vsParse(bytes, offset=offset)
-        #print bytes[offset:].encode('hex')
+        #print(bytes[offset:].encode('hex'))
         for i in xrange(self.mach_header.ncmds):
             # should we use endian from header?
             cmdtype, cmdlen = struct.unpack('<II', bytes[offset:offset+8])

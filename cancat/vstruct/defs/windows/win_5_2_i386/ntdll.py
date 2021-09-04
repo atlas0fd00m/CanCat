@@ -10,6 +10,8 @@
 # ProductName: Microsoft Windows Operating System
 # ProductVersion: 5.2.3790.4937
 # Translation: 78644233
+from past.builtins import xrange
+
 import vstruct
 from vstruct.primitives import *
 

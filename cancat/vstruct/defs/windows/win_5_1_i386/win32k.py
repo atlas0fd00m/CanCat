@@ -1,5 +1,7 @@
 # Version: 5.1
 # Architecture: i386
+from past.builtins import xrange
+
 import vstruct
 from vstruct.primitives import *
 

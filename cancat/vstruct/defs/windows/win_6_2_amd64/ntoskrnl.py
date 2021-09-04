@@ -1,5 +1,7 @@
 # Version: 6.2
 # Architecture: amd64
+from past.builtins import xrange
+
 import vstruct
 from vstruct.primitives import *
 

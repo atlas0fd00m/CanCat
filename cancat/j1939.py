@@ -1,7 +1,9 @@
+from __future__ import print_function
+
 import Queue
 import cancat
 import struct
-from J1939db import *
+from cancat.J1939db import *
 from cancat import *
 
 from cancat.vstruct.bitfield import *
@@ -70,19 +72,19 @@ def meldExtMsgs(msgs):
 
     outval = ''.join(out)
     if outval[length:] == '\xff'*(len(outval)-length):
-        #print "truncating %r to size %r" % (outval, length)
+        #print("truncating %r to size %r" % (outval, length))
         outval = outval[:length]
     #else:
-        #print "NOT truncating %r to size %r" % (outval, length)
+        #print("NOT truncating %r to size %r" % (outval, length))
 
     return outval
 
 ### renderers for specific PF numbers
 def pf_c9(idx, ts, arbtup, data, j1939):
     b4 = data[3]
-    req = "%.2x %.2x %.2x" % ([ord(d) for d in data[:3]])
+    req = "%.2x %.2x %.2x" % ([d for d in data[:3]])
     usexferpfn = ('', 'Use_Transfer_PGN', 'undef', 'NA')[b4 & 3]
-    
+
     return "Request2: %s %s" % (req,  usexferpgn)
 
 def pf_ea(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
@@ -93,7 +95,7 @@ def pf_eb(idx, ts, arbtup, data, j1939):
     if len(data) < 1:
         return 'TP ERROR: NO DATA!'
 
-    tpidx = ord(data[0])
+    tpidx = data[0]
 
     msgdata = 'TP.DT idx: %.x' % tpidx
     nextline = ''
@@ -107,13 +109,13 @@ def pf_eb(idx, ts, arbtup, data, j1939):
 
     if j1939.skip_TPDT:
         if not len(nextline):
-            return cancat.DONT_PRINT_THIS_MESSAGE 
+            return cancat.DONT_PRINT_THIS_MESSAGE
 
         else:
             return (cancat.DONT_PRINT_THIS_MESSAGE, nextline)
 
     if len(extmsgs['msgs']) > extmsgs['length']:
-            #print "ERROR: too many messages in Extended Message between %.2x -> %.2x\n\t%r" % (sa, da, extmsgs['msgs'])
+            #print("ERROR: too many messages in Extended Message between %.2x -> %.2x\n\t%r" % (sa, da, extmsgs['msgs']))
             pass
 
     if len(nextline):
@@ -127,7 +129,7 @@ def pf_ec(idx, ts, arbtup, data, j1939):
 
         (cb, totsize, pktct, maxct,
                 pgn2, pgn1, pgn0) = struct.unpack('<BHBBBBB', data)
-        
+
         # check for old stuff
         prefix = ''
         extmsgs = j1939.getExtMsgs(sa, da)
@@ -225,7 +227,7 @@ def pf_ec(idx, ts, arbtup, data, j1939):
             CM_ABORT:   ('Abort',         None),
             }
 
-    cb = ord(data[0])
+    cb = data[0]
 
     htup = tp_cm_handlers.get(cb)
     if htup != None:
@@ -233,14 +235,14 @@ def pf_ec(idx, ts, arbtup, data, j1939):
 
         if cb_handler == None:
             if j1939.skip_TPDT:
-                return cancat.DONT_PRINT_THIS_MESSAGE 
+                return cancat.DONT_PRINT_THIS_MESSAGE
 
             return 'TP.CM_%s' % subname
 
         newmsg = cb_handler(idx, ts, arbtup, data, j1939)
 
         if j1939.skip_TPDT:
-            return cancat.DONT_PRINT_THIS_MESSAGE 
+            return cancat.DONT_PRINT_THIS_MESSAGE
 
         if newmsg == None:
             return 'TP.CM_%s' % subname
@@ -252,7 +254,7 @@ def pf_ec(idx, ts, arbtup, data, j1939):
 def pf_ee(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
     if ps == 255 and sa == 254:
         return 'CANNOT CLAIM ADDRESS'
-    
+
     addrinfo = parseName(data).minrepr()
     return "Address Claim: %s" % addrinfo
 
@@ -261,7 +263,7 @@ def pf_ef(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
         return 'Proprietary A2'
 
     return 'Proprietary A1'
-    
+
 def pf_ff(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
     pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, data.encode('hex'))
     return "Proprietary B %s" % pgn
@@ -303,7 +305,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
 
         (cb, totsize, pktct, maxct,
                 pgn2, pgn1, pgn0) = struct.unpack('<BHBBBBB', data)
-        
+
         # check for old stuff
         extmsgs = j1939.getRealExtMsgs(sa, da)
         if len(extmsgs['msgs']):
@@ -402,8 +404,8 @@ def ec_handler(j1939, idx, ts, arbtup, data):
             CM_ABORT:   ('Abort',         None),
             }
 
-    cb = ord(data[0])
-    #print "ec: %.2x%.2x %.2x" % (arbtup[3], arbtup[4], cb)
+    cb = data[0]
+    #print("ec: %.2x%.2x %.2x" % (arbtup[3], arbtup[4], cb))
 
     htup = tp_cm_handlers.get(cb)
     if htup != None:
@@ -423,7 +425,8 @@ def eb_handler(j1939, idx, ts, arbtup, data):
     extmsgs = j1939.getRealExtMsgs(sa, da)
     extmsgs['msgs'].append((arbtup, data))
     if len(extmsgs['msgs']) >= extmsgs['length']:
-        if j1939.verbose: print "eb_handler: saving: %r->%r  %r %r" % (sa, da, len(extmsgs['msgs']) , extmsgs['length'])
+        if j1939.verbose: 
+            print "eb_handler: saving: %r->%r  %r %r" % (sa, da, len(extmsgs['msgs']) , extmsgs['length'])
         tidx = extmsgs['idx']
         pgn2 = extmsgs['pgn2']
         pgn1 = extmsgs['pgn1']
@@ -513,7 +516,7 @@ class J1939(cancat.CanInterface):
                     if len(enhanced) > 1:
                         nextline = '\n'.join(list(enhanced[1:]))
 
-                    # if we get multiple lines and the first is DONT_PRINT_THIS_MESSAGE, 
+                    # if we get multiple lines and the first is DONT_PRINT_THIS_MESSAGE,
                     # then just return nextline
                     if pfmeaning == cancat.DONT_PRINT_THIS_MESSAGE:
                         return nextline
@@ -531,9 +534,9 @@ class J1939(cancat.CanInterface):
         msg = data
 
         # hack to see if this message completed a long message)
-        #if self._last_extmsgs is not None: print idx, self._last_extmsgs[0], self._last_extmsgs
+        #if self._last_extmsgs is not None: print(idx, self._last_extmsgs[0], self._last_extmsgs)
         if self._last_extmsgs is not None and self._last_extmsgs[0] == idx:
-            #print "   DEBUG: SAME INDEX!", self._last_extmsgs
+            #print("   DEBUG: SAME INDEX!", self._last_extmsgs)
             midx, extmsgs = self._last_extmsgs
             if extmsgs['totsize'] > 0:
                 msg = ''.join([msg for arbtup, msg in extmsgs['msgs']])
@@ -545,7 +548,7 @@ class J1939(cancat.CanInterface):
                     pgn = (pgn1 << 8) | pgn0
                 res = J1939PGNdb.get(pgn)
 
-                #print "changing pgn: 0x%x" % pgn
+                #print("changing pgn: 0x%x" % pgn)
 
 
         if (pgn < 0xeb00 or pgn > 0xecff) and res and (self._repr_all_spns or self._repr_spns_by_pgn.get(pgn)):
@@ -563,16 +566,16 @@ class J1939(cancat.CanInterface):
     def _getLocals(self, idx, ts, arbid, data):
         prio, edp, dp, pf, ps, sa = parseArbid(arbid)
         pgn = (pf<<8) | ps
-        lcls = {'idx':idx, 
-                'ts':ts, 
-                'arbid':arbid, 
-                'data':data, 
-                'priority':prio, 
-                'edp':edp, 
-                'dp':dp, 
-                'pf':pf, 
-                'ps':ps, 
-                'sa':sa, 
+        lcls = {'idx':idx,
+                'ts':ts,
+                'arbid':arbid,
+                'data':data,
+                'priority':prio,
+                'edp':edp,
+                'dp':dp,
+                'pf':pf,
+                'ps':ps,
+                'sa':sa,
                 'pgn':pgn,
                 'da':ps,
                 'ge':ps,
@@ -582,10 +585,10 @@ class J1939(cancat.CanInterface):
 
     def _j1939_can_handler(self, message, none):
         '''
-        this function is run for *Every* received CAN message... and is executed from the 
+        this function is run for *Every* received CAN message... and is executed from the
         XMIT/RECV thread.  it *must* be fast!
         '''
-        #print repr(self), repr(cmd), repr(message)
+        #print(repr(self), repr(cmd), repr(message))
         arbid, data = self._splitCanMsg(message)
         idx, ts = self._submitMessage(CMD_CAN_RECV, message)
 
@@ -597,7 +600,7 @@ class J1939(cancat.CanInterface):
             self.queueMessageHandlerEvent(pfhandler, idx, ts, arbtup, data)
             #pfhandler(self, idx, ts, arbtup, data)
 
-        #print "submitted message: %r" % (message.encode('hex'))
+        #print("submitted message: %r" % (message.encode('hex')))
 
 
     def queueMessageHandlerEvent(self, pfhandler, idx, ts, arbtup, data):
@@ -615,13 +618,13 @@ class J1939(cancat.CanInterface):
                 #if self.verbose: print "_mhe_runner: %r %r %r %r %r" % (worktup)
                 pfhandler(self, idx, ts, arbtup, data)
 
-            except Exception, e:
-                print "MsgHandler ERROR: %r (%r)" % (e, worktup)
+            except Exception as e:
+                print("MsgHandler ERROR: %r (%r)" % (e, worktup))
                 if self.verbose:
                     sys.excepthook(*sys.exc_info())
 
 
-        
+
     # functions to support the J1939TP Stack (real stuff, not just repr)
     def getRealExtMsgs(self, sa, da):
         '''
@@ -630,6 +633,7 @@ class J1939(cancat.CanInterface):
 
         if no list exists for this pairing, one is created and an empty list is returned
         '''
+
         #if self.verbose: print 'getRealExtMsgs: %r' % (threading.current_thread())
         self.mquelock.acquire()
         try:
@@ -673,7 +677,7 @@ class J1939(cancat.CanInterface):
 
         returns whether the thing deleted exists previously
         * if da == None, returns whether the sa had anything previously
-        * otherwise, if the list 
+        * otherwise, if the list
         '''
         #if self.verbose: print 'clearRealExtMsgs: %r' % (threading.current_thread())
         exists = False
@@ -707,7 +711,7 @@ class J1939(cancat.CanInterface):
 
         msglist.append((idx, ts, sa, da, pgn, msg, tptype, lastidx))
         if self.verbose: 
-            print "-=-= saving sa:%x da:%x" % (sa, da)
+            print("-=-= saving sa:%x da:%x" % (sa, da))
 
     # This is for the pretty printing stuff...
     def getExtMsgs(self, sa, da):
@@ -749,7 +753,7 @@ class J1939(cancat.CanInterface):
 
         returns whether the thing deleted exists previously
         * if da == None, returns whether the sa had anything previously
-        * otherwise, if the list 
+        * otherwise, if the list
         '''
         exists = False
         msglists = self.extMsgs.get(sa)
@@ -815,7 +819,7 @@ class J1939(cancat.CanInterface):
         if len(msgs) > 255:
             raise Exception("J1939xmit_tp: attempt to send message that's too large")
 
-        cm_msg = struct.pack('<BHBBBBB', CM_RTS, len(message), len(msgs), 0xff, 
+        cm_msg = struct.pack('<BHBBBBB', CM_RTS, len(message), len(msgs), 0xff,
                 pgn2, pgn1, pgn0)
         self.J1939xmit(PF_TP_CM, da, sa, cm_msg, prio=prio)
         time.sleep(.01)  # hack: should watch for CM_CTS
@@ -834,13 +838,14 @@ class J1939(cancat.CanInterface):
         '''
         if start_msg == None:
             start_msg = self._last_recv_idx
-            #print "resuming last recv'd index: %d" % start_msg
+            #print("resuming last recv'd index: %d" % start_msg)
 
         count = 0
         starttime = time.time()
         while (count==0 or (block and time.time()-starttime < timeout)):
             #sys.stderr.write('.')
             count += 1
+
             self.mquelock.acquire()
             try:
                 msgs = self._RealExtMsgs.get((sa, da))
@@ -888,7 +893,8 @@ class J1939(cancat.CanInterface):
         if start_msg == None:
             start_msg = self._last_recv_idx
 
-        print "J1939recv_tp: Searching for response at or after msg idx: %d" % start_msg
+
+        print("J1939recv_tp: Searching for response at or after msg idx: %d" % start_msg)
         msg = self.recvRealExtMsg(sa, da, pgn2, pgn1, pgn0, start_msg, timeout=timeout)
         if msg == None:
             return None
@@ -959,14 +965,14 @@ class J1939(cancat.CanInterface):
             try:
                 msgrepr = self._reprCanMsg(*msg)
                 if msgrepr != cancat.DONT_PRINT_THIS_MESSAGE:
-                    print msgrepr
-            except Exception, e:
-                print e
+                    print(msgrepr)
+            except Exception as e:
+                print(e)
         '''
         example (from start of ECU):
         00000000 1545142410.990 pri/edp/dp: 6/0/0, PG: ea ff  Source: fe  Len: 03, Data: 00ee00              Request
         00000001 1545142411.077 pri/edp/dp: 6/0/0, PG: ee ff  Source: 00  Len: 08, Data: 4cca4d0100000000    Address Claim: id: 0xdca4c mfg: Cummins Inc (formerly Cummins Engine Co) Columbus, IN USA
-    
+
         currently ours:
         00001903 1545142785.127 pri/edp/dp: 6/0/0, PG: ea ff  Source: fe  Len: 03, Data: 00ee00              Request
 
@@ -1003,7 +1009,7 @@ def reprSPNdata(spnlist, msg):
             endBitO = endBit % 8
 
             datablob = msg[startByte:endByte]
-            #print "sb: %d\t eb: %d\t sB:%d\t SBO:%d\t eB:%d\t eBO:%d\t %r" % (startBit, endBit, startByte, startBitO, endByte, endBitO, datablob)
+            #print("sb: %d\t eb: %d\t sB:%d\t SBO:%d\t eB:%d\t eBO:%d\t %r" % (startBit, endBit, startByte, startBitO, endByte, endBitO, datablob))
 
             units = spn.get("Units")
             if units == 'ASCII':
@@ -1019,10 +1025,10 @@ def reprSPNdata(spnlist, msg):
                         datanum |= n
 
                     datanum >>= (7 - endBitO)
-                    #print "datanum: %x" % datanum
+                    #print("datanum: %x" % datanum)
                     mask = bu_masks[endBit - startBit + 1]
                     datanum &= mask
-                    #print "datanum: %x (mask: %x)" % (datanum, mask)
+                    #print("datanum: %x (mask: %x)" % (datanum, mask))
 
                     if units == 'bit':
                         meaning = ''
@@ -1056,7 +1062,7 @@ def reprSPNdata(spnlist, msg):
                         spnData = '%.3f %s' % (datanum, units)
                 except Exception as e:
                     spnData = "ERROR"
-                    print "SPN: %r %r (%r)" % (e, msg, spn)
+                    print("SPN: %r %r (%r)" % (e, msg, spn))
 
         spnlines.append('      SPN(%d): %-20s\t %s' % (spnum, spnData, spnName))
 

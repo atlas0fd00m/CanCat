@@ -1,3 +1,4 @@
+from past.builtins import xrange
 
 import vstruct
 from vstruct.primitives import *

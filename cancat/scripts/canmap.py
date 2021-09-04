@@ -3,7 +3,6 @@ from __future__ import print_function
 
 import sys
 import argparse
-import sets
 import re
 import time
 import signal
@@ -15,7 +14,6 @@ from cancat.utils.types import SparseHexRange, ECUAddress
 from cancat.utils import log
 from cancat.uds.ecu import ECU
 from cancat.uds.utils import ecu_did_scan, ecu_session_scan
-
 
 c = None
 _config = None

@@ -1,8 +1,9 @@
+from __future__ import print_function
+from past.builtins import xrange
+from io import open
 
 import vstruct
-
 from vstruct.primitives import *
-
 
 #const tag descriptions from wikipedia
 #Tag byte    Additional bytes    Description of constant
@@ -208,11 +209,11 @@ if __name__ == '__main__':
     import traceback
 
     for fname in sys.argv[1:]:
-        fbytes = file(fname,'rb').read()
+        fbytes = open(fname,'rb').read()
         c = JavaClass()
         try:
             c.vsParse( fbytes )
-            print c.tree()
+            print(c.tree())
 
             cname = c.getClassName() 
             sname = c.getSuperClassName()
@@ -226,10 +227,10 @@ if __name__ == '__main__':
 
             print('Constants:')
             for fname,const in c.const_pool:
-                print const.tag,const.data.tree()
+                print(const.tag,const.data.tree())
 
-            print c.getClassAttributes().keys()
+            print(c.getClassAttributes().keys())
 
-        except Exception, e:
-            print c.tree()
+        except Exception as e:
+            print(c.tree())
             traceback.print_exc()

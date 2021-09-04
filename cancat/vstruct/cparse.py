@@ -1,3 +1,6 @@
+from __future__ import print_function
+from past.builtins import xrange
+
 import vivisect.contrib
 
 from pycparser import c_parser
@@ -64,7 +67,7 @@ class StructParser:
         p = self.cls_parsers.get( elem.__class__ )
         if p == None:
             raise Exception('OMG NO PARSER FOR: %r' % elem)
-        #print 'getVsElement %s %s' % (astelem, p)
+        #print('getVsElement %s %s' % (astelem, p))
         return p( astelem )
 
     def c_getPointer(self, pdecl):
@@ -114,7 +117,7 @@ class StructParser:
         return int(celem[1].value)
 
     def c_getFuncDecl(self, felem):
-        print 'WOO'*300
+        print('WOO'*300)
 
     def parseStructSource(self, src):
         src = preProcessSource( src )
@@ -180,5 +183,5 @@ if __name__ == '__main__':
 
     a = awesome()
     a.vsParse('XXXXZZZZhow cool is this?\x00\x00\x00YYYYblahQQQQ')
-    print a.tree()
+    print(a.tree())
 
