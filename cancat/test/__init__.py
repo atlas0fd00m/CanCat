@@ -2,13 +2,11 @@
 import usb
 import time
 import queue
+import struct
 import logging
 import unittest
 import threading
 import traceback
-
-from rflib.const import *
-from rflib.bits import ord23
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 logger = logging.getLogger(__name__)

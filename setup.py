@@ -3,7 +3,7 @@ import sys
 import codecs
 import setuptools
 
-version = '1.9.3'
+version = '1.9.3.3'
 packages = ['cancat','cancat/vstruct']
 mods = []
 pkgdata = {}
@@ -33,6 +33,7 @@ setuptools.setup  (name  = 'cancat',
                 "pyusb",
                 "termcolor",
                 "future",
+                "six",
             ],
         classifiers      = [
                             'Development Status :: 5 - Production/Stable',

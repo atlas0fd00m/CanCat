@@ -3,3 +3,4 @@ pyserial
 pyusb
 termcolor
 future
+six
