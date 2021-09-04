@@ -268,8 +268,14 @@ class CanInterface(object):
         if self._io != None:
             self._io.close()
 
-        self._io = serial.Serial(port=self.port, baudrate=self._baud, dsrdtr=True)
-        self._io.setDTR(True)
+        # SHIM to allow us to easily specify a Fake CanCat for testing
+        if self.port == 'FakeCanCat':
+            import cancat.tests as testcat
+            self._io = testcat.FakeCanCat()
+
+        else:
+            self._io = serial.Serial(port=self.port, baudrate=self._baud, dsrdtr=True)
+            self._io.setDTR(True)
 
         # clear all locks and free anything waiting for them
         if self._in_lock != None:

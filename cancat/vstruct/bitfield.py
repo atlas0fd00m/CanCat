@@ -1,4 +1,4 @@
-import envi.bits as e_bits
+import cancat.envi.bits as e_bits
 from vstruct import VStruct
 from vstruct.primitives import *
 from binascii import unhexlify
