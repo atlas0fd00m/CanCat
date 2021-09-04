@@ -3,7 +3,7 @@ import os
 import codecs
 import setuptools
 
-version = '1.0.1'
+version = '1.9.0'
 packages = ['cancat','cancat/vstruct']
 mods = []
 pkgdata = {}
@@ -20,10 +20,10 @@ setuptools.setup  (name  = 'cancat',
         version          = version,
         description      = "Multi-purpose tool for interacting with Controller Area Networks (CAN) and SAE J1939",
         long_description = readme(),
-        author           = 'atlas of d00m',
+        author           = 'atlas of d00m and the GRIMM CyPhy team',
         author_email     = 'atlas@r4780y.com',
         url              = 'https://github.com/atlas0fd00m/CanCat',
-        download_url     = 'https://github.com/atlas0fd00m/rfcat/archive/v%s.tar.gz' % version,
+        download_url     = 'https://github.com/atlas0fd00m/CanCat/archive/v%s.tar.gz' % version,
         keywords         = ['can', 'controller area network', 'automotive', 'j1939', 'hacking', 'reverse engineering'],
         packages         = setuptools.find_packages(),
         package_data     = pkgdata,
@@ -46,11 +46,12 @@ setuptools.setup  (name  = 'cancat',
 
                             # Specify the Python versions you support here. In particular, ensure
                             # that you indicate whether you support Python 2, Python 3 or both.
-                            'Programming Language :: Python :: 2',
-                            'Programming Language :: Python :: 2.7',
-                            #'Programming Language :: Python :: 3',
-                            #'Programming Language :: Python :: 3.8',
-                            #'Operating System :: OS Indepentent',
+                            'Programming Language :: Python :: 3',
+                            'Programming Language :: Python :: 3.6',
+                            'Programming Language :: Python :: 3.7',
+                            'Programming Language :: Python :: 3.8',
+                            'Programming Language :: Python :: 3.9',
+                            'Operating System :: OS Indepentent',
                            ],
-        python_requires  = '>=2.7'
+        python_requires  = '>=3.6'
         )

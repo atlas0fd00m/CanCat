@@ -172,9 +172,56 @@ class FakeCanCat:
         data = msg[3:]
 
         if cmd == CMD_CHANGE_BAUD:
+            print(b'=CMD_CHANGE_BAUD=')
             self.log(b"CMD_CHANGE_BAUD")
+            self.CanCat_send(b'\x01', CMD_CHANGE_BAUD_RESULT)
 
         elif cmd == CMD_PING:
             print(b'=CMD_PING=')
+            self.log(b'=CMD_PING=')
             self.CanCat_send(data, CMD_PING_RESPONSE)
 
+        elif cmd == CMD_CAN_MODE:
+            print(b'=CMD_CAN_MODE:%r=' % data)
+            self.log(b'=CMD_CAN_MODE:%r=' % data)
+            self.CanCat_send(b'\x01', CMD_CAN_MODE_RESULT)
+
+        elif cmd == CMD_CAN_BAUD:
+            print(b'=CMD_CAN_BAUD:%r=' % data)
+            self.log(b'=CMD_CAN_BAUD:%r=' % data)
+            self.CanCat_send(b'\x01', CMD_CAN_BAUD_RESULT)
+
+        elif cmd == CMD_CAN_SEND:
+            print(b'=CMD_CAN_SEND:%r=' % data)
+            self.log(b'=CMD_CAN_SEND:%r=' % data)
+            self.CanCat_send(b'\x01', CMD_CAN_SEND_RESULT)
+
+        elif cmd == CMD_SET_FILT_MASK:
+            print(b'=CMD_SET_FILT_MASK:%r=' % data)
+            self.log(b'=CMD_SET_FILT_MASK:%r=' % data)
+            self.CanCat_send(b'\x01', CMD_SET_FILT_MASK_RESULT)
+
+        elif cmd == CMD_CAN_SEND_ISOTP:
+            print(b'=CMD_CAN_SEND_ISOTP:%r=' % data)
+            self.log(b'=CMD_CAN_SEND_ISOTP:%r=' % data)
+            self.CanCat_send(b'\x01', CMD_CAN_SEND_ISOTP_RESULT)
+
+        elif cmd == CMD_CAN_RECV_ISOTP:
+            print(b'=CMD_CAN_RECV_ISOTP:%r=' % data)
+            self.log(b'=CMD_CAN_RECV_ISOTP:%r=' % data)
+            self.CanCat_send(b'\x01', CMD_CAN_RECV_ISOTP_RESULT)
+
+        elif cmd == CMD_CAN_SENDRECV_ISOTP:
+            print(b'=CMD_CAN_SENDRECV_ISOTP:%r=' % data)
+            self.log(b'=CMD_CAN_SENDRECV_ISOTP:%r=' % data)
+            self.CanCat_send(b'\x01', CMD_CAN_SENDRECV_ISOTP_RESULT)
+
+        elif cmd == CMD_PRINT_CAN_REGS:
+            print(b'=CMD_PRINT_CAN_REGS:%r=' % data)
+            self.log(b'=CMD_PRINT_CAN_REGS:%r=' % data)
+            #self.CanCat_send(b'\x01', CMD_PRINT_CAN_REGS_RESULT)??
+
+        else:
+            print(b'===BAD COMMAND: %x : %r' % (cmd, data))
+            self.log(b'===BAD COMMAND: %x : %r' % (cmd, data))
+            self.CanCat_send(b'===BAD COMMAND: %x : %r' % (cmd, data), 3)
