@@ -62,7 +62,7 @@ CAN_RESP_GETTXBFTIMEOUT     = (6)
 CAN_RESP_SENDMSGTIMEOUT     = (7)
 CAN_RESP_FAIL               = (0xff)
 
-CAN_RESPS = { v: k for k,v in globals().items() if k.startswith('CAN_RESP') }
+CAN_RESPS = { v: k for k,v in globals().items() if k.startswith('CAN_RESP_') }
 
 # constants for setting baudrate for the CAN bus
 CAN_AUTOBPS  = 0
@@ -2243,7 +2243,6 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     gbls = globals()
     lcls = locals()
 
-    print intro
     try:
         import IPython
         ipsh = IPython.embed(banner1=intro, colors="neutral")
