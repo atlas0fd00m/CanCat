@@ -274,8 +274,14 @@ class CanInterface(object):
         if self._io != None:
             self._io.close()
 
-        self._io = serial.Serial(port=self.port, baudrate=self._baud, dsrdtr=True, timeout=None)
-        self._io.setDTR(True)
+        # SHIM to allow us to easily specify a Fake CanCat for testing
+        if self.port == 'FakeCanCat':
+            import cancat.test as testcat
+            self._io = testcat.FakeCanCat()
+
+        else:
+            self._io = serial.Serial(port=self.port, baudrate=self._baud, dsrdtr=True, timeout=None)
+            self._io.setDTR(True)
 
         # clear all locks and free anything waiting for them
         if self._in_lock != None:
@@ -528,8 +534,9 @@ class CanInterface(object):
             finally:
                 self._out_lock.release()
             # FIXME: wait for response?
-        except:
-            print("Could not acquire lock. Are you trying interactive commands without an active connection?")
+        except Exception as e:
+            print("Exception: %r" % e)
+            #print("Could not acquire lock. Are you trying interactive commands without an active connection?")
 
     def CANrecv(self, count=1):
         '''
