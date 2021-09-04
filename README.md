@@ -251,11 +251,11 @@ time out.
 ```python
 for i in range(0x700, 0x7f8):  
     u = uds.UDS(c, i, i+8)
-    print "Trying ", hex(i)
+    print("Trying ", hex(i))
     try:
         u.ReadDID(0xf190)
     except:
-        print "Error reading DID 0xF190, server exists at this address"
+        print("Error reading DID 0xF190, server exists at this address")
 ```
 
 If a timeout is received then no UDS server responded on the address.
@@ -269,9 +269,9 @@ other identifying information for this UDS server.
 ```python
 for i in range(0xf180, 0xf1a0):
     try:                  
-        print u.ReadDID(i)
+        print(u.ReadDID(i))
     except:          
-        print hex(i), " Returned error"
+        print(hex(i), " Returned error")
 ```
 
 Other UDS functionality includes:

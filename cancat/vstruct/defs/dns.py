@@ -1,5 +1,6 @@
-import socket
+from past.builtins import xrange
 
+import socket
 import vstruct
 from vstruct.primitives import *
 import vstruct.defs.inet as vs_inet
@@ -169,7 +170,7 @@ class DnsNameLabel(vstruct.VStruct):
             ordlabel = 0
             # some broken(?) packets have a pointer with an empty label
             if self.label:
-                ordlabel = ord(self.label)
+                ordlabel = self.label
             # the length field's lower 6 bits + the 8 bits from the label form the pointer
             self._pointer = ((self.length ^ 0xc0) << 8) + ordlabel
 

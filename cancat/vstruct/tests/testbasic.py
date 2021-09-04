@@ -1,3 +1,6 @@
+from __future__ import print_function
+from past.builtins import xrange
+
 import unittest
 
 import vstruct
@@ -166,7 +169,7 @@ class VStructTest(unittest.TestCase):
 
 
         v.vsParse('AAAAAAA')
-        #print v.tree()
+        #print(v.tree())
         self.assertEqual(1, v.w)
         self.assertEqual(0, v.x)
         self.assertEqual(1, v.y)
@@ -180,7 +183,7 @@ class VStructTest(unittest.TestCase):
         self.assertEqual('AAAAAAA', v.vsEmit())
 
         v.vsParse('ABCDEFG')
-        #print v.tree()
+        #print(v.tree())
         self.assertEqual(1, v.w)
         self.assertEqual(0, v.x)
         self.assertEqual(1, v.y)
@@ -195,7 +198,7 @@ class VStructTest(unittest.TestCase):
 
 
         v.vsParse('zxcvbnm')
-        #print v.tree()
+        #print(v.tree())
         self.assertEqual(1, v.w)
         self.assertEqual(7, v.x)
         self.assertEqual(2, v.y)
@@ -210,7 +213,7 @@ class VStructTest(unittest.TestCase):
 
         
         v.vsParse('asdfghj')
-        #print v.tree()
+        #print(v.tree())
         self.assertEqual(1, v.w)
         self.assertEqual(4, v.x)
         self.assertEqual(1, v.y)

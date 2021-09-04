@@ -1,3 +1,6 @@
+from __future__ import print_function
+from builtins import input
+
 import sys
 import time
 import cancat
@@ -156,12 +159,12 @@ class NegativeResponseException(Exception):
     def __repr__(self):
         negresprepr = NEG_RESP_CODES.get(self.neg_code)
         return "NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s   \tmsg: %s" % \
-            (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg.encode('hex'))
+            (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg)
 
     def __str__(self):
         negresprepr = NEG_RESP_CODES.get(self.neg_code)
         return "NEGATIVE RESPONSE to 0x%x (%s):   ERROR 0x%x: %s   \tmsg: %s" % \
-            (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg.encode('hex'))
+            (self.svc, UDS_SVCS.get(self.svc), self.neg_code, negresprepr, self.msg)
 
 
 class UDS(object):
@@ -183,21 +186,21 @@ class UDS(object):
 
         # check if the response is something we know about and can help out
         if msg != None and len(msg):
-            svc = ord(data[0])
-            svc_resp = ord(msg[0])
+            svc = data[0]
+            svc_resp = msg[0]
             errcode = 0
             if len(msg) >= 3:
-                errcode = ord(msg[2])
+                errcode = msg[2]
 
             if svc_resp == svc + 0x40:
-                if self.verbose: 
-                    print "Positive Response!"
+                if self.verbose:
+                    print("Positive Response!")
 
             negresprepr = NEG_RESP_CODES.get(errcode)
             if negresprepr != None and svc_resp != svc + 0x40:
-                if self.verbose > 1: 
-                    print negresprepr + "\n"
-
+                if self.verbose > 1:
+                    print(negresprepr + "\n")
+                # TODO: Implement getting final message if ResponseCorrectlyReceivedResponsePending is received
                 if errcode != 0x78: # Don't throw an exception for ResponseCorrectlyReceivedResponsePending
                     raise NegativeResponseException(errcode, svc, msg)
                 else:
@@ -206,11 +209,11 @@ class UDS(object):
 
         return msg
 
-       
     def _do_Function(self, func, data=None, subfunc=None, service=None):
-        omsg = chr(func)
         if subfunc != None:
-            omsg += chr(subfunc)
+            omsg = struct.pack('>BB', func, subfunc)
+        else:
+            omsg = struct.pack('>B', func)
 
         if data != None:
             omsg += data
@@ -239,7 +242,7 @@ class UDS(object):
             self.t.join(5.0)
             if self.t.isAlive():
                 if self.verbose: 
-                    print "Error killing Tester Present thread"
+                    print("Error killing Tester Present thread")
             self.t = None
 
     def DiagnosticSessionControl(self, session):
@@ -250,7 +253,7 @@ class UDS(object):
         currIdx = self.c.getCanMsgCount()
         return self._do_Function(SVC_READ_MEMORY_BY_ADDRESS, subfunc=0x24, data=struct.pack(">IH", address, size), service = 0x63)
         #return self.xmit_recv("\x23\x24" + struct.pack(">I", address) + struct.pack(">H", size), service = 0x63)
-        
+
     def ReadDID(self, did):
         '''
         Read the Data Identifier specified from the ECU.
@@ -280,19 +283,19 @@ class UDS(object):
         try:
             pack_fmt_str += {1:"B", 2:"H", 4:"I"}.get(addr_format >> 4) + {1:"B", 2:"H", 4:"I"}.get(addr_format & 0xf)
         except TypeError:
-            print "Cannot parse addressAndLengthFormatIdentifier", hex(addr_format)
+            print("Cannot parse addressAndLengthFormatIdentifier", hex(addr_format))
             return None
         msg = self.xmit_recv("\x34" + struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data)), extflag=self.extflag, service = 0x74)
 
         # Parse the response
-        if ord(msg[0]) != 0x74:
-            print "Error received: {}".format(msg.encode('hex'))
+        if msg[0] != 0x74:
+            print("Error received: {}".format(msg.encode('hex')))
             return msg
-        max_txfr_num_bytes = ord(msg[1]) >> 4 # number of bytes in the max tranfer length parameter
-        max_txfr_len = 0 
+        max_txfr_num_bytes = msg[1] >> 4 # number of bytes in the max tranfer length parameter
+        max_txfr_len = 0
         for i in range(2,2+max_txfr_num_bytes):
             max_txfr_len <<= 8
-            max_txfr_len += ord(msg[i])
+            max_txfr_len += msg[i]
 
         # Transfer data
         data_idx = 0
@@ -305,11 +308,11 @@ class UDS(object):
                 block_idx = 0
 
             # error checking
-            if msg is not None and ord(msg[0]) == 0x7f and ord(msg[2]) != 0x78:
-                print "Error sending data: {}".format(msg.encode('hex'))
+            if msg is not None and msg[0] == 0x7f and msg[2] != 0x78:
+                print("Error sending data: {}".format(msg.encode('hex')))
                 return None
             if msg is None:
-                print "Didn't get a response?"
+                print("Didn't get a response?")
                 data_idx -= max_txfr_len - 2
                 block_idx -= 1
                 if block_idx == 0:
@@ -332,7 +335,7 @@ class UDS(object):
         lenlenbyte = (lenlen << 4) | addrlen
 
         msg = self._do_Function(SVC_READ_MEMORY_BY_ADDRESS, data=struct.pack('<BI' + lfmt, lenlenbyte, address, length), service=0x63)
-        
+
         return msg
 
     def writeMemoryByAddress(self, address, data, lenlen=1, addrlen=4):
@@ -351,7 +354,7 @@ class UDS(object):
 
         msg = self._do_Function(SVC_WRITE_MEMORY_BY_ADDRESS, data=data, service=0x63)
         #msg = self.xmit_recv(data, service=0x63)
-        
+
         return msg
 
 
@@ -359,7 +362,7 @@ class UDS(object):
         '''
         Work in progress!
         '''
-        msg = self._do_Function(SVC_REQUEST_UPLOAD, subfunc=data_format, data = chr(addr_format) + struct.pack('>I', addr)[1:] +  struct.pack('>I', length)[1:]) 
+        msg = self._do_Function(SVC_REQUEST_UPLOAD, subfunc=data_format, data = chr(addr_format) + struct.pack('>I', addr)[1:] +  struct.pack('>I', length)[1:])
 
         sid, lfmtid, maxnumblocks = struct.unpack('>BBH', msg[:4])
 
@@ -369,12 +372,12 @@ class UDS(object):
             output.append(msg)
 
             if len(msg) and msg[0] != '\x76':
-                print "FAILURE TO DOWNLOAD ALL.  Returning what we have so far (including error message)"
+                print("FAILURE TO DOWNLOAD ALL.  Returning what we have so far (including error message)")
                 return output
 
         msg = self._do_Function(SVC_REQUEST_TRANSFER_EXIT)
         if len(msg) and msg[0] != '\x77':
-            print "FAILURE TO EXIT CLEANLY.  Returning what we received."
+            print("FAILURE TO EXIT CLEANLY.  Returning what we received.")
 
         return output
 
@@ -407,7 +410,7 @@ class UDS(object):
         try:
             for x in range(start, end):
                 try:
-                    if self.verbose: 
+                    if self.verbose:
                         sys.stderr.write(' %x ' % x)
 
                     val = self.ReadDID(x)
@@ -416,14 +419,14 @@ class UDS(object):
                 except KeyboardInterrupt:
                     raise
 
-                except Exception, e:
+                except Exception as e:
                     if self.verbose > 1:
-                        print e
+                        print(e)
 
                 time.sleep(delay)
 
         except KeyboardInterrupt:
-            print "Stopping Scan during DID 0x%x " % x
+            print("Stopping Scan during DID 0x%x " % x)
             return success
 
         return success
@@ -437,8 +440,8 @@ class UDS(object):
         msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service = 0x67)
         if msg is None:
             return msg
-        if(ord(msg[0]) == 0x7f):
-            print "Error getting seed:", msg.encode('hex')
+        if msg[0] == 0x7f:
+            print("Error getting seed:", msg.encode('hex'))
 
         else:
             seed = msg[2:]
@@ -456,7 +459,7 @@ class UDS(object):
             @secret = a SecurityAccess algorithm specific key
            Returns the key, as a string of key bytes.
         """
-        print "Not implemented in this class"
+        print("Not implemented in this class")
         return 0
 
 
@@ -467,21 +470,19 @@ def printUDSSession(c, tx_arbid, rx_arbid=None, paginate=45):
     msgs = [msg for msg in c.genCanMsgs(arbids=[tx_arbid, rx_arbid])]
 
     msgs_idx = 0
-    
+
     linect = 1
     while msgs_idx < len(msgs):
         arbid, isotpmsg, count = cisotp.msg_decode(msgs, msgs_idx)
-        #print "Message: (%s:%s) \t %s" % (count, msgs_idx, isotpmsg.encode('hex'))
-        svc = ord(isotpmsg[0])
+        #print("Message: (%s:%s) \t %s" % (count, msgs_idx, isotpmsg.encode('hex')))
+        svc = isotpmsg[0]
         mtype = (RESP_CODES, UDS_SVCS)[arbid==tx_arbid].get(svc, '')
 
-        print "Message: (%s:%s) \t %-30s %s" % (count, msgs_idx, isotpmsg.encode('hex'), mtype)
+        print("Message: (%s:%s) \t %-30s %s" % (count, msgs_idx, isotpmsg.encode('hex'), mtype))
         msgs_idx += count
 
         if paginate:
             if (linect % paginate)==0:
-                raw_input("%x)  PRESS ENTER" % linect)
+                input("%x)  PRESS ENTER" % linect)
 
         linect += 1
-        
-

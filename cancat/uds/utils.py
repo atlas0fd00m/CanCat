@@ -102,7 +102,7 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
         match_len = 1
 
     for idx, _, _, msg in u.c.genCanMsgs(start=start_index, arbids=[tx_arbid], maxsecs=timeout):
-        ftype = ord(msg[0]) >> 4
+        ftype = msg[0] >> 4
         # Our Tx arbid is probably a 0, but check for frame type 1 as well.
         if (ftype == 0 and msg[1:1+match_len] == tx_match_bytes) or \
                 (ftype == 1 and msg[2:2+match_len] == tx_match_bytes):
@@ -118,7 +118,7 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
     err_match = struct.pack('>BB', uds.SVC_NEGATIVE_RESPONSE, service)
 
     for idx, _, arbid, msg in u.c.genCanMsgs(start=tx_index+1, arbids=rx_range, maxsecs=timeout):
-        ftype = ord(msg[0]) >> 4
+        ftype = msg[0] >> 4
         # Check for frame types 0 (positive and negative responses) and 1
         if (ftype == 0 and msg[1:1+match_len] == rx_match_bytes) or \
                 (ftype == 0 and msg[1:3] == err_match) or \
@@ -198,7 +198,7 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
                 if possible_match:
                     log.warn('Possible non-standard responses for {} found:'.format(addr))
                     rx_arbid, msg = possible_match
-                    log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
+                    log.warn('{}: {}'.format(hex(rx_arbid), msg.hex()))
                     possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
         except uds.NegativeResponseException as e:
             log.debug('{} DID {}: {}'.format(addr, hex(did), e))
@@ -282,7 +282,7 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
                     if responses:
                         log.warn('Possible non-standard responses for {} found:'.format(addr))
                         rx_arbid, msg = possible_match
-                        log.warn('{}: {}'.format(hex(rx_arbid), msg.encode('hex')))
+                        log.warn('{}: {}'.format(hex(rx_arbid), msg.hex()))
                         possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
         except uds.NegativeResponseException as e:
             log.debug('{} session {}: {}'.format(addr, session, e))
@@ -346,8 +346,8 @@ def did_read_scan(u, did_range, delay=None):
         if resp is not None:
             log.debug('DID {}: {}'.format(hex(i), resp))
             if 'resp' in resp:
-                printable_did = ''.join([x if x in string.printable else '' for x in resp['resp'][3:]])
-                log.msg('DID {}: {} ({})'.format(did_str(i), resp['resp'].encode('hex'), printable_did))
+                printable_did = ''.join([chr(x) if chr(x) in string.printable else '' for x in resp['resp'][3:]])
+                log.msg('DID {}: {} ({})'.format(did_str(i), resp['resp'], printable_did))
             else:
                 log.msg('DID {}: ERR {}'.format(did_str(i), err_str(resp['err'])))
             dids[i] = resp
@@ -382,7 +382,7 @@ def did_write_scan(u, did_range, write_data, delay=None):
         if resp is not None:
             log.detail('DID {}: {}'.format(hex(i), resp))
             if 'resp' in resp:
-                log.msg('DID {}: {}'.format(did_str(i), resp['resp'].encode('hex')))
+                log.msg('DID {}: {}'.format(did_str(i), resp['resp'].hex()))
             else:
                 log.msg('DID {}: {}'.format(did_str(i), err_str(resp['err'])))
             dids[i] = resp
@@ -436,7 +436,7 @@ def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=No
             resp['prereqs'] = list(prereq_sessions)
             log.debug('session {}: {}'.format(i, resp))
             if 'resp' in resp:
-                log.msg('SESSION {}: {} ({})'.format(i, resp['resp'].encode('hex'), prereq_sessions))
+                log.msg('SESSION {}: {} ({})'.format(i, resp['resp'].hex(), prereq_sessions))
             else:
                 log.msg('SESSION {}: {} ({})'.format(i, err_str(resp['err']), prereq_sessions))
             sessions[i] = resp
@@ -523,7 +523,7 @@ def auth_scan(u, auth_range, key_func=None, delay=None):
         if resp is not None:
             log.debug('auth {}: {}'.format(i, resp))
             if 'resp' in resp:
-                log.msg('SECURITY {}: {}'.format(i, resp['resp'].encode('hex')))
+                log.msg('SECURITY {}: {}'.format(i, resp['resp'].hex()))
             else:
                 log.msg('SECURITY {}: {}'.format(i, err_str(resp['err'])))
             auth_levels[i] = resp

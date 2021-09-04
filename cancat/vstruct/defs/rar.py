@@ -1,3 +1,7 @@
+from __future__ import print_function
+from past.builtins import xrange
+from io import open
+
 import os
 import sys
 
@@ -154,7 +158,7 @@ class FILE_HEADER(Rar4Block):
             raise Exception("FIXME supprort LHD_EXTTIME")
 
         def setFileNameSize(x):
-            #print 'NAME SIZE',self.HEAD_DATA.NameSize 
+            #print('NAME SIZE',self.HEAD_DATA.NameSize)
             filename.vsSetLength( self.HEAD_DATA.NameSize )
 
         self.HEAD_DATA.vsAddParseCallback('NameSize',setFileNameSize)
@@ -204,7 +208,7 @@ class FILE_HEADER(Rar4Block):
                 #raise Exception("FIXME supprort LHD_EXTTIME")
 
             #def setFileNameSize(x):
-                #print 'NAME SIZE',self.HEAD_DATA.NameSize 
+                #print('NAME SIZE',self.HEAD_DATA.NameSize)
                 #filename.vsSetLength( self.HEAD_DATA.NameSize )
 
             #self.HEAD_DATA.vsAddParseCallback('NameSize',setFileNameSize)
@@ -254,35 +258,35 @@ def initIvKey30(passwd,salt):
 
     passb = passwd.encode('utf-16le')
     initkey = passb + salt
-    print 'PASS','->%s<-' % passwd
-    print 'SALT',salt.encode('hex')
-    print 'INIT',initkey.encode('hex')
+    print('PASS','->%s<-' % passwd)
+    print('SALT',salt.encode('hex'))
+    print('INIT',initkey.encode('hex'))
 
     sha1hash = hashlib.sha1()
     #sha1hash = rarsha()
     # crazy russian awesomeness/paranoia
     for i in xrange(rounds): # srsly?!?! fscking russians ;)
         sha1hash.update(initkey)
-        #print "INITKEY",initkey.encode("hex")
+        #print("INITKEY",initkey.encode("hex"))
         ib = struct.pack('<I',i)
         sha1hash.update( ib[:3] )
         #sha1hash.update( iblist[i] )
 
-        #print "pswnum",ib[:3].encode('hex')
+        #print("pswnum",ib[:3].encode('hex'))
         if i % roundsdiv == 0:
             digest = sha1hash.digest()
             #digest = sha1hash.done()
-            #print 'shaiv',digest.encode('hex')
+            #print('shaiv',digest.encode('hex'))
             aesiv[ i / roundsdiv ] = digest[-1]
-            #print 'AESINIT',i/roundsdiv,digest[-1].encode('hex')
+            #print('AESINIT',i/roundsdiv,digest[-1].encode('hex'))
             #raise 'WOOT'
 
-    print 'IV',(''.join(aesiv)).encode('hex')
+    print('IV',(''.join(aesiv)).encode('hex'))
     endswap = struct.unpack_from('<4I', sha1hash.digest())
     aeskey  = struct.pack('>4I', *endswap)
-    print 'KEY',aeskey.encode('hex')
+    print('KEY',aeskey.encode('hex'))
     #digest = sha1hash.digest()
-    #print 'PREKEY',digest.encode('hex')
+    #print('PREKEY',digest.encode('hex'))
     #for i in xrange(4):
         #for j in xrange(4):
             #aeskey[ (i*4) + j ] = chr( (digest[i] >> (j*8)) & 0xff )
@@ -350,9 +354,9 @@ class Rar:
         iv,key = initIvKey30(passwd,self.salt)
         aes = aesInit(iv,key)
         clearbuf = aes.decrypt(self.trybuf)
-        #print 'CLEAR',clearbuf.encode('hex')
+        #print('CLEAR',clearbuf.encode('hex'))
         crc,ctype,cflags,csize = struct.unpack_from('<HBHH', clearbuf)
-        #print 'CTYPE',hex(ctype),hex(FILE_HEAD)
+        #print('CTYPE',hex(ctype),hex(FILE_HEAD))
         return ctype == FILE_HEAD
 
     def setFilePasswd(self, passwd):
@@ -369,7 +373,7 @@ class Rar:
         while len(self.clearbuf) < size:
             crypted = self.fd.read(4096)
             self.clearbuf += self.aes.decrypt(crypted)
-            print 'CLEARBUF',self.clearbuf.encode('hex')
+            print('CLEARBUF',self.clearbuf.encode('hex'))
 
         ret = self.clearbuf[:size]
         self.clearbuf = self.clearbuf[size:]
@@ -398,14 +402,14 @@ class Rar:
                 #remain = csize % 16
                 #if remain:
                     #pad = self.read( 16 - remain )
-                    #print 'PAD',pad.encode('hex')
+                    #print('PAD',pad.encode('hex'))
 
             cls = rar4blocks.get(rar4.HEAD_TYPE)
             if cls != None:
                 rar4 = cls()
                 rar4.vsParse(hdr+body)
 
-            print rar4.tree()
+            print(rar4.tree())
             import sys; sys.stdin.readline()
 
             #if ctype == MAIN_HEAD and cflags & MHD_PASSWORD:
@@ -428,21 +432,21 @@ class Rar:
 def main():
 
     offset = 0
-    fd = file(sys.argv[1], 'rb')
+    fd = open(sys.argv[1], 'rb')
     testpass = sys.argv[2]
 
     rar = Rar()
     rar.parseRarHeader(fd)
     rar.mainhead.tree()
 
-    #print "FAIL TEST",rar.tryFilePasswd('asdf')
-    #print "PASS TEST",rar.tryFilePasswd(testpass)
+    #print("FAIL TEST",rar.tryFilePasswd('asdf'))
+    #print("PASS TEST",rar.tryFilePasswd(testpass))
 
     rar.setFilePasswd(testpass)
-    #print rar.read(4096).encode('hex')
+    #print(rar.read(4096).encode('hex'))
     rar.iterRar4Files()
     #for x in rar.iterRar4Chunks():
-        #print x
+        #print(x)
     return
 
     buf = fd.read(1024000)
@@ -451,31 +455,31 @@ def main():
 
     rar4 = Rar4Block()
     offset = rar4.vsParse(buf,offset=offset)
-    print rar4.tree()
+    print(rar4.tree())
 
-    #print 'PRE',buf[offset:offset+32].encode('hex')
+    #print('PRE',buf[offset:offset+32].encode('hex'))
     salt = buf[offset:offset+SIZE_SALT30]
-    print 'SALT',salt.encode('hex')
+    print('SALT',salt.encode('hex'))
     offset += SIZE_SALT30
 
     iv,key = initIvKey30(testpass,salt)
-    #print 'IV',iv.encode('hex')
-    #print 'KEY',key.encode('hex')
+    #print('IV',iv.encode('hex'))
+    #print('KEY',key.encode('hex'))
     aes = aesInit(iv,key)
     #raise 'woot'
-    #print aes.decrypt(buf[offset:offset+64]).encode('hex')
+    #print(aes.decrypt(buf[offset:offset+64]).encode('hex'))
     x = aes.decrypt(buf[offset:offset+64])
 
     rar4 = Rar4Block()
     rar4.vsParse(x)
     #offset = rar4.vsParse(buf,offset=offset)
-    print rar4.tree()
+    print(rar4.tree())
 
     #while offset < len(b):
         #r = RarBlock()
         #newoff = r.vsParse(b, offset=offset)
-        #print 'CRC',r.HEAD_CRC,r.HEAD_TYPE
-        #print r.tree(va=offset)
+        #print('CRC',r.HEAD_CRC,r.HEAD_TYPE)
+        #print(r.tree(va=offset))
 
         #offset = newoff
         

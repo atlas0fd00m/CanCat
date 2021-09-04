@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import cancat.envi.bits as e_bits
 from vstruct import VStruct
 from vstruct.primitives import *
@@ -75,7 +77,7 @@ class VBitField(VStruct):
 
             # adjust forward from last fields bits % 8
             startbyte,startbit = divmod(bitoff,8)
-            #print 'BYTE BIT OFF',byteoff,bitoff,(
+            #print('BYTE BIT OFF',byteoff,bitoff)
             #offset += bittobyte
 
             endbyte,endbit = divmod(bitoff + field._vs_bitwidth,8)
