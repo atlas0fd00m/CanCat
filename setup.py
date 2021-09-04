@@ -1,25 +1,22 @@
-import sys
 import os
+import sys
 import codecs
 import setuptools
 
-version = '1.9.1'
+version = '1.9.3'
 packages = ['cancat','cancat/vstruct']
 mods = []
 pkgdata = {}
 scripts = ['CanCat.py', 'J1939Cat']
 
-requirements = open('requirements.txt').read().split('\n')
-
-# Readme function to show readme as a description in pypi
-def readme():
-    with codecs.open('README.md', encoding='utf-8') as f:
-        return f.read()
+dirn = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(dirn, 'README.md'), 'r') as fd:
+    desc = fd.read()
 
 setuptools.setup  (name  = 'cancat',
         version          = version,
         description      = "Multi-purpose tool for interacting with Controller Area Networks (CAN) and SAE J1939",
-        long_description = readme(),
+        long_description = desc,
         long_description_content_type='text/markdown',
         author           = 'atlas of d00m and the GRIMM CyPhy team',
         author_email     = 'atlas@r4780y.com',
@@ -30,7 +27,12 @@ setuptools.setup  (name  = 'cancat',
         package_data     = pkgdata,
         ext_modules      = mods,
         scripts          = scripts,
-        install_requires = requirements,
+        install_requires = [    
+                "ipython",
+                "pyserial",
+                "pyusb",
+                "termcolor",
+            ],
         classifiers      = [
                             'Development Status :: 5 - Production/Stable',
                             'Intended Audience :: Telecommunications Industry',
