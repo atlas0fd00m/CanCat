@@ -4,11 +4,11 @@ import traceback
 # we can move things into here if we decide this replaces the exiting j1939 modules
 import cancat
 import struct
-from J1939db import *
+from cancat.J1939db import *
 from cancat import *
 from cancat.vstruct.bitfield import *
 
-import Queue
+import queue
 import threading
 ''' 
 This is a J1939 Stack module.
@@ -97,25 +97,29 @@ def pf_c9(idx, ts, arbtup, data, j1939):
     
     return "Request2: %s %s" % (req,  usexferpgn)
 
-def pf_ea(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+def pf_ea(idx, ts, arbtup, data, j1939):
+    (prio, edp, dp, pf, ps, sa) = arbtup
     return "Request: %s" % (data[:3].encode('hex'))
 
 # no pf_eb or pf_ec since those are handled at a lower-level in this stack
 
-def pf_ee(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+def pf_ee(idx, ts, arbtup, data, j1939):
+    prio, edp, dp, pf, ps, sa = arbtup
     if ps == 255 and sa == 254:
         return 'CANNOT CLAIM ADDRESS'
     
     addrinfo = parseName(data).minrepr()
     return "Address Claim: %s" % addrinfo
 
-def pf_ef(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+def pf_ef(idx, ts, arbtup, data, j1939):
+    prio, edp, dp, pf, ps, sa = arbtup
     if dp:
         return 'Proprietary A2'
 
     return 'Proprietary A1'
     
-def pf_ff(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+def pf_ff(idx, ts, arbtup, data, j1939):
+    prio, edp, dp, pf, ps, sa = arbtup
     pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, data.encode('hex'))
     return "Proprietary B %s" % pgn
 
@@ -153,7 +157,7 @@ class J1939Interface(cancat.CanInterface):
         if self._config.get('myIDs') is None:
             self._config['myIDs'] = []
 
-        self._mhe_queue = Queue.Queue()
+        self._mhe_queue = queue.Queue()
         mhethread = threading.Thread(target=self._mhe_runner)
         mhethread.setDaemon(True)
         mhethread.start()
@@ -187,7 +191,7 @@ class J1939Interface(cancat.CanInterface):
     def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
         if len(data) < 8:
             arbid = emitArbid(prio, edp, dp, pf, ps, sa)
-            # print "TX: %x : %r" % (arbid, data.encode('hex'))
+            # print("TX: %x : %r" % (arbid, data.encode('hex')))
             self.CANxmit(arbid, data, extflag=1)
             return
 
@@ -209,19 +213,19 @@ class J1939Interface(cancat.CanInterface):
                 pgn2, pgn1, pgn0)
 
         arbid = emitArbid(prio, edp, dp, PF_TP_CM, ps, sa)
-        # print "TXe: %x : %r" % (arbid, cm_msg.encode('hex'))
+        # print("TXe: %x : %r" % (arbid, cm_msg.encode('hex')))
         self.CANxmit(arbid, cm_msg, extflag=1)
         time.sleep(.01)  # hack: should watch for CM_CTS
         for msg in msgs:
             #self.J1939xmit(PF_TP_DT, ps, sa, msg, prio=prio)
             arbid = emitArbid(prio, edp, dp, PF_TP_DT, ps, sa)
-            print "TXe: %x : %r" % (arbid, msg.encode('hex'))
+            print("TXe: %x : %r" % (arbid, msg.encode('hex')))
             self.CANxmit(arbid, msg, extflag=1)
 
         # hack: should watch for CM_EOM
 
     def _reprCanMsg(self, idx, ts, arbtup, data, comment=None):
-        #print "_reprCanMsg: %r   %r" % (args, kwargs)
+        #print("_reprCanMsg: %r   %r" % (args, kwargs))
 
         if comment is None:
             comment = ''
@@ -274,7 +278,7 @@ class J1939Interface(cancat.CanInterface):
         this function is run for *Every* received CAN message... and is executed from the 
         XMIT/RECV thread.  it *must* be fast!
         '''
-        #print repr(self), repr(cmd), repr(tsmsg)
+        #print(repr(self), repr(cmd), repr(tsmsg))
         ts, message = tsmsg
         arbid, data = self._splitCanMsg(message)
         arbtup = parseArbid(arbid)
@@ -291,7 +295,7 @@ class J1939Interface(cancat.CanInterface):
         else:
             self.queueMessageHandlerEvent(self._submitJ1939Message, arbtup, data, ts)
 
-        #print "submitted message: %r" % (message.encode('hex'))
+        #print("submitted message: %r" % (message.encode('hex')))
 
 
     def queueMessageHandlerEvent(self, pfhandler, arbtup, data, ts):
@@ -315,8 +319,8 @@ class J1939Interface(cancat.CanInterface):
                     pfhandler, arbtup, data, ts = worktup
                     pfhandler(arbtup, data, ts)
 
-                except Exception, e:
-                    print "MsgHandler ERROR: %r (%r)" % (e, worktup)
+                except Exception as e:
+                    print("MsgHandler ERROR: %r (%r)" % (e, worktup))
                     if self.verbose:
                         sys.excepthook(*sys.exc_info())
 
@@ -328,7 +332,7 @@ class J1939Interface(cancat.CanInterface):
         *threadsafe*
         often runs in the MHE thread
         '''
-        print "_submitJ1939Message"
+        print("_submitJ1939Message")
         if timestamp is None:
             timestamp = time.time()
 
@@ -342,8 +346,8 @@ class J1939Interface(cancat.CanInterface):
                 try:
                     if not eval(advf, lcls):
                         return
-                except Exception, e:
-                    print "_submitJ1939Message advfilter ERROR: %r" % e
+                except Exception as e:
+                    print("_submitJ1939Message advfilter ERROR: %r" % e)
                     return
 
         self._j1939queuelock.acquire()
@@ -357,7 +361,7 @@ class J1939Interface(cancat.CanInterface):
                     if contnu: 
                         handled = True
 
-                except Exception, e:
+                except Exception as e:
                     self.log('_submitJ1939Message: ERROR: %r' % e)
             
             # check for any J1939 registered handlers (using the default system handlers):
@@ -366,7 +370,7 @@ class J1939Interface(cancat.CanInterface):
                 handled2 = cmdhandler(tsmsg, self)
 
             if handled and handled2:
-                #print "handled"
+                #print("handled")
                 return
 
             ##::: TODO, make this a listener.  if at all...
@@ -400,7 +404,7 @@ class J1939Interface(cancat.CanInterface):
             # note: this event will trigger for any of the data ranges, as long as the PF is correct... this may be a problem.
             # FIXME: come back to this...
 
-        except Exception, e:
+        except Exception as e:
             self.log("_submitMessage: ERROR: %r" % e, -1)
             if self.verbose:
                 sys.excepthook(*sys.exc_info())
@@ -485,7 +489,7 @@ class J1939Interface(cancat.CanInterface):
             (cb, totsize, pktct, maxct,
                     pgn2, pgn1, pgn0) = struct.unpack('<BHBBBBB', data)
 
-            # print out extended message and clear the buffers.
+            # print(out extended message and clear the buffers.)
             extmsgs = j1939.getTPmsgParts(da, sa)
             if extmsgs is None:
                 return 
@@ -536,7 +540,7 @@ class J1939Interface(cancat.CanInterface):
                 }
 
         cb = ord(data[0])
-        #print "ec: %.2x%.2x %.2x" % (arbtup[3], arbtup[4], cb)
+        #print("ec: %.2x%.2x %.2x" % (arbtup[3], arbtup[4], cb))
 
         htup = tp_cm_handlers.get(cb)
         if htup is not None:
@@ -562,7 +566,7 @@ class J1939Interface(cancat.CanInterface):
         extmsgs['msgs'].append((arbtup, data))
         if len(extmsgs['msgs']) >= extmsgs['length']:
             # we're done building this message, submit it!
-            #print "eb_handler: saving: %r %r" % (len(extmsgs['msgs']) , extmsgs['length'])
+            #print("eb_handler: saving: %r %r" % (len(extmsgs['msgs']) , extmsgs['length']))
             pgn2 = extmsgs['pgn2']
             pgn1 = extmsgs['pgn1']
             pgn0 = extmsgs['pgn0']
@@ -673,13 +677,13 @@ class J1939Interface(cancat.CanInterface):
         dp = pgn0 & 1
 
         if da != ps:
-            print "saveTPmsg: WARNING: da: 0x%x  but ps: 0x%x.  using ps" % (da, ps)
-            print da, sa, pgn, repr(msg)
+            print("saveTPmsg: WARNING: da: 0x%x  but ps: 0x%x.  using ps" % (da, ps))
+            print(da, sa, pgn, repr(msg))
         arbtup = prio, edp, dp, pf, ps, sa
         self._submitJ1939Message(arbtup, msg)
 
     def _getLocals(self, idx, ts, arbtup, data):
-        #print "getLocals:",idx, ts, arbtup, data
+        #print("getLocals:",idx, ts, arbtup, data)
         prio, edp, dp, pf, ps, sa = arbtup
         pgn = (pf << 8) | ps
         lcls = {'idx': idx,
@@ -759,7 +763,7 @@ class J1939Interface(cancat.CanInterface):
 
             # now actually handle messages
             # here's where we get J1939 specific...
-            #print messages[idx]
+            #print(messages[idx])
             ts, arbtup, data = messages[idx]
             #datatup = self._splitCanMsg(msg)
 
@@ -925,9 +929,9 @@ class J1939Interface(cancat.CanInterface):
             try:
                 msgrepr = self._reprCanMsg(*msg)
                 if msgrepr != cancat.DONT_PRINT_THIS_MESSAGE:
-                    print msgrepr
-            except Exception, e:
-                print e
+                    print(msgrepr)
+            except Exception as e:
+                print(e)
         '''
         example (from start of ECU):
         00000000 1545142410.990 pri/edp/dp: 6/0/0, PG: ea ff  Source: fe  Len: 03, Data: 00ee00              Request
@@ -986,7 +990,7 @@ def parsePGNData(pf, ps, msg):
 
             datablob = msg[startByte:endByte]
 
-        #print "sb: %d\t eb: %d\t sB:%d\t SBO:%d\t eB:%d\t eBO:%d\t %r" % (startBit, endBit, startByte, startBitO, endByte, endBitO, datablob)
+        #print("sb: %d\t eb: %d\t sB:%d\t SBO:%d\t eB:%d\t eBO:%d\t %r" % (startBit, endBit, startByte, startBitO, endByte, endBitO, datablob))
 
         if units == 'ASCII':
             spnRepr = repr(datablob)
@@ -999,11 +1003,11 @@ def parsePGNData(pf, ps, msg):
                 numbytes = struct.unpack('%dB' % len(datablob), datablob)
                 for i, n in enumerate(numbytes):
                     datanum |= (n << (8*i))
-                    #print "datanum (working): 0x%x   ::  0x%x" % (n, datanum)
+                    #print("datanum (working): 0x%x   ::  0x%x" % (n, datanum))
                     #datanum <<= 8
 
                 datanum >>= (7 - endBitO)
-                #print "datanum: %x" % datanum
+                #print("datanum: %x" % datanum)
 
                 mask = bu_masks[endBit - startBit + 1]
                 datanum &= mask
@@ -1011,7 +1015,7 @@ def parsePGNData(pf, ps, msg):
                 offset = spn.get('Offset')
                 if offset is not None:
                     datanum += offset
-                #print "datanum: %x (mask: %x)" % (datanum, mask)
+                #print("datanum: %x (mask: %x)" % (datanum, mask))
 
                 # make sense of the number based on units
                 if units == 'bit':
@@ -1038,7 +1042,7 @@ def parsePGNData(pf, ps, msg):
 
             except Exception as e:
                 spnRepr = "ERROR"
-                print "SPN: %r %r (%r)" % (e, msg, spn)
+                print("SPN: %r %r (%r)" % (e, msg, spn))
                 traceback.print_exc()
 
         spndata.append((spnum, spn, units, datanum, spnRepr))

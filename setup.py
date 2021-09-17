@@ -3,7 +3,7 @@ import sys
 import codecs
 import setuptools
 
-version = '1.9.3.3'
+version = '1.9.3.4'
 packages = ['cancat','cancat/vstruct']
 mods = []
 pkgdata = {}

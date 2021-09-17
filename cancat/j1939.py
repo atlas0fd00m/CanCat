@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-import Queue
+import queue
 import cancat
 import struct
 from cancat.J1939db import *
@@ -87,7 +87,8 @@ def pf_c9(idx, ts, arbtup, data, j1939):
 
     return "Request2: %s %s" % (req,  usexferpgn)
 
-def pf_ea(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+def pf_ea(idx, ts, arbtup, data, j1939):
+    (prio, edp, dp, pf, ps, sa) = arbtup
     return "Request: %s" % (data[:3].encode('hex'))
 
 def pf_eb(idx, ts, arbtup, data, j1939):
@@ -251,20 +252,23 @@ def pf_ec(idx, ts, arbtup, data, j1939):
 
     return 'TP.CM_%.2x' % cb
 
-def pf_ee(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+def pf_ee(idx, ts, arbtup, data, j1939):
+    (prio, edp, dp, pf, ps, sa) = arbtup
     if ps == 255 and sa == 254:
         return 'CANNOT CLAIM ADDRESS'
 
     addrinfo = parseName(data).minrepr()
     return "Address Claim: %s" % addrinfo
 
-def pf_ef(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+def pf_ef(idx, ts, arbtup, data, j1939):
+    (prio, edp, dp, pf, ps, sa) = arbtup
     if dp:
         return 'Proprietary A2'
 
     return 'Proprietary A1'
 
-def pf_ff(idx, ts, (prio, edp, dp, pf, ps, sa), data, j1939):
+def pf_ff(idx, ts, arbtup, data, j1939):
+    (prio, edp, dp, pf, ps, sa) = arbtup
     pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, data.encode('hex'))
     return "Proprietary B %s" % pgn
 
@@ -309,7 +313,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         # check for old stuff
         extmsgs = j1939.getRealExtMsgs(sa, da)
         if len(extmsgs['msgs']):
-            if j1939.verbose: print "clearing out old extmsgs: %r" % extmsgs
+            if j1939.verbose: print("clearing out old extmsgs: %r" % extmsgs)
             extmsgs['sa'] = sa
             extmsgs['da'] = da
             j1939.saveRealExtMsg(idx-1, ts, sa, da, (0,0,0), meldExtMsgs(extmsgs), TP_DIRECT_BROKEN, idx-1)
@@ -331,8 +335,8 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         extmsgs['type'] = TP_DIRECT
         extmsgs['adminmsgs'].append((arbtup, data))
         if j1939.verbose: 
-            print "new TP_CM message: %r, %r\t\t%r" % (arbtup, data.encode('hex'), extmsgs)
-            print '==1  %x %x->%x' % (pf, sa, da), extmsgs
+            print("new TP_CM message: %r, %r\t\t%r" % (arbtup, data.encode('hex'), extmsgs))
+            print('==1  %x %x->%x' % (pf, sa, da), extmsgs)
 
         # RESPOND!
         if da in j1939.myIDs:
@@ -345,7 +349,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         (cb, maxpkts, nextpkt, reserved,
                 pgn2, pgn1, pgn0) = struct.unpack('<BBBHBBB', data)
 
-        if j1939.verbose: print '==3  %x %x->%x' % (pf, sa, da), j1939.getRealExtMsgs(sa, da)
+        if j1939.verbose: print('==3  %x %x->%x' % (pf, sa, da), j1939.getRealExtMsgs(sa, da))
         # store extended message information for other stuff...
         extmsgs = j1939.getRealExtMsgs(sa, da)
         extmsgs['adminmsgs'].append((arbtup, data))
@@ -358,7 +362,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         (cb, totsize, pktct, maxct,
                 pgn2, pgn1, pgn0) = struct.unpack('<BHBBBBB', data)
 
-        # print out extended message and clear the buffers.
+        # print(out extended message and clear the buffers.)
         extmsgs = j1939.getRealExtMsgs(sa, da)
         extmsgs['adminmsgs'].append((arbtup, data))
 
@@ -414,7 +418,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         if cb_handler != None:
             cb_handler(arbtup, data, j1939, idx, ts)
             da, sa = arbtup[-2:]
-            if j1939.verbose: print '==2  ', j1939.getRealExtMsgs(sa, da)
+            if j1939.verbose: print('==2  ', j1939.getRealExtMsgs(sa, da))
 
 def eb_handler(j1939, idx, ts, arbtup, data):
     (prio, edp, dp, pf, da, sa) = arbtup
@@ -426,7 +430,7 @@ def eb_handler(j1939, idx, ts, arbtup, data):
     extmsgs['msgs'].append((arbtup, data))
     if len(extmsgs['msgs']) >= extmsgs['length']:
         if j1939.verbose: 
-            print "eb_handler: saving: %r->%r  %r %r" % (sa, da, len(extmsgs['msgs']) , extmsgs['length'])
+            print("eb_handler: saving: %r->%r  %r %r" % (sa, da, len(extmsgs['msgs']) , extmsgs['length']))
         tidx = extmsgs['idx']
         pgn2 = extmsgs['pgn2']
         pgn1 = extmsgs['pgn1']
@@ -478,7 +482,7 @@ class J1939(cancat.CanInterface):
         CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
 
         # setup the message handler event offload thread
-        self._mhe_queue = Queue.Queue()
+        self._mhe_queue = queue.Queue()
         mhethread = threading.Thread(target=self._mhe_runner)
         mhethread.setDaemon(True)
         mhethread.start()
@@ -615,7 +619,7 @@ class J1939(cancat.CanInterface):
                     continue
 
                 pfhandler, idx, ts, arbtup, data = worktup
-                #if self.verbose: print "_mhe_runner: %r %r %r %r %r" % (worktup)
+                #if self.verbose: print("_mhe_runner: %r %r %r %r %r" % (worktup))
                 pfhandler(self, idx, ts, arbtup, data)
 
             except Exception as e:
@@ -634,18 +638,18 @@ class J1939(cancat.CanInterface):
         if no list exists for this pairing, one is created and an empty list is returned
         '''
 
-        #if self.verbose: print 'getRealExtMsgs: %r' % (threading.current_thread())
+        #if self.verbose: print('getRealExtMsgs: %r' % (threading.current_thread()))
         self.mquelock.acquire()
         try:
             msglists = self._RealExtMsgParts.get(sa)
             if msglists == None:
-                if self.verbose: print ".get(sa) returned None.  creating msglists"
+                if self.verbose: print(".get(sa) returned None.  creating msglists")
                 msglists = {}
                 self._RealExtMsgParts[sa] = msglists
 
             mlist = msglists.get(da)
             if mlist == None:
-                if self.verbose: print "--mlist == None, creating for sa:%x da:%x" % (sa, da)
+                if self.verbose: print("--mlist == None, creating for sa:%x da:%x" % (sa, da))
                 mlist = {'msgs':[], 
                         'type' : -1, 
                         'adminmsgs' : [],
@@ -661,8 +665,8 @@ class J1939(cancat.CanInterface):
                         'totsize': 0,
                 }
                 msglists[da] = mlist
-        except Exception, e:
-            print "getRealExtMsgs: ERROR: %r" % e
+        except Exception as e:
+            print("getRealExtMsgs: ERROR: %r" % e)
         finally:
             self.mquelock.release()
 
@@ -679,16 +683,16 @@ class J1939(cancat.CanInterface):
         * if da == None, returns whether the sa had anything previously
         * otherwise, if the list
         '''
-        #if self.verbose: print 'clearRealExtMsgs: %r' % (threading.current_thread())
+        #if self.verbose: print('clearRealExtMsgs: %r' % (threading.current_thread()))
         exists = False
         if da != None:
-            if self.verbose: print "++clearing sa:%x da:%x" % (sa, da)
+            if self.verbose: print("++clearing sa:%x da:%x" % (sa, da))
             msglists = self._RealExtMsgParts.get(sa)
             exists = bool(msglists != None and len(msglists))
             self._RealExtMsgParts[sa] = {}
             return exists
 
-        if self.verbose: print "++clearing sa:%x COMPLETELY!" % (sa)
+        if self.verbose: print("++clearing sa:%x COMPLETELY!" % (sa))
         msglists = self._RealExtMsgParts.get(sa)
         if msglists == None:
             msglists = {}
@@ -850,7 +854,7 @@ class J1939(cancat.CanInterface):
             try:
                 msgs = self._RealExtMsgs.get((sa, da))
                 if msgs == None or not len(msgs):
-                    #print "no message for %.2x -> %.2x" % (sa, da)
+                    #print("no message for %.2x -> %.2x" % (sa, da))
                     continue
 
                 if msgs[-1][0] < start_msg:
@@ -864,22 +868,22 @@ class J1939(cancat.CanInterface):
                     midx = msg[0]
                     mpgn = msg[4]
                     mlastidx = msg[7]
-                    #print "     %r ?>= %r" % (midx, start_msg)
-                    #print "     %r ?= %r" % (mpgn, (pgn2, pgn1, pgn0))
+                    #print("     %r ?>= %r" % (midx, start_msg))
+                    #print("     %r ?= %r" % (mpgn, (pgn2, pgn1, pgn0)))
                     if mlastidx < start_msg:
                         continue
                     if mpgn != (pgn2, pgn1, pgn0):
                         continue
 
-                    #print "success! %s" % repr(msg)
-                    #print "setting last recv'd index: %d" % mlastidx
+                    #print("success! %s" % repr(msg))
+                    #print("setting last recv'd index: %d" % mlastidx)
                     self._last_recv_idx = mlastidx
                     ##FIXME:  make this threadsafe
                     #msgs.pop(midx)
                     return msg
 
-            except Exception, e:
-                print "recvRealExtMsg: ERROR: %r" % e
+            except Exception as e:
+                print("recvRealExtMsg: ERROR: %r" % e)
             finally:
                 self.mquelock.release()
 
@@ -1003,9 +1007,9 @@ def reprSPNdata(spnlist, msg):
             startBit = spn.get('StartBit')
             endBit = spn.get('EndBit')
 
-            startByte = startBit / 8
+            startByte = startBit // 8
             startBitO = startBit % 8
-            endByte = (endBit + 7) / 8
+            endByte = (endBit + 7) // 8
             endBitO = endBit % 8
 
             datablob = msg[startByte:endByte]
