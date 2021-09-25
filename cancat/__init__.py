@@ -805,7 +805,7 @@ class CanInterface(object):
         self._config['can_baud'] = baud_const
 
         while(response[1] != b'\x01'):
-            print("CAN INIT FAILED: Retrying")
+            print("CAN INIT FAILED WHILE SETTING BAUD RATE: Retrying")
             response = self.recv(CMD_CAN_BAUD_RESULT, wait=30)
 
     def setCanMode(self, mode):
@@ -824,9 +824,8 @@ class CanInterface(object):
             response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
 
             while(response[1] != b'\x01'):
-                print("CAN INIT FAILED: Retrying")
+                print("CAN INIT FAILED WHILE SETTING MODE: Retrying")
                 response = self.recv(CMD_CAN_MODE_RESULT, wait=30)
-
 
         self._config['can_mode'] = mode
         return response
