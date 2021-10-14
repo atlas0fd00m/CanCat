@@ -9,14 +9,14 @@ import threading
 
 import cancat.iso_tp as cisotp
 
-# In 11-bit CAN, an OBD2 tester typically sends requests with an ID of 7DF, and 
-# can accept response messages on IDs 7E8 to 7EF, requests to a specific ECU can 
-# be sent from ID 7E0 to 7E7.  So the non-OBD2 range normally ends at 7D7, 
+# In 11-bit CAN, an OBD2 tester typically sends requests with an ID of 7DF, and
+# can accept response messages on IDs 7E8 to 7EF, requests to a specific ECU can
+# be sent from ID 7E0 to 7E7.  So the non-OBD2 range normally ends at 7D7,
 # although I can't find a specific "standard" for this.
 #
-# In 29-bit CAN an OBD2 tester typically sends requests with an ID of 0x18DB33F1 
-# where 0x18DBxxxx indicates this is an OBD2 message, 0x33 indicates this 
-# message is for the OBD2 ECU(s), and 0xF1 is the tester.  Normal UDS messages 
+# In 29-bit CAN an OBD2 tester typically sends requests with an ID of 0x18DB33F1
+# where 0x18DBxxxx indicates this is an OBD2 message, 0x33 indicates this
+# message is for the OBD2 ECU(s), and 0xF1 is the tester.  Normal UDS messages
 # use a prefix of 0x18DAxxxx.
 # 0xF1 is used as a tester address in normal UDS messaging as well.
 ARBID_CONSTS = {
@@ -224,9 +224,9 @@ class UDS(object):
     def SendTesterPresent(self):
         while self.TesterPresent is True:
             if self.TesterPresentRequestsResponse:
-                self.c.CANxmit(self.tx_arbid, "023E000000000000".decode('hex'))
+                self.c.CANxmit(self.tx_arbid, b"\x02\x3E\x00\x00\x00\x00\x00\x00")
             else:
-                self.c.CANxmit(self.tx_arbid, "023E800000000000".decode('hex'))
+                self.c.CANxmit(self.tx_arbid, b"\x02\x3E\x80\x00\x00\x00\x00\x00")
             time.sleep(2.0)
 
     def StartTesterPresent(self, request_response=True):
@@ -240,14 +240,14 @@ class UDS(object):
         self.TesterPresent = False
         if self.t is not None:
             self.t.join(5.0)
-            if self.t.isAlive():
-                if self.verbose: 
+            if self.t.is_alive():
+                if self.verbose:
                     print("Error killing Tester Present thread")
             self.t = None
 
     def DiagnosticSessionControl(self, session):
         currIdx = self.c.getCanMsgCount()
-        return self._do_Function(SVC_DIAGNOSTICS_SESSION_CONTROL, chr(session), service=0x50)
+        return self._do_Function(SVC_DIAGNOSTICS_SESSION_CONTROL, data=struct.pack('>B', session), service=0x50)
 
     def ReadMemoryByAddress(self, address, size):
         currIdx = self.c.getCanMsgCount()
@@ -285,7 +285,7 @@ class UDS(object):
         except TypeError:
             print("Cannot parse addressAndLengthFormatIdentifier", hex(addr_format))
             return None
-        msg = self.xmit_recv("\x34" + struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data)), extflag=self.extflag, service = 0x74)
+        msg = self.xmit_recv(b"\x34" + struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data)), extflag=self.extflag, service = 0x74)
 
         # Parse the response
         if msg[0] != 0x74:
@@ -301,7 +301,7 @@ class UDS(object):
         data_idx = 0
         block_idx = 1
         while data_idx < len(data):
-            msg = self.xmit_recv("\x36" + chr(block_idx) + data[data_idx:data_idx+max_txfr_len-2], extflag=self.extflag, service = 0x76)
+            msg = self.xmit_recv(b"\x36" + struct.pack('>B', block_idx) + data[data_idx:data_idx+max_txfr_len-2], extflag=self.extflag, service = 0x76)
             data_idx += max_txfr_len - 2
             block_idx += 1
             if block_idx > 0xff:
@@ -445,8 +445,11 @@ class UDS(object):
 
         else:
             seed = msg[2:]
-            hexified_seed = " ".join(x.encode('hex') for x in seed)
-            key = str(bytearray(self._key_from_seed(hexified_seed, key)))
+            if isinstance(key, str):
+                # If key is a string convert it to bytes
+                key = bytes(self._key_from_seed(seed, bytes.fromhex(key.replace(' ', ''))))
+            else:
+                key = bytes(self._key_from_seed(seed, key))
 
             msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level+1, data=key, service = 0x67)
             return msg
@@ -460,7 +463,7 @@ class UDS(object):
            Returns the key, as a string of key bytes.
         """
         print("Not implemented in this class")
-        return 0
+        return []
 
 
 def printUDSSession(c, tx_arbid, rx_arbid=None, paginate=45):
