@@ -394,8 +394,7 @@ class UDS(object):
         pass
     def InputOutputControlByIdentifier(self, iodid):
         pass
-    def RoutineControl(self, rid):
-        pass
+
     def TransferData(self, did):
         pass
     def RequestTransferExit(self):
@@ -403,7 +402,18 @@ class UDS(object):
     def ControlDTCSetting(self):
         pass
 
-
+    def RoutineControl(self, action, routine, *args):
+        """
+        action: 1 for start, 0 for stop
+        routine: 2 byte value for which routine to call
+        *args: any additional arguments (must already be bytes)
+        """
+        # Extra data for routine control is initially just the routine, but
+        # accepts additional bytes
+        data = struct.pack('>H', routine)
+        for arg in args:
+            data += arg
+        return self._do_Function(SVC_ROUTINE_CONTROL, subfunc=action, data=data)
 
     def ScanDIDs(self, start=0, end=0x10000, delay=0):
         success = []
