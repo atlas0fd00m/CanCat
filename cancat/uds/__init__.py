@@ -442,10 +442,10 @@ class UDS(object):
         return success
 
 
-    def SecurityAccess(self, level, key = ""):
+    def SecurityAccess(self, level, secret = ""):
         """Send and receive the UDS messages to switch SecurityAccess levels.
             @level = the SecurityAccess level to switch to
-            @key = a SecurityAccess algorithm specific key
+            @secret = a SecurityAccess algorithm specific secret used to generate the key
         """
         msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service = 0x67)
         if msg is None:
@@ -455,11 +455,11 @@ class UDS(object):
 
         else:
             seed = msg[2:]
-            if isinstance(key, str):
+            if isinstance(secret, str):
                 # If key is a string convert it to bytes
-                key = bytes(self._key_from_seed(seed, bytes.fromhex(key.replace(' ', ''))))
+                key = bytes(self._key_from_seed(seed, bytes.fromhex(secret.replace(' ', ''))))
             else:
-                key = bytes(self._key_from_seed(seed, key))
+                key = bytes(self._key_from_seed(seed, secret))
 
             msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level+1, data=key, service = 0x67)
             return msg

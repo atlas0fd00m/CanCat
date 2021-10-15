@@ -23,8 +23,8 @@ def get_uds_29bit_destid(arbid):
 
 def gen_uds_resp_range(arbid):
     if arbid > uds.ARBID_CONSTS['29bit']['prefix']:
-        # Normally if a request is sent to 0x18DA01F1, the response should have 
-        # an arbitration ID of 0x18DAF101, but not all ECUs do things in 
+        # Normally if a request is sent to 0x18DA01F1, the response should have
+        # an arbitration ID of 0x18DAF101, but not all ECUs do things in
         # a "normal" way, so generate a range of possible response IDs.
 
         # The src from the request will be come the destination in the response
@@ -35,8 +35,8 @@ def gen_uds_resp_range(arbid):
     else:
         # Assume this is an 11-bit request
         #
-        # Normally if a request is sent to 0x710, the response should have an 
-        # arbitration ID of 0x718, but not all ECUs do things in a "normal" way, 
+        # Normally if a request is sent to 0x710, the response should have an
+        # arbitration ID of 0x718, but not all ECUs do things in a "normal" way,
         # so generate a range of possible response IDs.
         return _range_func(0x700, 0x800)
 
@@ -91,7 +91,7 @@ def new_session(u, session, prereq_sessions=None, tester_present=False):
 def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, timeout=3.0):
     # Starting at the supplied starting index, find the service request, and
     # then look for possible responses until the supplied timeout
-    
+
     if subfunction:
         tx_match_bytes = struct.pack('>BH', service, subfunction)
         rx_match_bytes = struct.pack('>BH', service + 0x40, subfunction)
@@ -125,7 +125,7 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
                 (ftype == 1 and msg[2:2+match_len] == rx_match_bytes):
             return tx_msg, (arbid, msg)
 
-    return tx_msg, None 
+    return tx_msg, None
 
 
 def err_str(err):
@@ -164,15 +164,15 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
         arb_id_range, ext, did, timeout, delay))
     ecus = []
     possible_ecus = []
-    for i in arb_id_range:  
+    for i in arb_id_range:
         if ext and i == uds.ARBID_CONSTS['29bit']['tester']:
-            # Skip i == 0xF1 because in that case the sender and receiver IDs 
+            # Skip i == 0xF1 because in that case the sender and receiver IDs
             # are the same
             log.detail('Skipping 0xF1 in ext ECU scan: invalid ECU address')
             continue
         elif ext == False and i > uds.ARBID_CONSTS['11bit']['max_req_id']:
-            # For non-extended scans the valid range goes from 0x00 to 0xFF, but 
-            # stop the scan at 0xf7 because at that time the response is the 
+            # For non-extended scans the valid range goes from 0x00 to 0xFF, but
+            # stop the scan at 0xf7 because at that time the response is the
             # largest possible valid value
             log.detail('Stopping std ECU scan at 0xF7: last valid ECU address')
             break
@@ -204,7 +204,7 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
             log.debug('{} DID {}: {}'.format(addr, hex(did), e))
             log.msg('found {}'.format(addr))
 
-            # If a negative response happened, that means an ECU is present 
+            # If a negative response happened, that means an ECU is present
             # to respond at this address.
             ecus.append(addr)
 
@@ -212,7 +212,7 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
             time.sleep(delay)
 
     # Double check any non-standard responses that were found
-    for addr in possible_ecus:  
+    for addr in possible_ecus:
         u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
                 verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
@@ -226,7 +226,7 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
             log.debug('{} DID {}: {}'.format(addr, hex(did), e))
             log.msg('found {}'.format(addr))
 
-            # If a negative response happened, that means an ECU is present 
+            # If a negative response happened, that means an ECU is present
             # to respond at this address.
             ecus.append(addr)
 
@@ -250,15 +250,15 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
 
     ecus = []
     possible_ecus = []
-    for i in arb_id_range:  
+    for i in arb_id_range:
         if ext and i == uds.ARBID_CONSTS['29bit']['tester']:
-            # Skip i == 0xF1 because in that case the sender and receiver IDs 
+            # Skip i == 0xF1 because in that case the sender and receiver IDs
             # are the same
             log.detail('Skipping 0xF1 in ext ECU scan: invalid ECU address')
             continue
         elif ext == False and i > uds.ARBID_CONSTS['11bit']['max_req_id']:
-            # For non-extended scans the valid range goes from 0x00 to 0xFF, but 
-            # stop the scan at 0xf7 because at that time the response is the 
+            # For non-extended scans the valid range goes from 0x00 to 0xFF, but
+            # stop the scan at 0xf7 because at that time the response is the
             # largest possible valid value
             log.detail('Stopping std ECU scan at 0xF7: last valid ECU address')
             break
@@ -288,7 +288,7 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
             log.debug('{} session {}: {}'.format(addr, session, e))
             log.msg('found {}'.format(addr))
 
-            # If a negative response happened, that means an ECU is present 
+            # If a negative response happened, that means an ECU is present
             # to respond at this address.
             ecus.append(addr)
 
@@ -296,7 +296,7 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
             time.sleep(delay)
 
     # Double check any non-standard responses that were found
-    for addr in possible_ecus:  
+    for addr in possible_ecus:
         u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
                 verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
@@ -310,7 +310,7 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
             log.debug('{} session {}: {}'.format(addr, sess, e))
             log.msg('found {}'.format(addr))
 
-            # If a negative response happened, that means an ECU is present 
+            # If a negative response happened, that means an ECU is present
             # to respond at this address.
             ecus.append(addr)
 
@@ -338,7 +338,7 @@ def did_read_scan(u, did_range, delay=None):
     log.debug('Starting DID read scan for range: {}'.format(did_range))
     u.c.placeCanBookmark('did_read_scan({}, delay={})'.format(did_range, delay))
     dids = {}
-    for i in did_range:  
+    for i in did_range:
         log.detail('Trying DID read {}'.format(hex(i)))
         u.c.placeCanBookmark('ReadDID({})'.format(hex(i)))
         resp = try_read_did(u, i)
@@ -375,7 +375,7 @@ def did_write_scan(u, did_range, write_data, delay=None):
     log.debug('Starting DID write scan for range: {}'.format(did_range))
     u.c.placeCanBookmark('did_write_scan({}, write_data={}, delay={})'.format(did_range, write_data, delay))
     dids = {}
-    for i in did_range:  
+    for i in did_range:
         log.detail('Trying DID write {}'.format(hex(i)))
         u.c.placeCanBookmark('WriteDID({})'.format(hex(i)))
         resp = try_write_did(u, i, write_data)
@@ -410,7 +410,7 @@ def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=No
     log.debug('Starting session scan for range: {}'.format(session_range))
     u.c.placeCanBookmark('session_scan({}, delay={})'.format(session_range, delay))
     sessions = {}
-    for i in session_range:  
+    for i in session_range:
         # If this session matches any one of the prereqs, or one of the
         # sessions already found, skip it
         if i in prereq_sessions or i in found_sessions:
@@ -474,7 +474,7 @@ def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=No
     if recursive_scan and (try_ecu_reset or try_sess_ctrl_reset):
         subsessions = {}
         for sess in sessions:
-            # Only attempt this with sessions that we got a successful response 
+            # Only attempt this with sessions that we got a successful response
             # for
             if 'msg' in sessions[sess]:
                 log.debug('Scanning for sessions from session {} ({})'.format(sess, prereq_sessions))
@@ -493,10 +493,10 @@ def session_scan(u, session_range, delay=None, recursive_scan=True):
     return session_results
 
 
-def try_auth(u, level, key):
+def try_auth(u, level, secret):
     auth_data = None
     try:
-        resp = u.SecurityAccess(level, key)
+        resp = u.SecurityAccess(level, secret)
         if resp is not None:
             auth_data = { 'resp':resp }
     except uds.NegativeResponseException as e:
@@ -510,16 +510,16 @@ def auth_scan(u, auth_range, key_func=None, delay=None):
     log.debug('Starting auth scan for range: {}'.format(auth_range))
     u.c.placeCanBookmark('auth_scan({}, key_func={}, delay={})'.format(auth_range, key_func, delay))
     auth_levels = {}
-    for i in auth_range:  
+    for i in auth_range:
         if key_func:
-            key = ''
+            secret = ''
         else:
-            key = key_func(i)
+            secret = key_func(i)
 
-        log.detail('Trying auth level {}: key \'{}\''.format(i, key))
-        u.c.placeCanBookmark('SecurityAccess({}, {})'.format(i, repr(key)))
+        log.detail('Trying auth level {}: secret \'{}\''.format(i, secret))
+        u.c.placeCanBookmark('SecurityAccess({}, {})'.format(i, repr(secret)))
 
-        resp = try_auth(u, i, key)
+        resp = try_auth(u, i, secret)
         if resp is not None:
             log.debug('auth {}: {}'.format(i, resp))
             if 'resp' in resp:
