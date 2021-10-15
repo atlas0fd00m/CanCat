@@ -376,7 +376,7 @@ def main():
 
     if args.verbose == 1:
         loglevel = log.DEBUG
-    elif args.verbose >= 2:
+    elif args.verbose and args.verbose >= 2:
         loglevel = log.DETAIL
     else:
         loglevel = log.WARNING
