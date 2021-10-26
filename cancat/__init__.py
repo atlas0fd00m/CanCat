@@ -318,7 +318,7 @@ class CanInterface(object):
 
         returns a list of the messages
         '''
-        allmsgs = self.recvall(CMD_CAN_RECV) 
+        allmsgs = self.recvall(CMD_CAN_RECV)
 
         # Clear the bookmarks as well because they are no longer meaningful
         self.bookmarks = []
@@ -336,7 +336,7 @@ class CanInterface(object):
 
 
         while not self._config['shutdown']:
-            try:    
+            try:
                 if not self._config['go']:
                     time.sleep(.4)
                     continue
@@ -883,7 +883,7 @@ class CanInterface(object):
             # re-create the messages handle
             if messages == None:
                 messages = self._messages.get(self._msg_source_idx, None)
-        
+
             # if we're off the end of the original request, and "tailing"
             if messages != None:
                 if tail and idx >= stop:
@@ -1038,7 +1038,14 @@ class CanInterface(object):
         see: saveSessionToFile()
         '''
         loadedFile = open(filename, 'rb')
-        me = pickle.load(loadedFile)
+        me = pickle.load(loadedFile, encoding='latin1')
+
+        # Go through the msgs and turn them into bytes
+        for cmd in me['messages']:
+            for i in range(len(me['messages'][cmd])):
+                ts, msg = me['messages'][cmd][i]
+                if isinstance(msg, str):
+                    me['messages'][cmd][i] = (ts, msg.encode('latin-1'))
 
         self.restoreSession(me, force=force)
         self._filename = filename
@@ -1064,7 +1071,7 @@ class CanInterface(object):
 
         for cmd in self._messages:
             self._msg_events[cmd] = threading.Event()
-            
+
     def saveSessionToFile(self, filename=None):
         '''
         Saves the current analysis session to the filename given
@@ -1598,13 +1605,13 @@ class CanInterface(object):
     def _printCanRegs(self):
         self._send(CMD_PRINT_CAN_REGS, "")
 
-    def _bytesHelper(self, msg): 
+    def _bytesHelper(self, msg):
         if isinstance(msg, six.string_types):
             if sys.version_info < (3, 0):
                 msg = bytes(msg)
             else:
                 msg = bytes(msg, 'raw_unicode_escape')
-        
+
         return msg
 
 def getAscii(msg, minbytes=3):

@@ -6,3 +6,7 @@ build/
 *.elf
 *~
 .*.sw?
+
+build/
+dist/
+cancat.egg-info/
