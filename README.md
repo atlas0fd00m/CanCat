@@ -21,7 +21,7 @@ The goals of CanCat are to provide:
 
 ## Software 
 ### Required:
-* Python 2.7
+* Python 3.6+
 
 
 ### Recommended:
