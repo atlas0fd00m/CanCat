@@ -1,4 +1,5 @@
 import traceback
+from binascii import hexlify
 
 #from cancat.j1939 import *
 # we can move things into here if we decide this replaces the exiting j1939 modules
@@ -69,7 +70,7 @@ def parseArbid(arbid):
     (prioPlus,
         pf,
         ps,
-        sa) = struct.unpack('BBBB', struct.pack(">I", arbid))
+        sa) = struct.unpack(b'BBBB', struct.pack(b">I", arbid))
 
     prio = prioPlus >> 2
     edp = (prioPlus >> 1) & 1
@@ -84,7 +85,7 @@ def meldExtMsgs(msgs):
     for arbtup, msg in msgs.get('msgs'):
         out.append(msg[1:])
 
-    outval = ''.join(out)
+    outval = b''.join(out)
     outval = outval[:length]
 
     return outval
@@ -99,7 +100,7 @@ def pf_c9(idx, ts, arbtup, data, j1939):
 
 def pf_ea(idx, ts, arbtup, data, j1939):
     (prio, edp, dp, pf, ps, sa) = arbtup
-    return "Request: %s" % (data[:3].encode('hex'))
+    return "Request: %s" % (hexlify(data[:3]))
 
 # no pf_eb or pf_ec since those are handled at a lower-level in this stack
 
@@ -120,7 +121,7 @@ def pf_ef(idx, ts, arbtup, data, j1939):
     
 def pf_ff(idx, ts, arbtup, data, j1939):
     prio, edp, dp, pf, ps, sa = arbtup
-    pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, data.encode('hex'))
+    pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, hexlify(data))
     return "Proprietary B %s" % pgn
 
 pgn_pfs = {
@@ -191,7 +192,7 @@ class J1939Interface(cancat.CanInterface):
     def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
         if len(data) < 8:
             arbid = emitArbid(prio, edp, dp, pf, ps, sa)
-            # print("TX: %x : %r" % (arbid, data.encode('hex')))
+            # print("TX: %x : %r" % (arbid, hexlify(data)))
             self.CANxmit(arbid, data, extflag=1)
             return
 
@@ -205,7 +206,7 @@ class J1939Interface(cancat.CanInterface):
         else:
             pgn0 = ps
 
-        msgs = ['%c'%(x+1) + message[x*7:(x*7)+7] for x in range((len(message)+6)/7)]
+        msgs = ['%c'%(x+1) + message[x*7:(x*7)+7] for x in range((len(message)+6)//7)]
         if len(msgs) > 255:
             raise Exception("J1939xmit_tp: attempt to send message that's too large")
 
@@ -213,13 +214,13 @@ class J1939Interface(cancat.CanInterface):
                 pgn2, pgn1, pgn0)
 
         arbid = emitArbid(prio, edp, dp, PF_TP_CM, ps, sa)
-        # print("TXe: %x : %r" % (arbid, cm_msg.encode('hex')))
+        # print("TXe: %x : %r" % (arbid, hexlify(cm_msg)))
         self.CANxmit(arbid, cm_msg, extflag=1)
         time.sleep(.01)  # hack: should watch for CM_CTS
         for msg in msgs:
             #self.J1939xmit(PF_TP_DT, ps, sa, msg, prio=prio)
             arbid = emitArbid(prio, edp, dp, PF_TP_DT, ps, sa)
-            print("TXe: %x : %r" % (arbid, msg.encode('hex')))
+            print("TXe: %x : %r" % (arbid, hexlify(msg)))
             self.CANxmit(arbid, msg, extflag=1)
 
         # hack: should watch for CM_EOM
@@ -271,7 +272,7 @@ class J1939Interface(cancat.CanInterface):
                     nextline = '\n' + '\n'.join(lines)
 
         return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Data: %-18s  %s\t\t%s%s" % \
-                (idx, ts, prio, edp, dp, pf, ps, sa, data.encode('hex'), pfmeaning, comment, nextline)
+                (idx, ts, prio, edp, dp, pf, ps, sa, hexlify(data), pfmeaning, comment, nextline)
 
     def _j1939_can_handler(self, tsmsg, none):
         '''
@@ -295,7 +296,7 @@ class J1939Interface(cancat.CanInterface):
         else:
             self.queueMessageHandlerEvent(self._submitJ1939Message, arbtup, data, ts)
 
-        #print("submitted message: %r" % (message.encode('hex')))
+        #print("submitted message: %r" % (hexlify(message)))
 
 
     def queueMessageHandlerEvent(self, pfhandler, arbtup, data, ts):
@@ -320,7 +321,7 @@ class J1939Interface(cancat.CanInterface):
                     pfhandler(arbtup, data, ts)
 
                 except Exception as e:
-                    print("MsgHandler ERROR: %r (%r)" % (e, worktup))
+                    print("(j1939stack)MsgHandler ERROR: %r (%r)" % (e, worktup))
                     if self.verbose:
                         sys.excepthook(*sys.exc_info())
 
@@ -332,7 +333,7 @@ class J1939Interface(cancat.CanInterface):
         *threadsafe*
         often runs in the MHE thread
         '''
-        print("_submitJ1939Message")
+        #print("_submitJ1939Message")
         if timestamp is None:
             timestamp = time.time()
 
@@ -539,7 +540,7 @@ class J1939Interface(cancat.CanInterface):
                 CM_ABORT:   ('Abort',         None),
                 }
 
-        cb = ord(data[0])
+        cb = data[0]
         #print("ec: %.2x%.2x %.2x" % (arbtup[3], arbtup[4], cb))
 
         htup = tp_cm_handlers.get(cb)
@@ -590,7 +591,7 @@ class J1939Interface(cancat.CanInterface):
                 maxct = extmsgs['maxct']
                 pktct = extmsgs['length']
 
-                data = struct.pack('<BHBBBBB', CM_EOM, totsize, pktct, maxct, pgn2, pgn1, pgn0)
+                data = struct.pack(b'<BHBBBBB', CM_EOM, totsize, pktct, maxct, pgn2, pgn1, pgn0)
                 j1939.J1939xmit(PF_TP_CM, sa, da,  data, prio=prio)
 
     # functions to support the J1939TP Stack (real stuff, not just repr)
@@ -676,7 +677,7 @@ class J1939Interface(cancat.CanInterface):
         edp = (pgn0 >> 1) & 1
         dp = pgn0 & 1
 
-        if da != ps:
+        if da != ps and self.verbose:
             print("saveTPmsg: WARNING: da: 0x%x  but ps: 0x%x.  using ps" % (da, ps))
             print(da, sa, pgn, repr(msg))
         arbtup = prio, edp, dp, pf, ps, sa
@@ -978,8 +979,9 @@ def parsePGNData(pf, ps, msg):
         # skip variable-length PGNs for now
         if (type(pgnlen) == str and 'ariable' in pgnlen):
             datablob = msg
+            endBit = endBitO = startByte = startBitO = startBit = 0
 
-        else:
+        else:       # FIXME: Rework this section
             startBit = spn.get('StartBit')
             endBit = spn.get('EndBit')
 
@@ -1000,6 +1002,7 @@ def parsePGNData(pf, ps, msg):
             try:
                 # carve out the number
                 datanum = 0
+                datafloat = 0.0
                 numbytes = struct.unpack('%dB' % len(datablob), datablob)
                 for i, n in enumerate(numbytes):
                     datanum |= (n << (8*i))
@@ -1011,10 +1014,12 @@ def parsePGNData(pf, ps, msg):
 
                 mask = bu_masks[endBit - startBit + 1]
                 datanum &= mask
+                #print("datanum(2): %x" % datanum)
 
                 offset = spn.get('Offset')
                 if offset is not None:
-                    datanum += offset
+                    datanum += int(offset)
+                    datafloat += offset
                 #print("datanum: %x (mask: %x)" % (datanum, mask))
 
                 # make sense of the number based on units
@@ -1038,7 +1043,7 @@ def parsePGNData(pf, ps, msg):
                     if resolution is not None:
                         datanum *= resolution
 
-                    spnRepr = '%.3f %s' % (datanum, units)
+                    spnRepr = '%.3f %s' % (datafloat, units)
 
             except Exception as e:
                 spnRepr = "ERROR"

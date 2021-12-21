@@ -623,7 +623,7 @@ class J1939(cancat.CanInterface):
                 pfhandler(self, idx, ts, arbtup, data)
 
             except Exception as e:
-                print("MsgHandler ERROR: %r (%r)" % (e, worktup))
+                print("(j1939)MsgHandler ERROR: %r (%r)" % (e, worktup))
                 if self.verbose:
                     sys.excepthook(*sys.exc_info())
 
@@ -819,7 +819,7 @@ class J1939(cancat.CanInterface):
 
     def J1939xmit_tp(self, da, sa, pgn2, pgn1, pgn0, message, prio=6, edp=0, dp=0):
 
-        msgs = ['%c'%(x+1) + message[x*7:(x*7)+7] for x in range((len(message)+6)/7)]
+        msgs = ['%c'%(x+1) + message[x*7:(x*7)+7] for x in range((len(message)+6)//7)]
         if len(msgs) > 255:
             raise Exception("J1939xmit_tp: attempt to send message that's too large")
 
