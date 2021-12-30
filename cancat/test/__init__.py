@@ -43,31 +43,6 @@ class fakeMemory:
             if val is not None:
                 self.memory[tgt] = val
 
-    '''
-    def mmio_RFST(self, tgt, dbyte):
-        logger.info('mmio_RFST(0x%x, %r)', tgt, dbyte)
-        print("RFST==%x  (%x)" % (self.readMemory(X_RFST, 1), ord(dbyte)))
-
-
-        # configure MARCSTATE
-        val = ord(dbyte)
-        if val in (2, 3):
-            val = dbyte+10
-
-        else:
-            val = MARC_STATE_RX
-
-        self.writeMemory(MARCSTATE, b'%c'%(val))
-
-        # still set RFST
-        return dbyte
-
-    def mmio_MARCSTATE(self, tgt, dbyte):
-        rfst = self.readMemory(X_RFST, 1)
-        logger.info('mmio_MARCSTATE(0x%x, %r) rfst=%r', tgt, dbyte, rfst)
-        return MARC_STATE_RX
-    '''
-
 ## Serial Commands ##
 CMD_LOG                 = 0x2f
 CMD_LOG_HEX             = 0x2e
@@ -97,14 +72,13 @@ CMD_CAN_SEND_ISOTP      = 0x46
 CMD_CAN_RECV_ISOTP      = 0x47
 CMD_CAN_SENDRECV_ISOTP  = 0x48
 
-# TODO: first, implement PING capability
-
-
 
 class FakeCanCat:
     '''
     This class emulates a real CanCat (the physical device).
     We're going to try making this single-threaded.  We may need to handle in/out in separate threads, but fingers crossed.
+
+    Lies!  We've added a background thread to handle pumping queued CAN Messages.
     '''
     def __init__(self):
         self._inbuf = b''
@@ -113,49 +87,94 @@ class FakeCanCat:
         self._inq = queue.Queue()
         self._outq = queue.Queue()  # this is what's handed to the CanCat receiver thread
         self.memory = fakeMemory()
+        self._fake_can_msgs = []
 
         self.start_ts = time.time()
 
-        #self.memory.writeMemory(0xdf00, FAKE_MEM_DF00)
-        #self.memory.writeMemory(0xdf46, b'\xf0\x0d')
-        #for intreg, intval in list(FAKE_INTERRUPT_REGISTERS.items()):
-        #    logger.info('setting interrupt register: %r = %r', intreg, intval)
-        #    self.memory.writeMemory(eval(intreg), intval)
-
-        # do we want to add in a few CAN messages to be received?
+        self._go = True
+        self._runner_sleep_delay = .5
+        self._thread = threading.Thread(target=self._runner, daemon=True)
+        self._thread.start()
 
     def clock(self):
         return time.time() - self.start_ts
 
-    def CanCat_send(self, data, cmd):
-        print(b'===FakeCanCat_send: cmd:%x data: %r' % (cmd, data))
+    def CanCat_send(self, cmd, data):
+        logger.info(b'===FakeCanCat_send: cmd:%x data: %r' % (cmd, data))
         packet = b'@%c%c%s' % (len(data)+1, cmd, data)
         self._inq.put(packet)
 
     def log(self, msg):
-        self.CanCat_send(b"FakeCanCat: " + msg, CMD_LOG)
+        self.CanCat_send(CMD_LOG, b"FakeCanCat: " + msg)
     def logHex(self, num):
-        self.CanCat_send(struct.pack(b"<I", num), CMD_LOG_HEX)
+        self.CanCat_send(CMD_LOG_HEX, struct.pack(b"<I", num))
     def logHexStr(self, num, prefix):
         self.log(prefix)
         self.logHex(num)
+
+    def _runner(self):
+        next_duration = self._runner_sleep_delay
+        curlist = None
+        while self._go:
+            try:
+
+                time.sleep(next_duration)
+                
+                if curlist:
+
+                    # pop the next message from the list
+                    msg_ts, datagram = curlist.pop(0)
+
+                    # write message to the out queue
+                    self.CanCat_send(CMD_CAN_RECV, datagram)
+
+                    # handle timing
+                    if curlist:
+                        # try to feather the delay between messages
+                        nextmsg_ts = curlist[0][0]
+                        next_duration = min(60, max(nextmsg_ts - msg_ts - .05, 0))
+
+                    else:
+                        # if we're at the end of a list, sleep the normal amount.
+                        next_duration = self._runner_sleep_delay
+
+                else:
+                    # the list is done... get a new list if we have one.
+                    if self._fake_can_msgs:
+                        curlist = self._fake_can_msgs.pop(0)
+
+                    next_duration = self._runner_sleep_delay
+
+            except:
+                logger.exception("Error in CanCat FakeDongle._runner thread.  Continuing...", exc_info=1)
+
+
+    def queueCanMessages(self, msgs):
+        '''
+        Add a list of messages to the queue, to be delivered as if received by 
+        the dongle.  Format:  [  (<timestamp-float>, b'data'), ...  ]
+
+        example: cancat.test.test_messages.test_j1939_msgs
+        '''
+        self._fake_can_msgs.append(msgs)
+
 
     #### FAKE SERIAL DEVICE (interface to Python)
     def read(self, count=1):
         if len(self._inbuf) < count:
             empty = False
             try:
-                #print(b'===fccc: attempting to get from _inq:')
+                #logger.info(b'===fccc: attempting to get from _inq:')
                 self._inbuf += self._inq.get(timeout = 1)
             except queue.Empty:
                 empty = True
-                #print(b'===fccc: attempting to get from _inq:  NOPE')
+                #logger.info(b'===fccc: attempting to get from _inq:  NOPE')
                 return b''
 
         out = self._inbuf[:count]
         self._inbuf = self._inbuf[count:]
         if len(out):
-            #print(b"===FakeCanCatCHEAT===: read(%r):  %x" % (count, ord(out)))
+            #logger.info(b"===FakeCanCatCHEAT===: read(%r):  %x" % (count, ord(out)))
             return out
 
         return b''
@@ -164,62 +183,62 @@ class FakeCanCat:
         #self._inq.put(msg) # nah, let's try to handle it here...
 
         self.log(b"write(%r)" % msg)
-        print(b"===FakeCanCatCHEAT===: write(%r)" % msg)
+        logger.info(b"===FakeCanCatCHEAT===: write(%r)" % msg)
 
         length, cmd = struct.unpack("<HB", msg[0:3])
         data = msg[3:]
 
         if cmd == CMD_CHANGE_BAUD:
-            print(b'=CMD_CHANGE_BAUD=')
+            logger.info(b'=CMD_CHANGE_BAUD=')
             self.log(b"CMD_CHANGE_BAUD")
-            self.CanCat_send(b'\x01', CMD_CHANGE_BAUD_RESULT)
+            self.CanCat_send(CMD_CHANGE_BAUD_RESULT, b'\x01')
 
         elif cmd == CMD_PING:
-            print(b'=CMD_PING=')
+            logger.info(b'=CMD_PING=')
             self.log(b'=CMD_PING=')
-            self.CanCat_send(data, CMD_PING_RESPONSE)
+            self.CanCat_send(CMD_PING_RESPONSE, data)
 
         elif cmd == CMD_CAN_MODE:
-            print(b'=CMD_CAN_MODE:%r=' % data)
+            logger.info(b'=CMD_CAN_MODE:%r=' % data)
             self.log(b'=CMD_CAN_MODE:%r=' % data)
-            self.CanCat_send(b'\x01', CMD_CAN_MODE_RESULT)
+            self.CanCat_send(CMD_CAN_MODE_RESULT, b'\x01')
 
         elif cmd == CMD_CAN_BAUD:
-            print(b'=CMD_CAN_BAUD:%r=' % data)
+            logger.info(b'=CMD_CAN_BAUD:%r=' % data)
             self.log(b'=CMD_CAN_BAUD:%r=' % data)
-            self.CanCat_send(b'\x01', CMD_CAN_BAUD_RESULT)
+            self.CanCat_send(CMD_CAN_BAUD_RESULT, b'\x01')
 
         elif cmd == CMD_CAN_SEND:
-            print(b'=CMD_CAN_SEND:%r=' % data)
+            logger.info(b'=CMD_CAN_SEND:%r=' % data)
             self.log(b'=CMD_CAN_SEND:%r=' % data)
-            self.CanCat_send(b'\x01', CMD_CAN_SEND_RESULT)
+            self.CanCat_send(CMD_CAN_SEND_RESULT, b'\x01')
 
         elif cmd == CMD_SET_FILT_MASK:
-            print(b'=CMD_SET_FILT_MASK:%r=' % data)
+            logger.info(b'=CMD_SET_FILT_MASK:%r=' % data)
             self.log(b'=CMD_SET_FILT_MASK:%r=' % data)
-            self.CanCat_send(b'\x01', CMD_SET_FILT_MASK_RESULT)
+            self.CanCat_send(CMD_SET_FILT_MASK_RESULT, b'\x01')
 
         elif cmd == CMD_CAN_SEND_ISOTP:
-            print(b'=CMD_CAN_SEND_ISOTP:%r=' % data)
+            logger.info(b'=CMD_CAN_SEND_ISOTP:%r=' % data)
             self.log(b'=CMD_CAN_SEND_ISOTP:%r=' % data)
-            self.CanCat_send(b'\x01', CMD_CAN_SEND_ISOTP_RESULT)
+            self.CanCat_send(CMD_CAN_SEND_ISOTP_RESULT, b'\x01')
 
         elif cmd == CMD_CAN_RECV_ISOTP:
-            print(b'=CMD_CAN_RECV_ISOTP:%r=' % data)
+            logger.info(b'=CMD_CAN_RECV_ISOTP:%r=' % data)
             self.log(b'=CMD_CAN_RECV_ISOTP:%r=' % data)
-            self.CanCat_send(b'\x01', CMD_CAN_RECV_ISOTP_RESULT)
+            self.CanCat_send(CMD_CAN_RECV_ISOTP_RESULT, b'\x01')
 
         elif cmd == CMD_CAN_SENDRECV_ISOTP:
-            print(b'=CMD_CAN_SENDRECV_ISOTP:%r=' % data)
+            logger.info(b'=CMD_CAN_SENDRECV_ISOTP:%r=' % data)
             self.log(b'=CMD_CAN_SENDRECV_ISOTP:%r=' % data)
-            self.CanCat_send(b'\x01', CMD_CAN_SENDRECV_ISOTP_RESULT)
+            self.CanCat_send(CMD_CAN_SENDRECV_ISOTP_RESULT, b'\x01')
 
         elif cmd == CMD_PRINT_CAN_REGS:
-            print(b'=CMD_PRINT_CAN_REGS:%r=' % data)
+            logger.info(b'=CMD_PRINT_CAN_REGS:%r=' % data)
             self.log(b'=CMD_PRINT_CAN_REGS:%r=' % data)
-            #self.CanCat_send(b'\x01', CMD_PRINT_CAN_REGS_RESULT)??
+            #self.CanCat_send(CMD_PRINT_CAN_REGS_RESULT, b'\x01')??
 
         else:
-            print(b'===BAD COMMAND: %x : %r' % (cmd, data))
+            logger.warning(b'===BAD COMMAND: %x : %r' % (cmd, data))
             self.log(b'===BAD COMMAND: %x : %r' % (cmd, data))
             self.CanCat_send(b'===BAD COMMAND: %x : %r' % (cmd, data), 3)
