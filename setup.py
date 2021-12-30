@@ -7,7 +7,7 @@ version = '2.0.0'
 packages = ['cancat','cancat/vstruct']
 mods = []
 pkgdata = {}
-scripts = ['CanCat', 'J1939Cat']
+scripts = ['CanCat', 'J1939Cat', 'canmap', 'cancat2candump', 'cancat2pcap', 'candump2cancat']
 
 dirn = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(dirn, 'README.md'), 'r') as fd:
