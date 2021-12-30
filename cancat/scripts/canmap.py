@@ -133,10 +133,10 @@ def udsmap_parse_args():
             choices='EDS', nargs='+', action=OneOrMoreOf,
             help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (S) diagnostic Sessions')
     parser.add_argument('-p', '--port', default='/dev/ttyACM0',
-            help='System device to use to communicate to the CanCat hardware (/dev/ttyACM0)') 
+            help='System device to use to communicate to the CanCat hardware (/dev/ttyACM0)')
     parser.add_argument('-b', '--baud',
             choices=_get_baud_options(), default='AUTO',
-            help='Set the CAN Bus Speed') 
+            help='Set the CAN Bus Speed')
     parser.add_argument('-t', '--discovery-type',
             choices=['did', 'session'], default='did',
             help='ECU discovery method: attempt to read a DID (F190), or enter diagnostic session 2')
@@ -158,9 +158,9 @@ def udsmap_parse_args():
     #        type=SecurityAccessKeyRange, default='01-41,61-7D',
     #        help='Security Access Key range to test, by default Security Sessions 43-60 are not tested, those values are used for end-of-life airbag deployment and may cause damage.')
 
-    # According to ISO 14229 there is no upper bound on the size of the key 
-    # (that I could see) aside from the constraints of the ISO-TP protocol 
-    # itself. But for sanity's sake the default will be to stop trying when we 
+    # According to ISO 14229 there is no upper bound on the size of the key
+    # (that I could see) aside from the constraints of the ISO-TP protocol
+    # itself. But for sanity's sake the default will be to stop trying when we
     # reach 32 bytes.
     #parser.add_argument('-L', metavar='<Key Length Range>',
     #        type=PayloadLength, default='01-20',
@@ -242,7 +242,12 @@ def save_results(results, filename=None):
     if filename is not None:
         import yaml
 
-        class literal_unicode(unicode): pass
+        try:
+            class literal_unicode(unicode): pass
+        except NameError:
+            # in python3 just use "str"
+            class literal_unicode(str): pass
+
         def literal_unicode_representer(dumper, data):
             return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
         yaml.add_representer(literal_unicode, literal_unicode_representer)
@@ -259,14 +264,14 @@ def save_results(results, filename=None):
 
         yaml.add_representer(ECU, ecu_presenter)
 
-        # TODO: It'd be more esthetically pleasing in the output files if 
-        #       response data could be represented as a simple ascii string with 
-        #       escaped bytes in it rather than the standard yaml "!!binary 
+        # TODO: It'd be more esthetically pleasing in the output files if
+        #       response data could be represented as a simple ascii string with
+        #       escaped bytes in it rather than the standard yaml "!!binary
         #       + base64 string" method.
         #
-        #       This is the closest I got but that makes it difficult to load 
-        #       the data. For now we will use the default !!binary format, if 
-        #       someone manually creates the data with escaped strings it'll 
+        #       This is the closest I got but that makes it difficult to load
+        #       the data. For now we will use the default !!binary format, if
+        #       someone manually creates the data with escaped strings it'll
         #       still be loaded correctly.
         #
         #       class data_str(str): pass
@@ -274,7 +279,7 @@ def save_results(results, filename=None):
         #             return dumper.represent_str(repr(data)[1:-1])
         #         yaml.add_representer(data_str, data_str_presenter)
 
-        # TODO: I should probably make the config a class of it's own also, with 
+        # TODO: I should probably make the config a class of it's own also, with
         #       .add_ecu(), .add_note(), .export(), .import()
         output_data = {}
         global _config
@@ -369,8 +374,8 @@ def scan(config, args, c, scancls):
 
 def main():
     args = udsmap_parse_args()
-    
-    # TODO: move this to it's own class in cancat.utils, the config/args global 
+
+    # TODO: move this to it's own class in cancat.utils, the config/args global
     #       data thing will be better handled that way
     #cancat.utils.canmap(args)
 
@@ -390,7 +395,7 @@ def main():
     log.debug(args)
 
     # TODO: Check for potentially damaging options
-    
+
     # TODO: Warn about how long the combined scan options will probably take:
     #   - ECU Scan: if timeout is 3s:
     #                   worst case with both std & ext = (247 + 255) * 3 =
@@ -398,7 +403,7 @@ def main():
     #   - ECU Scan: if timeout is 0.1s:
     #                   worst case with both std & ext = (247 + 255) * 0.1 =
     #                   50 sec = ~ 1 minute
-    #   - DID Scan: 
+    #   - DID Scan:
     #log.warning('ECU scan {} may take up to 25 minutes to complete'.format(args.E))
 
     global c
@@ -410,7 +415,7 @@ def main():
         scanlib = importlib.import_module(pkg)
         scancls = getattr(scanlib, cls)
 
-        # If the custom UDS class package has a "CanInterface" class, use that 
+        # If the custom UDS class package has a "CanInterface" class, use that
         # instead of the real cancat.CanInterface class
         if hasattr(scanlib, 'CanInterface'):
             ifaceclass = getattr(scanlib, 'CanInterface')
@@ -453,7 +458,7 @@ def main():
         if count2 <= count1:
             log_and_save(_config, 'ERROR: No CAN traffic detected on {} @ {}'.format(args.port, args.baud))
             save_and_exit(2)
-    
+
     # signal will catch CTRL-C in script contexts
     signal.signal(signal.SIGINT, sigint_handler)
 
