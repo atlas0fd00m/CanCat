@@ -2,13 +2,14 @@ import time
 import logging
 import unittest
 
+import cancat.j1939stack
+
+from cancat import *
+from cancat import CanInterface
 from cancat.test import test_messages
 from cancat.utils.types import ECUAddress
-from cancat import CanInterface
 
-import cancat.j1939stack
-from cancat import *
-
+from binascii import unhexlify
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,15 @@ class J1939Dongle_test(unittest.TestCase):
 
         c.printCanMsgs()
         c.printCanMsgs(advfilters=['len(data) > 8'])
+        c.printCanMsgs(advfilters=['pgn == 0xfeca'])
+
         test_msgs_long = [x for x in c.filterCanMsgs(advfilters=['len(data) > 8'])]
-        for test_msg_long in test_msgs_long:
-            logger.warning(test_msg_long)
+        self.assertEqual(len(test_msgs_long), 2)
+
+        test_msg_feca = [x for x in c.filterCanMsgs(advfilters=['pgn==0xfeca'])][0]
+        idx, ts, arbtup, data = test_msg_feca
+        self.assertEqual(data[0:5], unhexlify(b'57ff5b0004'))
+        self.assertEqual(data[-5:], unhexlify(b'0139040901'))
+        self.assertEqual(len(data), 78)
 
 

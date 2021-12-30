@@ -1224,8 +1224,13 @@ class CanInterface(object):
 
             # advanced filters allow python code to be handed in.  if any of the python code snippits result in "False" or 0, skip this message
             skip = False
-            for advf in advfilters:
+            if advfilters:
+                # do this once per message, but only if there are advanced filters
                 lcls = self._getLocals(idx, ts, arbid, msg)
+
+            for advf in advfilters:
+                # eval each advfilter string/python and determine if this 
+                # message should be included.
                 if not eval(advf, lcls):
                     skip = True
 
