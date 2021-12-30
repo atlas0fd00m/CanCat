@@ -87,12 +87,12 @@ class FakeCanCat:
         self._inq = queue.Queue()
         self._outq = queue.Queue()  # this is what's handed to the CanCat receiver thread
         self.memory = fakeMemory()
-        self._fake_can_msgs = []
+        self._fake_can_msgs = queue.Queue()
 
         self.start_ts = time.time()
 
         self._go = True
-        self._runner_sleep_delay = .5
+        self._runner_sleep_delay = 0
         self._thread = threading.Thread(target=self._runner, daemon=True)
         self._thread.start()
 
@@ -141,7 +141,7 @@ class FakeCanCat:
                 else:
                     # the list is done... get a new list if we have one.
                     if self._fake_can_msgs:
-                        curlist = self._fake_can_msgs.pop(0)
+                        curlist = self._fake_can_msgs.get()
 
                     next_duration = self._runner_sleep_delay
 
@@ -156,7 +156,7 @@ class FakeCanCat:
 
         example: cancat.test.test_messages.test_j1939_msgs
         '''
-        self._fake_can_msgs.append(msgs)
+        self._fake_can_msgs.put(msgs)
 
 
     #### FAKE SERIAL DEVICE (interface to Python)
