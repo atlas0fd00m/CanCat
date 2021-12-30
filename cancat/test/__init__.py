@@ -100,7 +100,7 @@ class FakeCanCat:
         return time.time() - self.start_ts
 
     def CanCat_send(self, cmd, data):
-        logger.info(b'===FakeCanCat_send: cmd:%x data: %r' % (cmd, data))
+        logger.debug(b'===FakeCanCat_send: cmd:%x data: %r' % (cmd, data))
         packet = b'@%c%c%s' % (len(data)+1, cmd, data)
         self._inq.put(packet)
 

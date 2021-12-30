@@ -2,10 +2,8 @@ import time
 import logging
 import unittest
 
-import cancat.j1939stack
-
-from cancat import *
-from cancat import CanInterface
+#from cancat import *
+from cancat.j1939stack import J1939Interface
 from cancat.test import test_messages
 from cancat.utils.types import ECUAddress
 
@@ -14,11 +12,10 @@ from binascii import unhexlify
 logger = logging.getLogger(__name__)
 
 
-class J1939Dongle_test(unittest.TestCase):
+class J1939_test(unittest.TestCase):
     def test_basic_j1939_dongle(self):
         # start out with CanInterface with a fake dongle
-        #c = J1939Interface(port='FakeCanCat')
-        c = j1939stack.J1939Interface(port='FakeCanCat')
+        c = J1939Interface(port='FakeCanCat')
         pingdata = b'foobar'
         pingtest = c.ping(pingdata)
         self.assertEqual(pingdata, pingtest[1])
