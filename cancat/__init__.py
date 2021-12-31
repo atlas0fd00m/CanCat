@@ -718,9 +718,12 @@ class CanInterface(object):
             if maxmsgs != None and maxmsgs < count:
                 return
             line = next(msg_gen)
-            print(line)
+            if line:
+                print(line)
+                count += 1
+            else:
+                time.sleep(.1)
 
-            count += 1
             if keystop():
                 break
 
@@ -848,6 +851,10 @@ class CanInterface(object):
 
         maxsecs limits the number of seconds this generator will go for.  it's intended
         for use with tail
+
+        if tail==True, if we run out of messages in the queue, this will yield a None
+        to allow the caller to decide what to do instead of waiting forever or until a
+        new message is received.
         '''
 
         messages = self.getCanMsgQueue()
@@ -892,6 +899,10 @@ class CanInterface(object):
 
                     if stop == msglen:
                         self.log("waiting for messages", 3)
+                        # if we're "tailing" yield Nones so the caller can decide what to do
+                        if tail:
+                            yield None
+
                         # wait for trigger event so we're not constantly polling
                         self._msg_events[self._msg_source_idx].wait(1)
                         self._msg_events[self._msg_source_idx].clear()
@@ -1217,7 +1228,13 @@ class CanInterface(object):
         if arbids != None and type(arbids) != list:
             arbids = [arbids]
 
-        for idx,ts,arbid,msg in self.genCanMsgs(start_msg, stop_msg, arbids=arbids, tail=tail, maxsecs=maxsecs):
+        for genmsg in self.genCanMsgs(start_msg, stop_msg, arbids=arbids, tail=tail, maxsecs=maxsecs):
+            # if we use "tail" we may yield Nones if we're waiting.
+            if genmsg is None:
+                yield None
+                continue
+
+            idx,ts,arbid,msg = genmsg
             if not ((arbids != None and arbid in arbids) or arbid not in ignore and (filter_ids==None or arbid not in filter_ids)):
                 self.log("skipping message: (%r, %r, %r, %r)" % ((idx, ts, arbid, msg)))
                 continue
@@ -1295,7 +1312,7 @@ class CanInterface(object):
             pass
 
     def reprCanMsgsLines(self, start_msg=0, stop_msg=None, start_bkmk=None, stop_bkmk=None, start_baseline_msg=None, stop_baseline_msg=None, arbids=None, ignore=[], advfilters=[], pretty=False, tail=False, viewbits=VIEW_ALL):
-        # FIXME: make different stats selectable using a bitfield arg (eg. REPR_TIME_DELTA | REPR_ASCII)
+        # TODO: make different stats selectable using a bitfield arg (eg. REPR_TIME_DELTA | REPR_ASCII)
         '''
         String representation of a set of CAN Messages.
         These can be filtered by start and stop message indexes, as well as
@@ -1345,7 +1362,13 @@ class CanInterface(object):
         data_repeat = 0
         data_similar = 0
 
-        for idx, ts, arbid, msg in self.filterCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids=arbids, ignore=ignore, advfilters=advfilters, tail=tail):
+        for filtmsg in self.filterCanMsgs(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids=arbids, ignore=ignore, advfilters=advfilters, tail=tail):
+            # if we use "tail" we may yield Nones if we're waiting.
+            if filtmsg is None:
+                yield None
+                continue
+
+            idx, ts, arbid, msg = filtmsg
             # insert bookmark names/comments in appropriate places
             while next_bkmk_idx < len(self.bookmarks) and idx >= self.bookmarks[next_bkmk_idx]:
                 yield (self.reprBookmark(next_bkmk_idx))
@@ -1368,7 +1391,7 @@ class CanInterface(object):
                     elif byte_cnt_diff <=4:
                         diff.append("Similar")
                         data_similar += 1
-                    # FIXME: make some better heuristic to identify "out of norm"
+                    # TODO: make some better heuristic to identify "out of norm"
 
             # look for ASCII data (4+ consecutive bytes)
             if (viewbits & VIEW_ASCII) and hasAscii(msg):
@@ -1738,7 +1761,7 @@ class CanInTheMiddleInterface(CanInterface):
 
 
     def genCanMsgsIso(self, start=0, stop=None, arbids=None):
-        # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
+        # TODO: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         '''
         CAN message generator.  takes in start/stop indexes as well as a list
         of desired arbids (list). Uses the isolation messages.
@@ -2081,7 +2104,13 @@ class CanInTheMiddleInterface(CanInterface):
         data_repeat = 0
         data_similar = 0
 
-        for idx, ts, arbid, msg in self.filterCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids=arbids, ignore=ignore, advfilters=advfilters):
+        for filtmsg in self.filterCanMsgsIso(start_msg, stop_msg, start_baseline_msg, stop_baseline_msg, arbids=arbids, ignore=ignore, advfilters=advfilters):
+            # if we use "tail" we may yield Nones if we're waiting.
+            if filtmsg is None:
+                yield None
+                continue
+
+            idx, ts, arbid, msg = filtmsg
             diff = []
 
             # insert bookmark names/comments in appropriate places

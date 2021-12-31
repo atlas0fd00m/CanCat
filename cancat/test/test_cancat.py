@@ -11,7 +11,21 @@ from binascii import unhexlify
 logger = logging.getLogger(__name__)
 
 
+def getLoadedFakeCanCatInterface():
+    # start out with CanInterface with a fake dongle
+    c = CanInterface(port='FakeCanCat')
+    c._io.queueCanMessages(test_messages.test_j1939_msgs_0)
+    c._io.queueCanMessages(test_messages.test_j1939_msgs_1)
+    return c
+        
 class CanCat_test(unittest.TestCase):
     def test_basic_cancat_dongle(self):
-        pass
+        c = getLoadedFakeCanCatInterface()
+
+        
+
+        # test CANrecv()
+        c.CANrecv().__next__()
+
+
 
