@@ -117,7 +117,7 @@ class CCPFollower(object):
         ctr = utils._parse_byte(msg[1])
 
         # Device ID is implementation specific and optional, just return back value for now
-        id = utils._parse_6_byte_value(msg[2:]) #'0x' + msg[2:].hex()
+        id = utils._parse_6_byte_value(msg[2:])
 
         parsed = {'CMD': cmd, 'CTR': ctr, 'DEVICE_ID': id}
 
@@ -583,32 +583,279 @@ class CCPFollower(object):
 
         return parsed
 
-    def _parse_select_cal_page_CRO():
-        print("Not Implemented")
+    def _parse_select_cal_page_CRO(self, msg):
+        '''
+        SELECT_CAL_PAGE CRO
 
-    def _parse_get_active_cal_page_CRO():
-        print("Not Implemented")
+        Tells follower to take whatever calibration page MTA0 is pointing to,
+        and make it the active calibration page.
 
-    def _parse_diag_service_CRO():
-        print("Not Implemented")
+        +-------+--------+-----------------------------------------------+
+        |   0   |  byte  |  CRO command type                             |
+        +-------+--------+-----------------------------------------------+
+        |   1   |  byte  |  Counter (CTR)                                |
+        +-------+--------+-----------------------------------------------+
+        |  2..7 |  bytes |  Don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
 
-    def _parse_action_service_CRO():
-        print("Not Implemented")
+        cmd = utils._parse_byte(msg[0])
+        ctr = utils._parse_byte(msg[1])
 
-    def _parse_get_daq_size_CRO():
-        print("Not Implemented")
+        parsed = {'CMD': cmd, 'CTR': ctr}
 
-    def _parse_set_daq_ptr_CRO():
-        print("Not Implemented")
+        return parsed
 
-    def _parse_write_daq_CRO():
-        print("Not Implemented")
+    def _parse_get_active_cal_page_CRO(self, msg):
+        '''
+        GET_ACTIVE_CAL_PAGE CRO
 
-    def _parse_start_stop_CRO():
-        print("Not Implemented")
+        Tells follower to return start address of currently active calibration page
 
-    def _parse_start_stop_all_CRO():
-        print("Not Implemented")
+        +-------+--------+-----------------------------------------------+
+        |   0   |  byte  |  CRO command type                             |
+        +-------+--------+-----------------------------------------------+
+        |   1   |  byte  |  Counter (CTR)                                |
+        +-------+--------+-----------------------------------------------+
+        |  2..7 |  bytes |  Don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        cmd = utils._parse_byte(msg[0])
+        ctr = utils._parse_byte(msg[1])
+
+        parsed = {'CMD': cmd, 'CTR': ctr}
+
+        return parsed
+
+    def _parse_diag_service_CRO(self, msg):
+        '''
+        DIAG_SERVICE CRO
+
+        Tells follower to carry out specified diagnostic service, then set Memory
+        Transfer Address (MTA0) to location of action service return info.
+
+        +-------+--------+-----------------------------------------------+
+        |   0   |  byte  |  CRO command type                             |
+        +-------+--------+-----------------------------------------------+
+        |   1   |  byte  |  Counter (CTR)                                |
+        +-------+--------+-----------------------------------------------+
+        |  2,3  |  word  |  Diagnostic service number                    |
+        +-------+--------+-----------------------------------------------+
+        |  4..7 |  bytes |  Parameters, if applicable                    |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        cmd = utils._parse_byte(msg[0])
+        ctr = utils._parse_byte(msg[1])
+
+        # spec shows two bytes for number but example only shows one byte
+        diag_service_num = utils._parse_2_byte_value(msg[2:4])
+        params = utils._parse_4_byte_value(msg[4:])
+
+        parsed = {'CMD': cmd, 'CTR': ctr, 'diag_service_num': diag_service_num, \
+                  'params': params}
+
+        return parsed
+
+    def _parse_action_service_CRO(self, msg):
+        '''
+        ACTION_SERVICE CRO
+
+        Tells follower to carry out specified action service, then set Memory
+        Transfer Address (MTA0) to location of action service return info.
+
+        +-------+--------+-----------------------------------------------+
+        |   0   |  byte  |  CRO command type                             |
+        +-------+--------+-----------------------------------------------+
+        |   1   |  byte  |  Counter (CTR)                                |
+        +-------+--------+-----------------------------------------------+
+        |  2,3  |  word  |  Action service number                        |
+        +-------+--------+-----------------------------------------------+
+        |  4..7 |  bytes |  Parameters, if applicable                    |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        cmd = utils._parse_byte(msg[0])
+        ctr = utils._parse_byte(msg[1])
+
+        # spec shows two bytes for number but example only shows one byte
+        action_service_num = utils._parse_2_byte_value(msg[2:4])
+        params = utils._parse_4_byte_value(msg[4:])
+
+        parsed = {'CMD': cmd, 'CTR': ctr, 'action_service_num': action_service_num, \
+                  'params': params}
+
+        return parsed
+
+    def _parse_get_daq_size_CRO(self, msg):
+        '''
+        GET_DAQ_SIZE CRO
+
+        Tells follower to return size of specified DAQ list as the # of
+        available Object Descriptor Tables, and clears the current list.
+
+        If specified list # is not available, size = 0 should be returned.
+
+        +-------+--------+-----------------------------------------------+
+        |   0   |  byte  |  CRO command type                             |
+        +-------+--------+-----------------------------------------------+
+        |   1   |  bytes |  Counter (CTR)                                |
+        +-------+--------+-----------------------------------------------+
+        |   2   |  byte  |  DAQ list number (0,1,...)                    |
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  Don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        |  4..7 |  bytes |  Unsigned long CAN identifier of DTO          |
+        |       |        |  dedicated to list number                     |
+        +-------+--------+-----------------------------------------------+
+        '''
+        cmd = utils._parse_byte(msg[0])
+        ctr = utils._parse_byte(msg[1])
+
+        daq_list_num = utils._parse_byte(msg[2])
+        can_dto_id = utils._parse_4_byte_value(msg[4:])
+
+        parsed = {'CMD': cmd, 'CTR': ctr, 'daq_list_num': daq_list_num,
+                  'can_dto_id': can_dto_id }
+
+        return parsed
+
+    def _parse_set_daq_ptr_CRO(self, msg):
+        '''
+        SET_DAQ_PTR CRO
+
+        Tells follower to initialize the DAQ list pointer for a subsequent write to a DAQ list
+
+        +-------+--------+-----------------------------------------------+
+        |   0   |  byte  |  CRO command type                             |
+        +-------+--------+-----------------------------------------------+
+        |   1   |  byte  |  Counter (CTR)                                |
+        +-------+--------+-----------------------------------------------+
+        |   2   |  byte  |  DAQ list number (0,1,...)                    |
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  Object Descriptor Table ODT number (0,1,...) |
+        +-------+--------+-----------------------------------------------+
+        |   4   |  byte  |  Element number within ODT (0,1,...)          |
+        +-------+--------+-----------------------------------------------+
+        |  5..7 |  bytes |  Don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+        cmd = utils._parse_byte(msg[0])
+        ctr = utils._parse_byte(msg[1])
+
+        daq_list_num = utils._parse_byte(msg[2])
+        odt_num = utils._parse_byte(msg[3])
+        odt_elem_num = utils._parse_byte(msg[4])
+
+        parsed = {'CMD': cmd, 'CTR': ctr, 'daq_list_num': daq_list_num, \
+                  'odt_num': odt_num, 'odt_elem_num': odt_elem_num}
+
+        return parsed
+
+    def _parse_write_daq_CRO(self, msg):
+        '''
+        WRITE_DAQ CRO
+
+        Tells follower to write one entry to DAQ list defined by the DAQ list
+        pointer (see SET_DAQ_PTR).
+
+        Size of DAQ element in bytes: 1, 2, 4 are valid values but is dependent on ECU impl.
+
+        +-------+--------+-----------------------------------------------+
+        |   0   |  byte  |  CRO command type                             |
+        +-------+--------+-----------------------------------------------+
+        |   1   |  byte  |  Counter (CTR)                                |
+        +-------+--------+-----------------------------------------------+
+        |   2   |  byte  |  Size of DAQ element in bytes { 1, 2, 4 }     |
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  Address extension of DAQ element             |
+        +-------+--------+-----------------------------------------------+
+        |  4..7 |  bytes |  Unsigned long address of DAQ element         |
+        +-------+--------+-----------------------------------------------+
+        '''
+        cmd = utils._parse_byte(msg[0])
+        ctr = utils._parse_byte(msg[1])
+
+        daq_elem_size = utils._parse_byte(msg[2])
+        address_ext = utils._parse_byte(msg[3])
+        address = utils._parse_4_byte_value(msg[4:])
+
+        parsed = {'CMD': cmd, 'CTR': ctr, 'daq_elem_size': daq_elem_size, \
+                  'address_ext': address_ext, 'address': address}
+
+        return parsed
+
+    def _parse_start_stop_CRO(self, msg):
+        '''
+        START_STOP CRO
+
+        Tells follower to start or stop specified DAQ list
+
+        Params:
+        - Modes: 0x00 stops specified DAQ list, 0x01 starts specified DAQ list,
+          0x02 prepares DAQ list for synchronised start.
+        - Last ODT number specifies which ODTs (From 0 to Last ODT number) of
+          the DAQ list should be transmitted.
+        - Event Channel No #: specifies the generic signal source that effectively
+          determines the data transmission timing.
+        - Prescaler: >= 1, can reduce transmission rate
+
+        +-------+--------+-----------------------------------------------+
+        |   0   |  byte  |  CRO command type                             |
+        +-------+--------+-----------------------------------------------+
+        |   1   |  byte  |  Counter (CTR)                                |
+        +-------+--------+-----------------------------------------------+
+        |   2   |  byte  |  Mode (specified above)                       |
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  DAQ list number                              |
+        +-------+--------+-----------------------------------------------+
+        |   4   |  byte  |  Last ODT number                              |
+        +-------+--------+-----------------------------------------------+
+        |   5   |  byte  |  Event Channel number                         |
+        +-------+--------+-----------------------------------------------+
+        |  6..7 |  bytes |  Transmission rate prescaler                  |
+        +-------+--------+-----------------------------------------------+
+        '''
+        cmd = utils._parse_byte(msg[0])
+        ctr = utils._parse_byte(msg[1])
+
+        mode = utils._parse_byte(msg[2])
+        daq_list_num = utils._parse_byte(msg[3])
+        last_odt_num = utils._parse_byte(msg[4])
+        event_chan_num = utils._parse_byte(msg[5])
+        prescaler = utils._parse_2_byte_value_motorola(msg[6:8])
+
+        parsed = {'CMD': cmd, 'CTR': ctr, 'mode': mode, 'daq_list_num': daq_list_num, \
+                  'last_odt_num': last_odt_num, 'event_chan_num': event_chan_num, \
+                  'prescaler': prescaler }
+
+        return parsed
+
+    def _parse_start_stop_all_CRO(self, msg):
+        '''
+        START_STOP_ALL CRO
+
+        Tells follower to start/stop periodic transmission of all DAQ lists that
+        were previously configured with START_STOP command.
+
+        +-------+--------+-----------------------------------------------+
+        |   0   |  byte  |  CRO command type                             |
+        +-------+--------+-----------------------------------------------+
+        |   1   |  byte  |  Counter (CTR)                                |
+        +-------+--------+-----------------------------------------------+
+        |   2   |  byte  |  0x00 to stop transmission, 0x01 to start     |
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+        cmd = utils._parse_byte(msg[0])
+        ctr = utils._parse_byte(msg[1])
+        mode = utils._parse_byte(msg[2])
+
+        parsed = {'CMD': cmd, 'CTR': ctr, 'mode': mode }
+
+        return parsed
 
     '''
     +---------------------------------------------------------------------+
@@ -722,8 +969,8 @@ class CCPFollower(object):
         - 0x33:  Upload of classified data
         - 0x32:  Data block size >5
 
-        Right now, this returns 4 bytes back, not 5.  TODO Will need to change the
-        struct.unpack to support variable byte sizes.
+        Right now, this returns 4 bytes back, not 5. Will need to change the
+        util functions to support variable byte sizes.
 
         Bytes after 0xFF, return code and counter:
         +-------+--------+-----------------------------------------------+
@@ -957,29 +1204,195 @@ class CCPFollower(object):
 
         return msg
 
-    def _generate_select_cal_page_CRO():
-        print("Not Implemented")
+    def _generate_select_cal_page_CRM(self, return_code, counter):
+        '''
+        This command's function depends on the ECU implementation. The previously
+        initialized MTA0 points to the start of the calibration data page that
+        is selected as the currently active page by this command.
 
-    def _generate_get_active_cal_page_CRO():
-        print("Not Implemented")
+        Possible return codes:
+        - 0x00:  acknowledge (no error)
 
-    def _generate_diag_service_CRO():
-        print("Not Implemented")
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
 
-    def _generate_action_service_CRO():
-        print("Not Implemented")
+        msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
+              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
 
-    def _generate_get_daq_size_CRO():
-        print("Not Implemented")
+        return msg
 
-    def _generate_set_daq_ptr_CRO():
-        print("Not Implemented")
+    def _generate_get_active_cal_page_CRM(self, return_code, counter, address_ext, address):
+        '''
+        This command returns the start address of the calibration page that is
+        currently active in the follower device.
 
-    def _generate_write_daq_CRO():
-        print("Not Implemented")
+        Possible return codes: not specified
 
-    def _generate_start_stop_CRO():
-        print("Not Implemented")
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  address extension                            |
+        +-------+--------+-----------------------------------------------+
+        |  4..7 |  bytes |  unsigned long address                        |
+        +-------+--------+-----------------------------------------------+
+        '''
 
-    def _generate_start_stop_all_CRO():
-        print("Not Implemented")
+        msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
+              utils._gen_byte(counter) + utils._gen_byte(address_ext) + \
+              utils._gen_4_byte_val(address)
+
+        return msg
+
+    def _generate_diag_service_CRM(self, return_code, counter, return_len, data_type_qual):
+        '''
+        The follower device carries out the requested service and automatically
+        sets the Memory Transfer Address MTA0 to the location from which the
+        CCP leader device (host) may subsequently upload the requested
+        diagnostic service return information.
+
+        Then the follower device will respond back with the following contents:
+
+        Notes:
+        - Data type qualifier is implementation-specific.
+
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  length of return information (in bytes)      |
+        +-------+--------+-----------------------------------------------+
+        |   4   |  byte  |  data type qualifier of return information    |
+        +-------+--------+-----------------------------------------------+
+        |  5..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
+              utils._gen_byte(counter) + utils._gen_byte(return_len) + \
+              utils._gen_byte(data_type_qual) + utils._gen_byte(DONT_CARE_VAL)*3
+
+        return msg
+
+    def _generate_action_service_CRM(self, return_code, counter, return_len, data_type_qual):
+        '''
+        The follower device carries out the requested service and automatically
+        sets the Memory Transfer Address MTA0 to the location from which the CCP
+        leader device may subsequently upload the requested action service
+        return information (if applicable).
+
+        Notes:
+        - Data type qualifier is implementation-specific.
+
+        Then the follower device will respond back with the following contents:
+
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  length of return information (in bytes)      |
+        +-------+--------+-----------------------------------------------+
+        |   4   |  byte  |  data type qualifier of return information    |
+        +-------+--------+-----------------------------------------------+
+        |  5..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
+              utils._gen_byte(counter) + utils._gen_byte(return_len) + \
+              utils._gen_byte(data_type_qual) + utils._gen_byte(DONT_CARE_VAL)*3
+
+        return msg
+
+    def _generate_get_daq_size_CRM(self, return_code, counter, daq_list_size, first_pid):
+        '''
+        Returns the size of the specified DAQ list as the number of available
+        Object Descriptor Tables (ODTs) and clears the current list.
+
+        If the specified list number is not available, size = 0 should be returned.
+
+        The PID of a specific ODT of a DAQ list is determined by:
+          PID = First PID of DAQ list + ODT number
+
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |   3   |  byte  |  DAQ list size (= # of ODTs in this list)     |
+        +-------+--------+-----------------------------------------------+
+        |   4   |  byte  |  First PID of DAQ list                        |
+        +-------+--------+-----------------------------------------------+
+        |  5..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
+              utils._gen_byte(counter) + utils._gen_byte(daq_list_size) + \
+              utils._gen_byte(first_pid) + utils._gen_byte(DONT_CARE_VAL)*3
+
+        return msg
+
+    def _generate_set_daq_ptr_CRM(self, return_code, counter):
+        '''
+        Initializes the DAQ list pointer for a subsequent write to a DAQ list.
+        See 'Organization of Data Acquisition Messages' from https://automotivetechis.files.wordpress.com/2012/06/ccp211.pdf
+
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
+              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+
+        return msg
+
+    def _generate_write_daq_CRM(self, return_code, counter):
+        '''
+        Follower should write one entry (description of a single DAQ element)
+        to a DAQ list defined by the DAQ list pointer (SET_DAQ_PTR, separate command).
+
+        The leader device needs to manage any ECU limitations.
+        THe follower device must manage DAQ element bytes consistently.
+
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
+              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+
+        return msg
+
+    def _generate_start_stop_CRM(self, return_code, counter):
+        '''
+        START_STOP command will start or stop data acquistion, or prepare a
+        synchronized start of the specified DAQ list.
+
+        The CRO from the leader device specifies modes, what to transmit, and so on.
+        The follower device just reports back a status code.
+
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
+              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+
+        return msg
+
+    def _generate_start_stop_all_CRM(self, return_code, counter):
+        '''
+        Same as START_STOP but will start (or stop) ALL previously stopped/started
+        DAQ lists. The follower device just reports back a status code.
+
+        Bytes after 0xFF, return code and counter:
+        +-------+--------+-----------------------------------------------+
+        |  3..7 |  bytes |  don't care                                   |
+        +-------+--------+-----------------------------------------------+
+        '''
+
+        msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
+              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+
+        return msg

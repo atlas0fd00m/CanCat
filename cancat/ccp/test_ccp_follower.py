@@ -130,6 +130,69 @@ class TestCcpFollowerMessageParsing(unittest.TestCase):
         parsed = ccp._parse_set_s_status_CRO(received_CRO)
         self.assertEqual(parsed, expected)
 
+    def test_parse_select_cal_page_CRO(self):
+        ccp = CCPFollower(c=None)
+        received_CRO = b'\x11\x37\x90\x90\x90\x90\x90\x90'
+        expected = {'CMD': 0x11, 'CTR': 0x37 }
+        parsed = ccp._parse_select_cal_page_CRO(received_CRO)
+        self.assertEqual(parsed, expected)
+
+    def test_parse_get_active_cal_page_CRO(self):
+        ccp = CCPFollower(c=None)
+        received_CRO = b'\x09\x38\x90\x90\x90\x90\x90\x90'
+        expected = {'CMD': 0x09, 'CTR': 0x38 }
+        parsed = ccp._parse_get_active_cal_page_CRO(received_CRO)
+        self.assertEqual(parsed, expected)
+
+    def test_parse_diag_service_CRO(self):
+        ccp = CCPFollower(c=None)
+        received_CRO = b'\x20\x39\x08\x00\x00\x00\x00\x00'
+        expected = {'CMD': 0x20, 'CTR': 0x39, 'diag_service_num': '0x8', 'params': '0x0' }
+        parsed = ccp._parse_diag_service_CRO(received_CRO)
+        self.assertEqual(parsed, expected)
+
+    def test_parse_action_service_CRO(self):
+        ccp = CCPFollower(c=None)
+        received_CRO = b'\x21\x3a\x08\x00\x05\x00\x00\x00'
+        expected = {'CMD': 0x21, 'CTR': 0x3a, 'action_service_num': '0x8', 'params': '0x5000000' }
+        parsed = ccp._parse_action_service_CRO(received_CRO)
+        self.assertEqual(parsed, expected)
+
+    def test_parse_get_daq_size_CRO(self):
+        ccp = CCPFollower(c=None)
+        received_CRO = b'\x14\x3b\x01\x90\x33\x44\x55\x66'
+        expected = {'CMD': 0x14, 'CTR': 0x3b, 'daq_list_num': 1, 'can_dto_id': '0x33445566' }
+        parsed = ccp._parse_get_daq_size_CRO(received_CRO)
+        self.assertEqual(parsed, expected)
+
+    def test_parse_set_daq_ptr_CRO(self):
+        ccp = CCPFollower(c=None)
+        received_CRO = b'\x15\x3c\x02\x01\x03\x90\x90\x90'
+        expected = {'CMD': 0x15, 'CTR': 0x3c, 'daq_list_num': 2, 'odt_num': 1, 'odt_elem_num': 3 }
+        parsed = ccp._parse_set_daq_ptr_CRO(received_CRO)
+        self.assertEqual(parsed, expected)
+
+    def test_parse_write_daq_CRO(self):
+        ccp = CCPFollower(c=None)
+        received_CRO = b'\x16\x3d\x04\x01\xca\xfe\xca\xfe'
+        expected = {'CMD': 0x16, 'CTR': 0x3d, 'daq_elem_size': 4, 'address_ext': 1, 'address': '0xcafecafe' }
+        parsed = ccp._parse_write_daq_CRO(received_CRO)
+        self.assertEqual(parsed, expected)
+
+    def test_parse_start_stop_CRO(self):
+        ccp = CCPFollower(c=None)
+        received_CRO = b'\x06\x3e\x02\x01\x05\x02\x00\x01'
+        expected = {'CMD': 0x06, 'CTR': 0x3e, 'mode': 2, 'daq_list_num': 1, 'last_odt_num': 5, 'event_chan_num': 2, 'prescaler': '0x1' }
+        parsed = ccp._parse_start_stop_CRO(received_CRO)
+        self.assertEqual(parsed, expected)
+
+    def test_parse_start_stop_all_CRO(self):
+        ccp = CCPFollower(c=None)
+        received_CRO = b'\x08\x3f\x01\x90\x90\x90\x90\x90'
+        expected = {'CMD': 0x08, 'CTR': 0x3f, 'mode': 1 }
+        parsed = ccp._parse_start_stop_all_CRO(received_CRO)
+        self.assertEqual(parsed, expected)
+
     def test_sanity_check(self):
         self.assertEqual('beep', 'BEEP'.lower())
 
@@ -271,4 +334,90 @@ class TestCCPFollowerMessageGeneration(unittest.TestCase):
         ccp = CCPFollower(c=None)
         msg = ccp._generate_get_s_status_CRM(0x00, counter, session_status, addl_status_qual)
         expected = b'\xff\x00\x84\x99\x01\x90\x90\x90'
+        self.assertEqual(msg, expected)
+
+    def test_generate_select_cal_page_CRM(self):
+        counter = 0x84
+
+        ccp = CCPFollower(c=None)
+        expected = b'\xff\x00\x84\x90\x90\x90\x90\x90'
+        msg = ccp._generate_select_cal_page_CRM(0x00, counter)
+        self.assertEqual(msg, expected)
+
+    def test_generate_get_active_cal_page_CRM(self):
+        counter = 0x85
+
+        ccp = CCPFollower(c=None)
+
+        address_ext = 0xb
+        address = 0xdeadbeef
+
+        expected = b'\xff\x00\x85\x0b\xde\xad\xbe\xef'
+        msg = ccp._generate_get_active_cal_page_CRM(0x00, counter, address_ext, address)
+        self.assertEqual(msg, expected)
+
+    def test_generate_diag_service_CRM(self):
+        counter = 0x86
+
+        ccp = CCPFollower(c=None)
+
+        return_len = 0x20
+        data_type_qual = 0x00
+
+        expected = b'\xff\x00\x86\x20\x00\x90\x90\x90'
+        msg = ccp._generate_diag_service_CRM(0x00, counter, return_len, data_type_qual)
+        self.assertEqual(msg, expected)
+
+    def test_generate_action_service_CRM(self):
+        counter = 0x87
+
+        ccp = CCPFollower(c=None)
+
+        return_len = 0x20
+        data_type_qual = 0x00
+
+        expected = b'\xff\x00\x87\x20\x00\x90\x90\x90'
+        msg = ccp._generate_action_service_CRM(0x00, counter, return_len, data_type_qual)
+        self.assertEqual(msg, expected)
+
+    def test_generate_get_daq_size_CRM(self):
+        counter = 0x88
+        daq_list_size = 0x10
+        first_pid = 0x08
+
+        ccp = CCPFollower(c=None)
+        expected = b'\xff\x00\x88\x10\x08\x90\x90\x90'
+        msg = ccp._generate_get_daq_size_CRM(0x00, counter, daq_list_size, first_pid)
+        self.assertEqual(msg, expected)
+
+    def test_generate_select_cal_page_CRM(self):
+        counter = 0x89
+
+        ccp = CCPFollower(c=None)
+        expected = b'\xff\x00\x89\x90\x90\x90\x90\x90'
+        msg = ccp._generate_set_daq_ptr_CRM(0x00, counter)
+        self.assertEqual(msg, expected)
+
+    def test_generate_write_daq_CRM(self):
+        counter = 0x8a
+
+        ccp = CCPFollower(c=None)
+        expected = b'\xff\x00\x8a\x90\x90\x90\x90\x90'
+        msg = ccp._generate_write_daq_CRM(0x00, counter)
+        self.assertEqual(msg, expected)
+
+    def test_generate_start_stop_CRM(self):
+        counter = 0x8b
+
+        ccp = CCPFollower(c=None)
+        expected = b'\xff\x00\x8b\x90\x90\x90\x90\x90'
+        msg = ccp._generate_start_stop_CRM(0x00, counter)
+        self.assertEqual(msg, expected)
+
+    def test_generate_start_stop_all_CRM(self):
+        counter = 0x8c
+
+        ccp = CCPFollower(c=None)
+        expected = b'\xff\x00\x8c\x90\x90\x90\x90\x90'
+        msg = ccp._generate_start_stop_all_CRM(0x00, counter)
         self.assertEqual(msg, expected)

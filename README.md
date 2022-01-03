@@ -1,5 +1,5 @@
 # CanCat
-CanCat is an open source multi-purpose tool for interacting and experimenting with Controller Area Networks (CAN), such as those that are often used in cars, building automation, etc. 
+CanCat is an open source multi-purpose tool for interacting and experimenting with Controller Area Networks (CAN), such as those that are often used in cars, building automation, etc.
 
 ## Description
 CanCat has two main parts:  
@@ -9,7 +9,7 @@ CanCat has two main parts:
 The CAN-transceiver combinations that are currently supported by CanCat are:
 * Arduino with SeeedStudio's CANBUS Shield
 * Arduino DUE with Togglebit.net's CAN shield
-* [Macchina M2 (Under-the-Hood)](https://www.macchina.cc/catalog) 
+* [Macchina M2 (Under-the-Hood)](https://www.macchina.cc/catalog)
 * [Macchina M2 (Under-the-Dash)](https://www.macchina.cc/catalog)
 
 The goals of CanCat are to provide:
@@ -19,7 +19,7 @@ The goals of CanCat are to provide:
 
 
 
-## Software 
+## Software
 ### Required:
 * Python 3.6+
 
@@ -49,19 +49,19 @@ $ pip install --user ipython
 
 3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software).  
 
-4) (OPTIONAL) If you are using a [Macchina M2](https://www.macchina.cc/) follow 
-the [getting started 
-guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to 
+4) (OPTIONAL) If you are using a [Macchina M2](https://www.macchina.cc/) follow
+the [getting started
+guide](http://docs.macchina.cc/m2/getting-started/arduino.html) for the M2 to
 install the M2 hardware definitions in the Arduino tool.
 
-5) (OPTIONAL) If you are on a Linux system, you may choose to install the 
-[arduino-cli](https://github.com/arduino/arduino-cli) for your platform. The 
-arduino-cli tool can be used to compile and flash your CAN device without 
-opening the Arudino IDE. 
+5) (OPTIONAL) If you are on a Linux system, you may choose to install the
+[arduino-cli](https://github.com/arduino/arduino-cli) for your platform. The
+arduino-cli tool can be used to compile and flash your CAN device without
+opening the Arudino IDE.
 
-6) Clone CanCat and build the desired firmware. If you are not using the 
-arduino-cli tool, use the Arduino IDE as normal to build and flash the sketch 
-onto your target device. If you have installed the arguing-cli tool you can 
+6) Clone CanCat and build the desired firmware. If you are not using the
+arduino-cli tool, use the Arduino IDE as normal to build and flash the sketch
+onto your target device. If you have installed the arguing-cli tool you can
 compile and flash the CanCat firmware with the following steps:
 
 ```
@@ -71,7 +71,7 @@ $ cd CanCat/sketches
 $ make due
 ```
 
-7) Ensure that your CAN-transceiver is not in bootloader mode by unplugging its 
+7) Ensure that your CAN-transceiver is not in bootloader mode by unplugging its
 USB connector and then plugging it back in again.
 
 8) Connect to your CAN-transceiver with CanCat
@@ -93,7 +93,7 @@ $ ./CanCat.py -p /dev/ttyACM0  # if CanCat device is /dev/ttyACM0
 
 Research Mode: enjoy the raw power of CanCat
 
-currently your environment has an object called "c" for CanCat.  this is how 
+currently your environment has an object called "c" for CanCat.  this is how
 you interact with the CanCat tool:
     >>> c.ping()
     >>> c.placeBookmark('')
@@ -118,7 +118,7 @@ you interact with the CanCat tool:
 
 `>>>` and `In [#]:` are used interchangeably in this instruction guide.  
 
-`>>>` is the default interactive python prompt, and commands using this prompt will use the `CANalysis` object. 
+`>>>` is the default interactive python prompt, and commands using this prompt will use the `CANalysis` object.
 
 `In [#]:` is the ipython prompt, and commands using this prompt will begin with the `c` object.  
 
@@ -145,7 +145,7 @@ Once you connect to your CAN-transceiver, you will want to use CanCat to set the
 After you have set the baud rate on your CAN-transceiver, CanCat will automatically capture any messages it sees on the CAN bus it is attached to. CanCat will store these messages in the current session for analysis. *Note: Unless you save the CanCat capture, the messages you have captured will no longer be stored once you end your CanCat session.*
 
 ### Saving CanCat captures
-CanCat will only save what it has captured when you tell it to save, so make sure to save your capture session / analysis periodically. 
+CanCat will only save what it has captured when you tell it to save, so make sure to save your capture session / analysis periodically.
 
 ```python
 >>> CANalysis.saveSessionToFile('filename_for_this_session')
@@ -245,7 +245,7 @@ will print out the UDS error message that was received.
 
 Since CanCat can be scripted easily, scanning for UDS servers on CAN is easily
 accomplished. The following loop will send a ReadDID request to every
-arbitration ID from 0x700 to 0x7F7 and print out which servers respond, and which 
+arbitration ID from 0x700 to 0x7F7 and print out which servers respond, and which
 time out.
 
 ```python
@@ -260,9 +260,9 @@ for i in range(0x700, 0x7f8):
 
 If a timeout is received then no UDS server responded on the address.
 If a positive response or negative respons is received, then you have
-discovered a UDS server. Other functionality can be scripted as well, 
+discovered a UDS server. Other functionality can be scripted as well,
 such as scanning DIDs to see which are implemented. This code will
-scan all the DIDs in the range from 0xF180 to 0xF19F, which contains 
+scan all the DIDs in the range from 0xF180 to 0xF19F, which contains
 useful information such as hardware and software part numbers, VINs, and
 other identifying information for this UDS server.
 
@@ -296,6 +296,40 @@ An additional function provided is `printUDSSession`, which takes a CanCat
 variable, and the RX and TX arbitration IDs and parses UDS traffic from the
 CAN traffic captured by CanCat.
 
+## CCP Module
+CanCat has a CCP (CAN Calibration Protocol) module. CCP is a predecessor to XCP and is used for calibration and data acquisition.
+
+CCP allows a single master device (called "leaders" in this implementation) connect to multiple slave devices (called "followers" in this implementation).
+
+Basic usage is as follows:
+
+```python
+In [1]: import ccp
+
+In [2]: cl = ccp.CCPLeader(c) # if you are acting as a leader device, communicating with a follower device
+
+In [3]: cf = ccp.CCPFollower(c) # if you are acting as a follower device, communicating with a leader device
+```
+
+CanCat's CCP module implements "parse" and "generate" functions for each of the CCP commands defined in the CCP specification (https://automotivetechis.files.wordpress.com/2012/06/ccp211.pdf) unless otherwise noted:
+* Leader-side parsing of received event messages (errors) and data acquistion CRMs have not been implemented at this time.
+* Data Acquisition (DAQ) functions have been added to the follower according to the spec but have not been tested.
+
+In addition to the "parse" and "generate" functions, CCP sequences are defined at the end of `ccp_leader.py`.
+
+CCP’s endianness is implementation-specific (aside from CONNECT, DISCONNECT, and TEST messages), so you may need to make modifications to this code. Other implementation-specific settings are noted in the documentation above each function.
+
+Before calibration or data acquisition ("DAQ") can happen, a logical point-to-point connection needs to be established between the leader and follower devices using a CONNECT message.
+
+In CCP, all messages (and data responses) are packed into "message objects" with up to 8 bytes of data. The available message types are as follows:
+
+  CRO (Command Receive Object): message sent from the leader device to the
+      follower device(s).
+  CRM (Command Return Message): one type of message sent from the follower device
+      to the leader device containing command / error code and command counter.
+  DTO (Data Transmission Object): message sent from the follower device to the
+      leader device (Command Return Message or Event Message or Data Acquisition Message).
+
 
 ## Other CanCat Uses
 ### Using CanCat to Analyze Previous Captures
@@ -307,22 +341,22 @@ $ ./CanCat.py -f filename_of_previous_capture  # no CanCat device required
 
 
 ### CAN-in-the-Middle
-CAN-in-the-Middle is another way to utilize your CanCat. It requires two CAN shields 
-on one arduino. One of the CAN shields needs to be modified so that the CS pin of the 
-MCP2515 CAN controller is on D10, rather than D9. This is accomplished by cutting a 
+CAN-in-the-Middle is another way to utilize your CanCat. It requires two CAN shields
+on one arduino. One of the CAN shields needs to be modified so that the CS pin of the
+MCP2515 CAN controller is on D10, rather than D9. This is accomplished by cutting a
 trace on the CAN shield PCB and bridging (solder bridge or 0-ohm resistor) the pads
-for CS and D10. Instructions are also on the seeedstudio Wiki, although their board 
-differed slightly from mine, mostly in that the pads are on the bottom of the board 
+for CS and D10. Instructions are also on the seeedstudio Wiki, although their board
+differed slightly from mine, mostly in that the pads are on the bottom of the board
 on mine and on the top of the board in their example.
 
 Once you have a properly modified CAN Bus shield, you'll be able to isolate components
 connected to the CAN bus to see which messages a specific device is sending, without
-changing the conditions by fully removing it from the CAN Bus. This can be very helpful for 
+changing the conditions by fully removing it from the CAN Bus. This can be very helpful for
 certain reverse engineering tasks.
 
-Flash the CAN_in_the_middle firmware to the Arduino. Hook the CAN wires up so that the 
+Flash the CAN_in_the_middle firmware to the Arduino. Hook the CAN wires up so that the
 device you are trying to isolate is connected to the modified CAN shield that uses D10
-for CS, and the vehicle CAN bus (with the rest of the devices) is connected to the 
+for CS, and the vehicle CAN bus (with the rest of the devices) is connected to the
 unmodified CAN shield. These are referred to as the Isolation network (ISO)
 and the Vehicle network (VEH) respectively.
 
@@ -332,8 +366,8 @@ Start CAN_in_the_middle with the following command:
 
 ( where the -p option is your port and -S is the CAN Baud rate.)
 
-Most of the commands for Can-in-the-Middle are the same as the normal CanCat interface. 
-Functions that report only what has been received on the Isolation side have Iso appended 
+Most of the commands for Can-in-the-Middle are the same as the normal CanCat interface.
+Functions that report only what has been received on the Isolation side have Iso appended
 to the end of the function name. For example:
 
 ```sh
@@ -351,9 +385,9 @@ Placing a bookmark places a bookmark simultaneously on both the Isolation inform
 ##  canmap
 
 Canmap is a tool built on CanCat to scan a CAN bus for various UDS capabilities.  
-Canmap is built on top of the `cancat.uds.UDS` class.  Canmap has many different 
-options to control what type of scans are performed, and how the scans are 
-performed, but the basic information required is the type of scan to run, the 
+Canmap is built on top of the `cancat.uds.UDS` class.  Canmap has many different
+options to control what type of scans are performed, and how the scans are
+performed, but the basic information required is the type of scan to run, the
 port the CanCat device is present on, and the bus speed:
 
 The most basic scan is an ECU scan to identify what ECUs are on the bus
@@ -374,11 +408,11 @@ $ ./canmap -p /dev/ttyACM0 -b 500K -sEDS
 
 ### Saving canmap scan output
 
-The results of a canmap scan can be saved as a configuration yaml file with the 
-`-o` (`--output-file`) option. This yaml file can be used as an input to future 
-scans with the `-i` (`--input-file`) option. If an input config file is provided 
-information that is already in the config will not be scanned again unless the 
-`-r` (`--rescan`) option is provided. For example an aborted DID scan can later 
+The results of a canmap scan can be saved as a configuration yaml file with the
+`-o` (`--output-file`) option. This yaml file can be used as an input to future
+scans with the `-i` (`--input-file`) option. If an input config file is provided
+information that is already in the config will not be scanned again unless the
+`-r` (`--rescan`) option is provided. For example an aborted DID scan can later
 be resumed and any ECUs that DIDs were found for will not be searched for again:
 
 ```bash
@@ -388,15 +422,15 @@ $ ./canmap -p /dev/ttyACM0 -b 500K -sEDS -o scan_results.yml
 $ ./canmap -p /dev/ttyACM0 -b 500K -sEDS -i scan_results.yml -o scan_results.yml
 ```
 
-The configuration file saves some additional scan parameters such as the baud 
-rate, and timeout parameters. These parameters are re-used when the config file 
+The configuration file saves some additional scan parameters such as the baud
+rate, and timeout parameters. These parameters are re-used when the config file
 is provided as an input config.
 
-The config file contain a `notes` field that indicates the command(s) used to 
+The config file contain a `notes` field that indicates the command(s) used to
 create that config file.
 
-The raw can messages can also be saved as a CanCat session with the `-c` 
-(`--can-sesison-file`) option. This can be useful to diagnose strange responses 
+The raw can messages can also be saved as a CanCat session with the `-c`
+(`--can-sesison-file`) option. This can be useful to diagnose strange responses
 found during the scanning:
 
 ```bash
@@ -411,8 +445,8 @@ $ ./CanCat.py -f scan_with_weird_errors.sess
 
 ### ECU Scanning
 
-The Range of ECUs to scan can be specified with the `-E` option, the default 
-range is `00-FF` for both standard (11-bit) and extended (29-bit) CAN 
+The Range of ECUs to scan can be specified with the `-E` option, the default
+range is `00-FF` for both standard (11-bit) and extended (29-bit) CAN
 addressing. The bus mode can be set with the `-m` (`-bus-mode`) option.
 
 To scan only a subset of the ECU range in 11-bit mode the command would be:
@@ -421,46 +455,46 @@ To scan only a subset of the ECU range in 11-bit mode the command would be:
 $ ./canmap -p /dev/ttyACM0 -b 500K -sE -E 60-A0 -m std
 ```
 
-ECU scanning works by sending a read DID request (`cancat.uds.UDS.ReadDID`) or 
-a session control request (`cancat.uds.UDS.DiagnosticSessionControl`) and 
-waiting for a timeout, a negative response or a positive response.  The default 
+ECU scanning works by sending a read DID request (`cancat.uds.UDS.ReadDID`) or
+a session control request (`cancat.uds.UDS.DiagnosticSessionControl`) and
+waiting for a timeout, a negative response or a positive response.  The default
 method is to attempt to read the VIN from each UDS address   
-(`cancat.uds.UDS.ReadDID(0xF190)`). Different methods are available because 
+(`cancat.uds.UDS.ReadDID(0xF190)`). Different methods are available because
 different methods have different degrees of success on different vehicles.
 
 The other factor that can affect the success rate is how quickly ECUs respond.  
-The UDS standard timeout is 3 seconds, scanning both bus modes with 3 second 
-timeouts could take up to 25 minutes. Instead the default timeout for ECU 
-scanning is 0.2 seconds, if fewer ECUs than expected are identified it may be 
-worth re-trying the scan with an increased timeout by setting the `-T` 
+The UDS standard timeout is 3 seconds, scanning both bus modes with 3 second
+timeouts could take up to 25 minutes. Instead the default timeout for ECU
+scanning is 0.2 seconds, if fewer ECUs than expected are identified it may be
+worth re-trying the scan with an increased timeout by setting the `-T`
 (--timeout`) option.
 
 ### DID Scanning
 
-DID scanning can take a while depending on the behavior of the ECUs. By default 
-only the UDS standard identification DIDs (`F180-F18E,F190-F1FF`) are searched 
-for.  Testing has shown that searching a range of `F000-FFFF` can take around 
-2 minutes for cooperative ECUs, but much much longer for ECUs which allow 
-requests to timeout rather than sending negative responses. A larger range can 
+DID scanning can take a while depending on the behavior of the ECUs. By default
+only the UDS standard identification DIDs (`F180-F18E,F190-F1FF`) are searched
+for.  Testing has shown that searching a range of `F000-FFFF` can take around
+2 minutes for cooperative ECUs, but much much longer for ECUs which allow
+requests to timeout rather than sending negative responses. A larger range can
 be specified with the `-D` option:
 
 ```bash
 $ ./canmap -p /dev/ttyACM0 -b 500K -sD -D F000-FFFF -i known_ecus.yml
 ```
 
-DIDs are only scanned on ECUs that have already been identified. If a DID scan 
+DIDs are only scanned on ECUs that have already been identified. If a DID scan
 is run and there are no known ECUs then no messages will be sent.
 
 ### Session Scanning
 
-It is assumed that the default session for each ECU is session 1.  DIDs 
-identified through scanning are associated with session 1. By default the full 
-range of diagnostic sessions is searched (`02-7F`). I have found on some ECUs 
-that sessions can only be entered after already being in another prerequesite 
-session. Searching for these recursive diagnostic sessions is enabled by default 
+It is assumed that the default session for each ECU is session 1.  DIDs
+identified through scanning are associated with session 1. By default the full
+range of diagnostic sessions is searched (`02-7F`). I have found on some ECUs
+that sessions can only be entered after already being in another prerequesite
+session. Searching for these recursive diagnostic sessions is enabled by default
 but can be disabled with the `-n` (`--no-recursive-session-scanning`) option.
 
-Depending on the ECU behavior, session scanning can take a varying amount of 
+Depending on the ECU behavior, session scanning can take a varying amount of
 time and/or produce strange error conditions.
 
 ## Unit Tests
@@ -473,6 +507,3 @@ python -m unittest discover -v
 This project is made possible through collaboration with researchers at GRIMM (SMFS, Inc.), most notably Matt Carpenter and Tim Brom.
 
 ## Happy Hacking!
-
-
-

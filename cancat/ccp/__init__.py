@@ -1,2 +1,2 @@
-from ccp_leader import *
-from ccp_follower import *
+from .ccp_leader import *
+from .ccp_follower import *

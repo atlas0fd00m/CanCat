@@ -136,6 +136,9 @@ def _parse_2_byte_value(value):
     # Again, implementation specific.
     return hex(struct.unpack('<H', value)[0])
 
+def _parse_2_byte_value_motorola(value):
+    return hex(struct.unpack('>H', value)[0])
+
 def _gen_4_byte_val(value):
     return struct.pack('>I', value)
 
