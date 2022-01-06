@@ -67,6 +67,10 @@ compile and flash the CanCat firmware with the following steps:
 ```
 $ arduino-cli lib install due_can
 $ git clone https://github.com/atlas0fd00m/CanCat
+$arduino-cli config add board_manager.additional_urls https://macchina.cc/package_macchina_index.json
+$arduino-cli core update-index
+$arduino-cli core install arduino:sam
+$arduino-cli core install macchina:sam
 $ cd CanCat/sketches
 $ make due
 ```
