@@ -72,7 +72,7 @@ $ arduino-cli core update-index
 $ arduino-cli core install arduino:sam
 $ arduino-cli core install macchina:sam
 $ cd CanCat/sketches
-$ make due
+$ make m2
 ```
 
 7) Ensure that your CAN-transceiver is not in bootloader mode by unplugging its 
