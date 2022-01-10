@@ -117,7 +117,7 @@ def start(level=None, filename=None):
         else:
             _log_filename = filename
 
-    # TODO: add timesamp log output if log file already exists rather than 
+    # TODO: add timesamp log output if log file already exists rather than
     # overwriting?
     if _log_file is None and _log_filename is not None:
         _log_file = open(_log_filename, 'w+')
@@ -142,6 +142,7 @@ def log(level, *args):
     if _log_level >= level:
         if _log_file is not None:
             _log_file.write(level + msg + '\n')
+            _log_file.flush()
 
         if _use_color:
             print(level.colorized() + msg)

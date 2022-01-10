@@ -168,10 +168,9 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
     possible_ecus = []
     for i in arb_id_range:
         tester_id = uds.ARBID_CONSTS[ext]['tester']
-        if i == tester:
+        if i == tester_id:
             # Skip i == 0xF1 because in that case the sender and receiver IDs
             # are the same
-            tester_id = uds.ARBID_CONSTS[ext]['tester']
             log.detail('Skipping {} in ext ECU scan: invalid ECU address'.format(hex(tester_id)))
             continue
 
@@ -256,7 +255,7 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
     possible_ecus = []
     for i in arb_id_range:
         tester_id = uds.ARBID_CONSTS[ext]['tester']
-        if i == tester:
+        if i == tester_id:
             # Skip i == 0xF1 because in that case the sender and receiver IDs
             # are the same
             log.detail('Skipping {} in ext ECU scan: invalid ECU address'.format(hex(tester_id)))
