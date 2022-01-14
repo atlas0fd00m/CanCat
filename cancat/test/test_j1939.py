@@ -10,9 +10,9 @@ from binascii import unhexlify
 logger = logging.getLogger(__name__)
 
 
-def getLoadedFakeJ1939Interface():
+def getLoadedFakeJ1939Interface(**kwargs):
     # start out with CanInterface with a fake dongle
-    c = J1939Interface(port='FakeCanCat')
+    c = J1939Interface(port='FakeCanCat', **kwargs)
     c._io.queueCanMessages(test_j1939_msgs_0)
     c._io.queueCanMessages(test_j1939_msgs_1)
     return c
@@ -26,11 +26,14 @@ class J1939_test(unittest.TestCase):
         pingtest = c.ping(pingdata)
         self.assertEqual(pingdata, pingtest[1])
 
-        for x in range(3):
-            logger.warning("messageCount: %r", c.getCanMsgCount())
+        for x in range(16):
+            canmsgct = c.getCanMsgCount()
+            logger.warning("messageCount: %r", canmsgct)
+            if canmsgct > 700:
+                break
             time.sleep(.2)
 
-        c.printCanMsgs()
+        logger.info(c.reprCanMsgs()[-300:])
         c.printCanMsgs(advfilters=['len(data) > 8'])
         c.printCanMsgs(advfilters=['pgn == 0xfeca'])
 
