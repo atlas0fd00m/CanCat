@@ -50,3 +50,8 @@ class J1939_test(unittest.TestCase):
         self.assertEqual(len(data), 78)
 
 
+        # now do destructive testing
+        ts, arbtup, msg = c.J1939recv(pf=0xf0, ps=0x03, sa=0)[0]
+        self.assertEqual(arbtup, (0x3, 0x0, 0x0, 0xf0, 0x3, 0x0))
+        self.assertEqual(msg, b'\xda\xfe\x00\xff\xff\x0fc}')
+

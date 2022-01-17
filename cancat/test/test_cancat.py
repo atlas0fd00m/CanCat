@@ -22,10 +22,7 @@ class CanCat_test(unittest.TestCase):
     def test_basic_cancat_dongle(self):
         c = getLoadedFakeCanCatInterface()
 
-        
-
         # test CANrecv()
-        c.CANrecv().__next__()
+        msg = next(c.CANrecv())
 
-
-
+        # test the rest of the CanCat interface
