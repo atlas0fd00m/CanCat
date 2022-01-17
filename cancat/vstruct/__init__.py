@@ -6,7 +6,7 @@ import struct
 from copy import deepcopy
 from inspect import isclass
 
-import vstruct.primitives as vs_prims
+from . import primitives as vs_prims
 
 
 class MemObjFile:
