@@ -3,7 +3,7 @@ import sys
 import codecs
 import setuptools
 
-version = '2.0.0'
+VERSION = open('VERSION').read().strip()
 packages = ['cancat','cancat/vstruct']
 mods = []
 pkgdata = {}
@@ -14,14 +14,14 @@ with open(os.path.join(dirn, 'README.md'), 'r') as fd:
     desc = fd.read()
 
 setuptools.setup  (name  = 'cancat',
-        version          = version,
+        version          = VERSION,
         description      = "Multi-purpose tool for interacting with Controller Area Networks (CAN) and SAE J1939",
         long_description = desc,
         long_description_content_type='text/markdown',
         author           = 'atlas of d00m and the GRIMM CyPhy team',
         author_email     = 'atlas@r4780y.com',
         url              = 'https://github.com/atlas0fd00m/CanCat',
-        download_url     = 'https://github.com/atlas0fd00m/CanCat/archive/v%s.tar.gz' % version,
+        download_url     = 'https://github.com/atlas0fd00m/CanCat/archive/v%s.tar.gz' % VERSION,
         keywords         = ['can', 'controller area network', 'automotive', 'j1939', 'hacking', 'reverse engineering'],
         packages         = setuptools.find_packages(),
         package_data     = pkgdata,
