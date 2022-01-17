@@ -465,7 +465,7 @@ class CanInterface(object):
         if self.verbose >= verbose:
             print("%.2f %s: %s" % (time.time(), self.name, message))
 
-    def recv(self, cmd, wait=None):
+    def recv(self, cmd, wait=0xffffffff):
         '''
         Warning: Destructive:
             removes a message from a mailbox and returns it.
