@@ -11,7 +11,7 @@ from cancat.vstruct.bitfield import *
 
 import queue
 import threading
-''' 
+'''
 This is a J1939 Stack module.
 It's purpose is to provide a J1939-capable object which extends (consumes) CanCat's CanInterface module, and provides a J1939 interface.
 In the original J1939 module, extended messages were treated like oddities.  This module will work on the premise that all messages (except TP messages) are created equal, and are available in the same queue.  TP messages will be the "specialty" messages which create new, arbitrary sized messages from smaller ones.  If they don't make it through, they don't.  This module is intended to make J1939 attack clients easier to work with, whereas the first module was focused on reverse engineering.  Let's see if we can't come up with something awesome, then possible merge them together in the future.
@@ -95,7 +95,7 @@ def pf_c9(idx, ts, arbtup, data, j1939):
     b4 = data[3]
     req = "%.2x %.2x %.2x" % ([ord(d) for d in data[:3]])
     usexferpfn = ('', 'Use_Transfer_PGN', 'undef', 'NA')[b4 & 3]
-    
+
     return "Request2: %s %s" % (req,  usexferpgn)
 
 def pf_ea(idx, ts, arbtup, data, j1939):
@@ -108,7 +108,7 @@ def pf_ee(idx, ts, arbtup, data, j1939):
     prio, edp, dp, pf, ps, sa = arbtup
     if ps == 255 and sa == 254:
         return 'CANNOT CLAIM ADDRESS'
-    
+
     addrinfo = parseName(data).minrepr()
     return "Address Claim: %s" % addrinfo
 
@@ -118,7 +118,7 @@ def pf_ef(idx, ts, arbtup, data, j1939):
         return 'Proprietary A2'
 
     return 'Proprietary A1'
-    
+
 def pf_ff(idx, ts, arbtup, data, j1939):
     prio, edp, dp, pf, ps, sa = arbtup
     pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, hexlify(data))
@@ -210,7 +210,7 @@ class J1939Interface(cancat.CanInterface):
         if len(msgs) > 255:
             raise Exception("J1939xmit_tp: attempt to send message that's too large")
 
-        cm_msg = struct.pack('<BHBBBBB', CM_RTS, len(message), len(msgs), 0xff, 
+        cm_msg = struct.pack('<BHBBBBB', CM_RTS, len(message), len(msgs), 0xff,
                 pgn2, pgn1, pgn0)
 
         arbid = emitArbid(prio, edp, dp, PF_TP_CM, ps, sa)
@@ -248,7 +248,7 @@ class J1939Interface(cancat.CanInterface):
                     if len(enhanced) > 1:
                         nextline = '\n'.join(list(enhanced[1:]))
 
-                    # if we get multiple lines and the first is DONT_PRINT_THIS_MESSAGE, 
+                    # if we get multiple lines and the first is DONT_PRINT_THIS_MESSAGE,
                     # then just return nextline
                     if pfmeaning == cancat.DONT_PRINT_THIS_MESSAGE:
                         return nextline
@@ -276,7 +276,7 @@ class J1939Interface(cancat.CanInterface):
 
     def _j1939_can_handler(self, tsmsg, none):
         '''
-        this function is run for *Every* received CAN message... and is executed from the 
+        this function is run for *Every* received CAN message... and is executed from the
         XMIT/RECV thread.  it *must* be fast!
         '''
         #print(repr(self), repr(cmd), repr(tsmsg))
@@ -300,13 +300,13 @@ class J1939Interface(cancat.CanInterface):
 
 
     def queueMessageHandlerEvent(self, pfhandler, arbtup, data, ts):
-        ''' 
+        '''
         this is run in the XMIT/RECV thread and is intended to handle offloading the data fast
         '''
         self._mhe_queue.put((pfhandler, arbtup, data, ts))
 
     def _mhe_runner(self):
-        ''' 
+        '''
         runs the mhe thread, which is offloaded so that the message-handling thread can keep going
         '''
         while not self._config.get('shutdown'):
@@ -353,18 +353,18 @@ class J1939Interface(cancat.CanInterface):
 
         self._j1939queuelock.acquire()
         try:
-            # do we want to break things apart into PGN mboxes at this point?  if so, we have to also allow 
+            # do we want to break things apart into PGN mboxes at this point?  if so, we have to also allow
             # subscription at this level for things like sniffing.  Like this:
             handled = False
             for listener in self._j1939_msg_listeners:
                 try:
                     contnu = listener(arbtup, message)
-                    if contnu: 
+                    if contnu:
                         handled = True
 
                 except Exception as e:
                     self.log('_submitJ1939Message: ERROR: %r' % e)
-            
+
             # check for any J1939 registered handlers (using the default system handlers):
             cmdhandler = self._cmdhandlers.get(J1939MSGS)
             if cmdhandler is not None:
@@ -440,7 +440,7 @@ class J1939Interface(cancat.CanInterface):
 
             (cb, totsize, pktct, maxct,
                     pgn2, pgn1, pgn0) = struct.unpack('<BHBBBBB', data)
-            
+
             # check for old stuff
             extmsgs = j1939.getTPmsgParts(da, sa)
             if extmsgs is not None and len(extmsgs['msgs']):
@@ -493,7 +493,7 @@ class J1939Interface(cancat.CanInterface):
             # print(out extended message and clear the buffers.)
             extmsgs = j1939.getTPmsgParts(da, sa)
             if extmsgs is None:
-                return 
+                return
 
             extmsgs['adminmsgs'].append((arbtup, data))
 
@@ -618,13 +618,13 @@ class J1939Interface(cancat.CanInterface):
         mlist = msglists.get(da)
         if mlist is None and create:
             # create something new
-            mlist = {'length':0, 
-                    'msgs':[], 
-                    'type':None, 
-                    'adminmsgs':[], 
-                    'pgn0':None, 
-                    'pgn1':None, 
-                    'pgn2':None,   
+            mlist = {'length':0,
+                    'msgs':[],
+                    'type':None,
+                    'adminmsgs':[],
+                    'pgn0':None,
+                    'pgn1':None,
+                    'pgn2':None,
                     'totsize':0,
                     'maxct':0xff,
                     'sa' : sa,
@@ -643,7 +643,7 @@ class J1939Interface(cancat.CanInterface):
 
         returns whether the thing deleted exists previously
         * if da is None, returns whether the sa had anything previously
-        * otherwise, if the list 
+        * otherwise, if the list
         '''
         exists = False
         if da is None:
@@ -738,17 +738,17 @@ class J1939Interface(cancat.CanInterface):
             # placed here to ensure checking whether we're receiving messages or not
             if maxsecs is not None and time.time() > maxsecs+starttime:
                 return
-        
-            # If we start sniffing before we receive any messages, 
+
+            # If we start sniffing before we receive any messages,
             # messages will be "None". In this case, each time through
             # this loop, check to see if we have messages, and if so,
             # re-create the messages handle
             if messages is None:
                 messages = self.getCanMsgQueue()
-        
+
             # if we're off the end of the original request, and "tailing"
             if tail and idx >= stop:
-                msgqlen = len(messages) 
+                msgqlen = len(messages)
                 self.log("stop=%d  len=%d" % (stop, msgqlen), 3)
 
                 if stop == msgqlen:
@@ -801,7 +801,7 @@ class J1939Interface(cancat.CanInterface):
 
             ts, arbtup, msg = mque[cur]
             cur += 1
-           
+
             # we have a message now, does the PGN match?
             mprio, medp, mdp, mpf, mps, msa = arbtup
             if mpf != pf or mps != ps or msa != sa:
@@ -840,7 +840,7 @@ class J1939Interface(cancat.CanInterface):
 
             ts, arbtup, msg = mque[cur]
             cur += 1
-           
+
             # we have a message now, does the PGN match? (loose matching)
             mprio, medp, mdp, mpf, mps, msa = arbtup
             if pf is not None:
@@ -937,7 +937,7 @@ class J1939Interface(cancat.CanInterface):
         example (from start of ECU):
         00000000 1545142410.990 pri/edp/dp: 6/0/0, PG: ea ff  Source: fe  Len: 03, Data: 00ee00              Request
         00000001 1545142411.077 pri/edp/dp: 6/0/0, PG: ee ff  Source: 00  Len: 08, Data: 4cca4d0100000000    Address Claim: id: 0xdca4c mfg: Cummins Inc (formerly Cummins Engine Co) Columbus, IN USA
-    
+
         currently ours:
         00001903 1545142785.127 pri/edp/dp: 6/0/0, PG: ea ff  Source: fe  Len: 03, Data: 00ee00              Request
 
@@ -945,6 +945,8 @@ class J1939Interface(cancat.CanInterface):
 
 MAX_WORD = 64
 bu_masks = [(2 ** (i)) - 1 for i in range(8*MAX_WORD+1)]
+
+unknown_pgn_data = {"Label": "ERROR", "Name": "ERROR", "SPNs": []}
 
 def parsePGNData(pf, ps, msg):
 
@@ -955,7 +957,7 @@ def parsePGNData(pf, ps, msg):
         pgn = (pf << 8) | ps
 
     # grab the PGN data
-    res = J1939PGNdb.get(pgn)
+    res = J1939PGNdb.get(pgn, unknown_pgn_data)
     out = {'pgn': pgn, 'pgndata': res}
 
     spnlist = res.get('SPNs')
