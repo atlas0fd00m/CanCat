@@ -564,7 +564,7 @@ def resolvepath(impmod, pathstr):
     return resolve(impmod, nameparts)
 
 # NOTE: Gotta import this *after* VStruct/VSArray defined
-from .vstruct import defs as vs_defs
+from . import defs as vs_defs
 
 def getStructure(sname):
     """
