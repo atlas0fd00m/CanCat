@@ -1,8 +1,8 @@
 from __future__ import print_function
 
 import cancat.envi.bits as e_bits
-from vstruct import VStruct
-from vstruct.primitives import *
+from cancat.vstruct import VStruct
+from cancat.vstruct.primitives import *
 from binascii import unhexlify
 
 class v_bits(v_number):

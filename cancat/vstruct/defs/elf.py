@@ -1,7 +1,7 @@
 from past.builtins import xrange
 
-import vstruct
-from vstruct.primitives import *
+from cancat import vstruct
+from cancat.vstruct.primitives import *
 
 EI_NIDENT = 4
 EI_PADLEN = 7
