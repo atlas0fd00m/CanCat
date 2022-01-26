@@ -15,7 +15,7 @@ class v_bits(v_number):
         '''
         override base because we are not using the min or max val.
         '''
-        self._vs_value = long(value)
+        self._vs_value = int(value)
 
     def vsSetBitWidth(self, width):
         self._vs_bitwidth = width
@@ -90,7 +90,7 @@ class VBitField(VStruct):
                 endround = 1
 
             fieldbytes = bytez[offset + startbyte:offset+endbyte+endround]
-            rawint = int( fieldbytes.encode('hex'), 16)
+            rawint = int( fieldbytes.hex(), 16)
             if endshift:
             #if bitshift:
                 rawint >>= endshift
