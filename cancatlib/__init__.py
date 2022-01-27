@@ -2,6 +2,7 @@ from __future__ import print_function
 from past.builtins import xrange
 from builtins import input, bytes
 import six
+from operator import itemgetter
 
 import os
 import sys
@@ -964,18 +965,18 @@ class CanInterface(object):
         '''
         Prints session stats only for messages between two bookmarks
         '''
-        print(self.getSessionStatsByBookmark(start, stop))
+        print(self.getSessionStatsByBookmark(start=start, stop=stop, reverse=reverse, sort=sort))
 
-    def printSessionStats(self, start=0, stop=None):
+    def printSessionStats(self, start=0, stop=None, reverse=True, sort=None):
         '''
         Print session stats by Arbitration ID (aka WID/PID/CANID/etc...)
         between two message indexes (where they sit in the CMD_CAN_RECV
         mailbox)
         '''
         print(self._reprSessionStatsHeader())
-        print(self.getSessionStats(start, stop))
+        print(self.getSessionStats(start=start, stop=stop, reverse=reverse, sort=sort))
 
-    def getSessionStatsByBookmark(self, start=None, stop=None):
+    def getSessionStatsByBookmark(self, start=None, stop=None, reverse=True, sort=None):
         '''
         returns session stats by bookmarks
         '''
@@ -989,9 +990,17 @@ class CanInterface(object):
         else:
             stop_msg = self.getCanMsgCount()
 
-        return(self.getSessionStats(start=start_msg, stop=stop_msg))
+        return(self.getSessionStats(start=start_msg, stop=stop_msg, reverse=reverse, sort=sort))
 
-    def getArbitrationIds(self, start=0, stop=None, reverse=False):
+    def _sortArbitrationIds(self, arbid_list, reverse=True, sort=None):
+        if sort is None:
+            # Sort on the msg count only
+            return sorted(arbid_list, key=itemgetter(0), reverse=reverse)
+        else:
+            # Sort on arbitration ID
+            return sorted(arbid_list, key=itemgetter(1), reverse=reverse)
+
+    def getArbitrationIds(self, start=0, stop=None, reverse=False, sort=None):
         '''
         return a list of Arbitration IDs
         '''
@@ -1005,8 +1014,8 @@ class CanInterface(object):
             arbmsgs.append((ts, data))
             msg_count += 1
 
-        arbid_list = [(len(msgs), arbid, msgs) for arbid,msgs in arbids.items()]
-        arbid_list.sort(reverse=reverse)
+        unsorted_list = [(len(msgs), arbid, msgs) for arbid,msgs in arbids.items()]
+        arbid_list = self._sortArbitrationIds(unsorted_list, reverse=reverse, sort=sort)
 
         return arbid_list
 
@@ -1016,9 +1025,9 @@ class CanInterface(object):
     def _reprArbid(self, arbid):
         return '  %8x' % arbid
 
-    def getSessionStats(self, start=0, stop=None):
+    def getSessionStats(self, start=0, stop=None, reverse=True, sort=None):
         out = []
-        arbid_list = self.getArbitrationIds(start=start, stop=stop, reverse=True)
+        arbid_list = self.getArbitrationIds(start=start, stop=stop, reverse=reverse, sort=sort)
 
         for datalen, arbid, msgs in arbid_list:
             last = 0

@@ -1,5 +1,6 @@
 import traceback
 from binascii import hexlify
+from operator import itemgetter
 
 import cancatlib
 import struct
@@ -75,7 +76,54 @@ def parseArbid(arbid):
     edp = (prioPlus >> 1) & 1
     dp = prioPlus & 1
 
-    return prio, edp, dp, pf, ps, sa
+    return arbid, prio, edp, dp, pf, ps, sa
+
+
+def getArbtupInfo(arbtup):
+    '''
+    Return a dictionary of values that can be sorted on based on the arbtup
+    '''
+    arbid, prio, edp, dp, pf, ps, sa = arbtup
+    if (arbid is not None and arbid <= 0x7FF) or (dp and edp):
+        # First check if this message is a J1939 message or not
+        return {'arbid': arbid, 'pri': None, 'priority': None, 'edp': None,
+                'dp': None, 'pf': None, 'ps': None, 'sa': None, 'pg': None,
+                'pgn': None, 'da': None, 'ge': None}
+
+    if pf < 240:
+        # If the PDU Format is 0-239 then the PGN is only the PF field
+        pgn = pf << 8
+
+        # In this format there is no group extension value, and the PS field is
+        # the destination address
+        ge = None
+        da = ps
+    else:
+        # If the PDU Format is 240+ then the PGN is the PF and PS fields
+        pgn = (pf << 8) | ps
+
+        # The PS value is the group extension, technically these messages are
+        # broadcast and don't have a specific destination, but proprietary
+        # messages may choose to use the GE as the DA. So for that purpose the
+        # DA is still set to PS here.
+        ge = ps
+        da = ps
+
+    return {'arbid': arbid, 'pri': prio, 'priority': prio, 'edp': edp, 'dp': dp,
+            'pf': pf, 'ps': ps, 'sa': sa, 'pg': pgn, 'pgn': pgn, 'da': ps,
+            'ge': ge}
+
+
+def arbinfo_list_getter(*items):
+    '''
+    Provide operator.attrgetter-type function that can return the elected keys
+    from an arbtup value
+    '''
+    def g(obj):
+        # The arbtup is the second item
+        data = getArbtupInfo(obj[1])
+        return tuple(data[i] for i in items if data[i] is not None)
+    return g
 
 
 def meldExtMsgs(msgs):
@@ -98,13 +146,13 @@ def pf_c9(idx, ts, arbtup, data, j1939):
     return "Request2: %s %s" % (req,  usexferpgn)
 
 def pf_ea(idx, ts, arbtup, data, j1939):
-    (prio, edp, dp, pf, ps, sa) = arbtup
+    _, prio, edp, dp, pf, ps, sa = arbtup
     return "Request: %s" % (hexlify(data[:3]))
 
 # no pf_eb or pf_ec since those are handled at a lower-level in this stack
 
 def pf_ee(idx, ts, arbtup, data, j1939):
-    prio, edp, dp, pf, ps, sa = arbtup
+    _, prio, edp, dp, pf, ps, sa = arbtup
     if ps == 255 and sa == 254:
         return 'CANNOT CLAIM ADDRESS'
 
@@ -112,14 +160,14 @@ def pf_ee(idx, ts, arbtup, data, j1939):
     return "Address Claim: %s" % addrinfo
 
 def pf_ef(idx, ts, arbtup, data, j1939):
-    prio, edp, dp, pf, ps, sa = arbtup
+    _, prio, edp, dp, pf, ps, sa = arbtup
     if dp:
         return 'Proprietary A2'
 
     return 'Proprietary A1'
 
 def pf_ff(idx, ts, arbtup, data, j1939):
-    prio, edp, dp, pf, ps, sa = arbtup
+    _, prio, edp, dp, pf, ps, sa = arbtup
     pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, hexlify(data))
     return "Proprietary B %s" % pgn
 
@@ -224,16 +272,36 @@ class J1939Interface(cancatlib.CanInterface):
 
         # hack: should watch for CM_EOM
 
+    def _sortArbitrationIds(self, arbid_list, reverse=True, sort=None):
+        if sort is None:
+            # Sort on the msg count only
+            return sorted(arbid_list, key=itemgetter(0), reverse=reverse)
+
+        if isinstance(sort, str):
+            sort_keys = ['arbid', 'priority', 'edp', 'dp', 'pf', 'ps', 'sa', 'pg', 'pgn', 'da', 'ge']
+            key_list = sort.split(',')
+            if all(k in sort_keys for k in key_list):
+                return sorted(arbid_list, key=arbinfo_list_getter(*key_list), reverse=reverse)
+
+            print('You can sort J1939 message information on one or more of the following values: %s' % sort_keys)
+            # Return the normal unsorted list
+            return sorted(arbid_list, key=itemgetter(0), reverse=reverse)
+
     def _reprSessionStatsHeader(self):
         return '  Arb ID  (pri/edp/dp PG  SA)    Msg Count    Timing (mean/median/high/low)'
 
     def _reprArbid(self, arbtup):
-        #return "pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  sa: %.2x" % arbid
-        arbid = emitArbid(*arbtup)
-        if arbid <= 0x7FF:
+        arbid, prio, edp, dp, pf, ps, sa = arbtup
+        if arbid is None:
+            # If arbid is None then this was a multiple-CAN frame J1939 TP
+            # message
+            return "  TP MSG    (%d/%d/%d   %.2x%.2x %.2x)" % (prio, edp, dp, pf, ps, sa)
+        elif arbid <= 0x7FF or (dp and edp):
+            # If the arbid is <= 0x7FF then this is an 11-bit CAN frame and not
+            # a J1939 message. If the EDP and DP flags are both 1 then this is
+            # an ISO 15765-3 (UDS) message
             return " %8x                 " % arbid
         else:
-            prio, edp, dp, pf, ps, sa = arbtup
             return " %08x   (%d/%d/%d   %.2x%.2x %.2x)" % (arbid, prio, edp, dp, pf, ps, sa)
 
     def _reprCanMsg(self, idx, ts, arbtup, data, comment=None):
@@ -242,7 +310,7 @@ class J1939Interface(cancatlib.CanInterface):
         if comment is None:
             comment = ''
 
-        prio, edp, dp, pf, ps, sa = arbtup
+        _, prio, edp, dp, pf, ps, sa = arbtup
 
         # give name priority to the Handler, then the manual name (this module), then J1939PGNdb
         pfmeaning, handler = pgn_pfs.get(pf, ('',None))
@@ -294,7 +362,7 @@ class J1939Interface(cancatlib.CanInterface):
         ts, message = tsmsg
         arbid, data = self._splitCanMsg(message)
         arbtup = parseArbid(arbid)
-        prio, edp, dp, pf, ps, sa = arbtup
+        _, prio, edp, dp, pf, ps, sa = arbtup
 
         # if i don't care about this message... bail. (0xef+ is multicast)
         if pf < 0xef and ps not in self._config['myIDs'] and not self.promisc:
@@ -332,6 +400,7 @@ class J1939Interface(cancatlib.CanInterface):
                     pfhandler(arbtup, data, ts)
 
                 except Exception as e:
+                    raise
                     print("(j1939stack)MsgHandler ERROR: %r (%r)" % (e, worktup))
                     if self.verbose:
                         sys.excepthook(*sys.exc_info())
@@ -348,7 +417,7 @@ class J1939Interface(cancatlib.CanInterface):
         if timestamp is None:
             timestamp = time.time()
 
-        prio, edp, dp, pf, ps, sa = arbtup
+        _, prio, edp, dp, pf, ps, sa = arbtup
         pgn = (pf<<8) | ps
         datarange = (edp<<1) | dp
 
@@ -447,7 +516,7 @@ class J1939Interface(cancatlib.CanInterface):
         pgn0 is prio/edp/dp
         '''
         def tp_cm_10(arbtup, data, j1939):     # RTS
-            (prio, edp, dp, pf, da, sa) = arbtup
+            _, prio, edp, dp, pf, da, sa = arbtup
 
             (cb, totsize, pktct, maxct,
                     pgn2, pgn1, pgn0) = struct.unpack('<BHBBBBB', data)
@@ -481,7 +550,7 @@ class J1939Interface(cancatlib.CanInterface):
                 j1939.J1939xmit(0xec, sa, da, response, prio)
 
         def tp_cm_11(arbtup, data, j1939):     # CTS
-            (prio, edp, dp, pf, da, sa) = arbtup
+            _, prio, edp, dp, pf, da, sa = arbtup
 
             (cb, maxpkts, nextpkt, reserved,
                     pgn2, pgn1, pgn0) = struct.unpack('<BBBHBBB', data)
@@ -496,7 +565,7 @@ class J1939Interface(cancatlib.CanInterface):
             # SOMEHOW WE TRIGGER THE CONTINUATION OF TRANSMISSION
 
         def tp_cm_13(arbtup, data, j1939):     # EOM
-            (prio, edp, dp, pf, da, sa) = arbtup
+            _, prio, edp, dp, pf, da, sa = arbtup
 
             (cb, totsize, pktct, maxct,
                     pgn2, pgn1, pgn0) = struct.unpack('<BHBBBBB', data)
@@ -513,7 +582,7 @@ class J1939Interface(cancatlib.CanInterface):
             # Probably need to trigger some mechanism telling the originator
 
         def tp_cm_20(arbtup, data, j1939):     # BROADCAST MESSAGE (BAM)
-            (prio, edp, dp, pf, da, sa) = arbtup
+            _, prio, edp, dp, pf, da, sa = arbtup
 
             (cb, totsize, pktct, reserved,
                     pgn2, pgn1, pgn0) = struct.unpack('<BHBBBBB', data)
@@ -565,7 +634,7 @@ class J1939Interface(cancatlib.CanInterface):
         '''
         special handler for TP_DT messages
         '''
-        (prio, edp, dp, pf, da, sa) = arbtup
+        _, prio, edp, dp, pf, da, sa = arbtup
         if len(data) < 1:
             j1939.log('pf=0xeb: TP ERROR: NO DATA!')
             return
@@ -691,12 +760,12 @@ class J1939Interface(cancatlib.CanInterface):
         if da != ps and self.verbose:
             print("saveTPmsg: WARNING: da: 0x%x  but ps: 0x%x.  using ps" % (da, ps))
             print(da, sa, pgn, repr(msg))
-        arbtup = prio, edp, dp, pf, ps, sa
+        arbtup = None, prio, edp, dp, pf, ps, sa
         self._submitJ1939Message(arbtup, msg)
 
     def _getLocals(self, idx, ts, arbtup, data):
         #print("getLocals:",idx, ts, arbtup, data)
-        prio, edp, dp, pf, ps, sa = arbtup
+        _, prio, edp, dp, pf, ps, sa = arbtup
         pgn = (pf << 8) | ps
         lcls = {'idx': idx,
                 'ts': ts,
@@ -782,10 +851,10 @@ class J1939Interface(cancatlib.CanInterface):
             # make ts an offset instead of the real time.
             ts -= startts
 
-            #if arbids is not None and arbid not in arbids:
-            #    # allow filtering of arbids
-            #    idx += 1
-            #    continue
+            if arbids is not None and arbtup[0] not in arbids:
+                # allow filtering of arbids
+                idx += 1
+                continue
 
             yield((idx, ts, arbtup, data))
             idx += 1
@@ -814,7 +883,7 @@ class J1939Interface(cancatlib.CanInterface):
             cur += 1
 
             # we have a message now, does the PGN match?
-            mprio, medp, mdp, mpf, mps, msa = arbtup
+            _, mprio, medp, mdp, mpf, mps, msa = arbtup
             if mpf != pf or mps != ps or msa != sa:
                 continue
 
@@ -853,7 +922,7 @@ class J1939Interface(cancatlib.CanInterface):
             cur += 1
 
             # we have a message now, does the PGN match? (loose matching)
-            mprio, medp, mdp, mpf, mps, msa = arbtup
+            _, mprio, medp, mdp, mpf, mps, msa = arbtup
             if pf is not None:
                 if type(pf) in (tuple, list):
                     if mpf not in pf:
