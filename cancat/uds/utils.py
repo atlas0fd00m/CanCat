@@ -12,24 +12,24 @@ from cancat.utils.types import ECUAddress, _range_func
 
 
 def get_uds_29bit_srcid(arbid):
-    consts = uds.ARBID_CONSTS[1]
+    consts = uds.ARBID_CONSTS[CAN_MSG_29BIT]
     return arbid & consts['srcid_mask']
 
 
 def get_uds_29bit_destid(arbid):
-    consts = uds.ARBID_CONSTS[0]
+    consts = uds.ARBID_CONSTS[CAN_MSG_11BIT]
     return (arbid & consts['destid_mask']) >> consts['destid_shift']
 
 
 def gen_uds_resp_range(arbid):
-    if arbid > uds.ARBID_CONSTS[1]['prefix']:
+    if arbid > uds.ARBID_CONSTS[CAN_MSG_29BIT]['prefix']:
         # Normally if a request is sent to 0x18DA01F1, the response should have
         # an arbitration ID of 0x18DAF101, but not all ECUs do things in
         # a "normal" way, so generate a range of possible response IDs.
 
         # The src from the request will be come the destination in the response
         dest_id = get_uds_29bit_srcid(arbid)
-        base_id = uds.ARBID_CONSTS[1]['prefix'] & (dest_id << uds.ARBID_CONSTS[1]['destid_shift'])
+        base_id = uds.ARBID_CONSTS[CAN_MSG_29BIT]['prefix'] & (dest_id << uds.ARBID_CONSTS[CAN_MSG_29BIT]['destid_shift'])
 
         return _range_func(base_id, base_id + 0x100)
     else:
