@@ -5,6 +5,7 @@ from binascii import hexlify
 # we can move things into here if we decide this replaces the exiting j1939 modules
 import cancat
 import struct
+from cancat.j1939 import emitArbid
 from cancat.J1939db import *
 from cancat import *
 from cancat.vstruct.bitfield import *
@@ -224,6 +225,18 @@ class J1939Interface(cancat.CanInterface):
             self.CANxmit(arbid, msg, extflag=1)
 
         # hack: should watch for CM_EOM
+
+    def _reprSessionStatsHeader(self):
+        return '  Arb ID  (pri/edp/dp PG  SA)    Msg Count    Timing (mean/median/high/low)'
+
+    def _reprArbid(self, arbtup):
+        #return "pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  sa: %.2x" % arbid
+        arbid = emitArbid(*arbtup)
+        if arbid <= 0x7FF:
+            return " %8x                 " % arbid
+        else:
+            prio, edp, dp, pf, ps, sa = arbtup
+            return " %08x   (%d/%d/%d   %.2x%.2x %.2x)" % (arbid, prio, edp, dp, pf, ps, sa)
 
     def _reprCanMsg(self, idx, ts, arbtup, data, comment=None):
         #print("_reprCanMsg: %r   %r" % (args, kwargs))
@@ -946,7 +959,9 @@ class J1939Interface(cancat.CanInterface):
 MAX_WORD = 64
 bu_masks = [(2 ** (i)) - 1 for i in range(8*MAX_WORD+1)]
 
-unknown_pgn_data = {"Label": "ERROR", "Name": "ERROR", "SPNs": []}
+# Minimum keys required by the parsePGNData() function to display unknown/vendor
+# specific PGNs
+unknown_pgn_data = {"Name": "", "SPNs": []}
 
 def parsePGNData(pf, ps, msg):
 
