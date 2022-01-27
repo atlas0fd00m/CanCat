@@ -967,6 +967,7 @@ class CanInterface(object):
         between two message indexes (where they sit in the CMD_CAN_RECV
         mailbox)
         '''
+        print(self._reprSessionStatsHeader())
         print(self.getSessionStats(start, stop))
 
     def getSessionStatsByBookmark(self, start=None, stop=None):
@@ -1004,9 +1005,14 @@ class CanInterface(object):
 
         return arbid_list
 
+    def _reprSessionStatsHeader(self):
+        return 'Arbitration ID   Msg Count    Timing (mean/median/high/low)'
+
+    def _reprArbid(self, arbid):
+        return '  %8x' % arbid
+
     def getSessionStats(self, start=0, stop=None):
         out = []
-
         arbid_list = self.getArbitrationIds(start=start, stop=stop, reverse=True)
 
         for datalen, arbid, msgs in arbid_list:
@@ -1035,8 +1041,9 @@ class CanInterface(object):
                 low = 0
                 mean = 0
                 median = mean
-            out.append("id: 0x%x\tcount: %d\ttiming::  mean: %.3f\tmedian: %.3f\thigh: %.3f\tlow: %.3f" % \
-                    (arbid, datalen, mean, median, high, low))
+            arbid_str = self._reprArbid(arbid)
+            out.append("%s\t %-12d mean: %8.3f     mdn: %8.3f    hi: %8.3f    lo: %7.3f" % \
+                    (arbid_str, datalen, mean, median, high, low))
 
         msg_count = self.getCanMsgCount()
         out.append("Total Uniq IDs: %d\nTotal Messages: %d" % (len(arbid_list), msg_count))
@@ -1246,7 +1253,7 @@ class CanInterface(object):
                 lcls = self._getLocals(idx, ts, arbid, msg)
 
             for advf in advfilters:
-                # eval each advfilter string/python and determine if this 
+                # eval each advfilter string/python and determine if this
                 # message should be included.
                 if not eval(advf, lcls):
                     skip = True
