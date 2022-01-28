@@ -19,24 +19,36 @@ import cancat.iso_tp as cisotp
 # message is for the OBD2 ECU(s), and 0xF1 is the tester.  Normal UDS messages
 # use a prefix of 0x18DAxxxx.
 # 0xF1 is used as a tester address in normal UDS messaging as well.
-ARBID_CONSTS = {
-    '11bit': {
+ARBID_CONSTS = (
+    # extflag = 0, 11bit
+    {
         'prefix': 0x700,
         'prefix_mask': 0xF00,
         'resp_offset': 8,  # rxid is normally the txid + 8
-        'max_req_id': 0xF7,
         'obd2_broadcast': 0x7DF,
+        'obd2_response': 0x7E8,
+
+        # To ensure the entries match between 11 and 29-bit constants
+        'destid_mask': None,
+        'destid_shift': None,
+        'srcid_mask': None,
+        'tester': None,
     },
-    '29bit': {
+    # extflag = 1, 29bit
+    {
         'prefix': 0x18DA0000,
         'prefix_mask': 0xFFFF0000,
         'destid_mask': 0x0000FF00,
         'destid_shift': 8,
         'srcid_mask': 0x000000FF,
         'tester': 0xF1,
-        'obd2_broadcast': 0x18DA33F1,
+        'obd2_broadcast': 0x18DB33F1,
+        'obd2_response': 0x18DAF10E,
+
+        # To ensure the entries match between 11 and 29-bit constants
+        'resp_offset': None,
     }
-}
+)
 
 ISO_14229_DIDS = {
     0xF180: 'bootSoftwareIdentificationDataIdentifier',

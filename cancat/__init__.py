@@ -85,6 +85,10 @@ CAN_500KBPS  = 16
 CAN_666KBPS  = 17
 CAN_1000KBPS = 18
 
+# Flag to indicate STD (11-bit) or EXT (29-bit) messages
+ARBID_11BIT = 0
+ARBID_29BIT = 1
+
 # state constants for the Receiver thread
 RXTX_DISCONN    = -1
 RXTX_SYNC       = 0

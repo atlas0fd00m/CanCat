@@ -12,24 +12,24 @@ from cancat.utils.types import ECUAddress, _range_func
 
 
 def get_uds_29bit_srcid(arbid):
-    consts = uds.ARBID_CONSTS['29bit']
+    consts = uds.ARBID_CONSTS[ARBID_29BIT]
     return arbid & consts['srcid_mask']
 
 
 def get_uds_29bit_destid(arbid):
-    consts = uds.ARBID_CONSTS['29bit']
+    consts = uds.ARBID_CONSTS[ARBID_11BIT]
     return (arbid & consts['destid_mask']) >> consts['destid_shift']
 
 
 def gen_uds_resp_range(arbid):
-    if arbid > uds.ARBID_CONSTS['29bit']['prefix']:
+    if arbid > uds.ARBID_CONSTS[ARBID_29BIT]['prefix']:
         # Normally if a request is sent to 0x18DA01F1, the response should have
         # an arbitration ID of 0x18DAF101, but not all ECUs do things in
         # a "normal" way, so generate a range of possible response IDs.
 
         # The src from the request will be come the destination in the response
         dest_id = get_uds_29bit_srcid(arbid)
-        base_id = uds.ARBID_CONSTS['29bit']['prefix'] & (dest_id << uds.ARBID_CONSTS['29bit']['destid_shift'])
+        base_id = uds.ARBID_CONSTS[ARBID_29BIT]['prefix'] & (dest_id << uds.ARBID_CONSTS[ARBID_29BIT]['destid_shift'])
 
         return _range_func(base_id, base_id + 0x100)
     else:
@@ -43,17 +43,17 @@ def gen_uds_resp_range(arbid):
 
 def gen_arbids(idx, ext=0):
     if ext:
-        prefix = uds.ARBID_CONSTS['29bit']['prefix']
-        tester = uds.ARBID_CONSTS['29bit']['tester']
-        dest_shift = uds.ARBID_CONSTS['29bit']['destid_shift']
+        prefix = uds.ARBID_CONSTS[ext]['prefix']
+        tester = uds.ARBID_CONSTS[ext]['tester']
+        dest_shift = uds.ARBID_CONSTS[ext]['destid_shift']
 
         arb_id = prefix + (idx << dest_shift) + tester
         resp_id = prefix + (tester << dest_shift) + idx
     else:
-        prefix = uds.ARBID_CONSTS['11bit']['prefix']
+        prefix = uds.ARBID_CONSTS[ext]['prefix']
 
         arb_id = prefix + idx
-        resp_id = prefix + idx + uds.ARBID_CONSTS['11bit']['resp_offset']
+        resp_id = prefix + idx + uds.ARBID_CONSTS[ext]['resp_offset']
 
     return (arb_id, resp_id)
 
@@ -117,15 +117,16 @@ def find_possible_resp(u, start_index, tx_arbid, service, subfunction=None, time
     rx_range = gen_uds_resp_range(tx_arbid)
     err_match = struct.pack('>BB', uds.SVC_NEGATIVE_RESPONSE, service)
 
+    matches = []
     for idx, _, arbid, msg in u.c.genCanMsgs(start=tx_index+1, arbids=rx_range, maxsecs=timeout):
         ftype = msg[0] >> 4
         # Check for frame types 0 (positive and negative responses) and 1
         if (ftype == 0 and msg[1:1+match_len] == rx_match_bytes) or \
                 (ftype == 0 and msg[1:3] == err_match) or \
                 (ftype == 1 and msg[2:2+match_len] == rx_match_bytes):
-            return tx_msg, (arbid, msg)
+            matches.append((arbid, msg))
 
-    return tx_msg, None
+    return tx_msg, matches
 
 
 def err_str(err):
@@ -162,28 +163,23 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
     log.debug('Starting{} DID read ECU scan for range: {}'.format(scan_type, arb_id_range))
     c.placeCanBookmark('ecu_did_scan({}, ext={}, did={}, timeout={}, delay={})'.format(
         arb_id_range, ext, did, timeout, delay))
+
     ecus = []
     possible_ecus = []
     for i in arb_id_range:
-        if ext and i == uds.ARBID_CONSTS['29bit']['tester']:
+        tester_id = uds.ARBID_CONSTS[ext]['tester']
+        if i == tester_id:
             # Skip i == 0xF1 because in that case the sender and receiver IDs
             # are the same
-            log.detail('Skipping 0xF1 in ext ECU scan: invalid ECU address')
+            log.detail('Skipping {} in ext ECU scan: invalid ECU address'.format(hex(tester_id)))
             continue
-        elif ext == False and i > uds.ARBID_CONSTS['11bit']['max_req_id']:
-            # For non-extended scans the valid range goes from 0x00 to 0xFF, but
-            # stop the scan at 0xf7 because at that time the response is the
-            # largest possible valid value
-            log.detail('Stopping std ECU scan at 0xF7: last valid ECU address')
-            break
 
         arb_id, resp_id = gen_arbids(i, ext)
-
         addr = ECUAddress(arb_id, resp_id, ext)
-
         u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
                 verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
+
         try:
             start_index = u.c.getCanMsgCount()
             msg = u.ReadDID(did)
@@ -193,12 +189,12 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
 
                 ecus.append(addr)
             else:
-                tx_msg, possible_match = find_possible_resp(u, start_index, arb_id,
+                tx_msg, responses = find_possible_resp(u, start_index, arb_id,
                         uds.SVC_READ_DATA_BY_IDENTIFIER, did, timeout)
-                if possible_match:
-                    log.warn('Possible non-standard responses for {} found:'.format(addr))
-                    rx_arbid, msg = possible_match
-                    log.warn('{}: {}'.format(hex(rx_arbid), msg.hex()))
+                if responses:
+                    log.warn('Possible non-standard responses for {} found:'.format(hex(addr.tx_arbid)))
+                    for rx_arbid, msg in responses:
+                        log.warn('{}: {}'.format(hex(rx_arbid), msg.hex()))
                     possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
         except uds.NegativeResponseException as e:
             log.debug('{} DID {}: {}'.format(addr, hex(did), e))
@@ -212,10 +208,17 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
             time.sleep(delay)
 
     # Double check any non-standard responses that were found
+    if possible_ecus:
+        log.detail('Retrying possible non-standard ECU addresses')
     for addr in possible_ecus:
+        # if the TX ID is the OBD2 request ID, skip it
+        if addr.tx_arbid == uds.ARBID_CONSTS[addr.extflag]['obd2_broadcast']:
+            log.detail('Skipping OBD2 broadcast address ECU {}'.format(addr))
+            continue
+
         u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
                 verbose=verbose_flag, timeout=timeout)
-        log.detail('Trying {}'.format(addr))
+        log.detail('Checking for possible ECU {}'.format(addr))
         try:
             msg = u.ReadDID(did)
             if msg is not None:
@@ -251,23 +254,17 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
     ecus = []
     possible_ecus = []
     for i in arb_id_range:
-        if ext and i == uds.ARBID_CONSTS['29bit']['tester']:
+        tester_id = uds.ARBID_CONSTS[ext]['tester']
+        if i == tester_id:
             # Skip i == 0xF1 because in that case the sender and receiver IDs
             # are the same
-            log.detail('Skipping 0xF1 in ext ECU scan: invalid ECU address')
+            log.detail('Skipping {} in ext ECU scan: invalid ECU address'.format(hex(tester_id)))
             continue
-        elif ext == False and i > uds.ARBID_CONSTS['11bit']['max_req_id']:
-            # For non-extended scans the valid range goes from 0x00 to 0xFF, but
-            # stop the scan at 0xf7 because at that time the response is the
-            # largest possible valid value
-            log.detail('Stopping std ECU scan at 0xF7: last valid ECU address')
-            break
 
         arb_id, resp_id = gen_arbids(i, ext)
-
         addr = ECUAddress(arb_id, resp_id, ext)
-        u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag, verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
+
         try:
             start_index = u.c.getCanMsgCount()
             with new_session(u, session) as msg:
@@ -280,9 +277,9 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
                     tx_msg, responses = find_possible_resp(u, start_index, arb_id,
                             uds.SVC_DIAGNOSTICS_SESSION_CONTROL, session, timeout)
                     if responses:
-                        log.warn('Possible non-standard responses for {} found:'.format(addr))
-                        rx_arbid, msg = possible_match
-                        log.warn('{}: {}'.format(hex(rx_arbid), msg.hex()))
+                        log.warn('Possible non-standard responses for {} found:'.format(hex(addr.tx_arbid)))
+                        for rx_arbid, msg in responses:
+                            log.warn('{}: {}'.format(hex(rx_arbid), msg.hex()))
                         possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
         except uds.NegativeResponseException as e:
             log.debug('{} session {}: {}'.format(addr, session, e))
@@ -296,7 +293,14 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
             time.sleep(delay)
 
     # Double check any non-standard responses that were found
+    if possible_ecus:
+        log.detail('Retrying possible non-standard ECU addresses')
     for addr in possible_ecus:
+        # if the TX ID is the OBD2 request ID, skip it
+        if addr.tx_arbid == uds.ARBID_CONSTS[addr.extflag]['obd2_broadcast']:
+            log.detail('Skipping OBD2 broadcast address ECU {}'.format(addr))
+            continue
+
         u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
                 verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
