@@ -1147,9 +1147,9 @@ class CCPLeader(object):
 
         protection_status_bool = utils._parse_byte(CCP_message[3])
         if protection_status_bool == 1:
-            protection_status = 'true'
+            protection_status = True
         else:
-            protection_status = 'false'
+            protection_status = False
 
         seed_data = utils._parse_4_byte_value(CCP_message[4:])
 
@@ -1254,10 +1254,10 @@ class CCPLeader(object):
 
         if addl_info_bool == 0:
             return {'CRC': crc_tuple[0], 'CTR': counter, \
-                    'session_status': session_status, 'addl_info_bool': 'false', }
+                    'session_status': session_status, 'addl_info_bool': False, }
 
         return {'CRC': crc_tuple[0], 'CTR': counter, \
-                'session_status': session_status, 'addl_info_bool': 'true', \
+                'session_status': session_status, 'addl_info_bool': True, \
                 'addl_info': 'not implemented yet' }
 
     def _parse_select_cal_page_CRM(self, CCP_message):

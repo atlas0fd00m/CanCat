@@ -554,14 +554,14 @@ class TestCcpMessageParsing(unittest.TestCase):
         GetSeed_CRM_true = b'\xff\x00\x27\x01\x14\x15\x16\x17'
         parsed = ccp._parse_Command_Return_Message(GetSeed_CRM_true, CCP_GET_SEED)
         expected = {'CRC': 'acknowledge / no error', 'CTR': 0x27, \
-                    'protection_status': 'true', \
+                    'protection_status': True, \
                     'seed_data': '0x14151617'}
         self.assertEqual(parsed, expected)
 
         GetSeed_CRM_false = b'\xff\x00\x27\x00\x14\x15\x16\x17'
         parsed = ccp._parse_Command_Return_Message(GetSeed_CRM_false, CCP_GET_SEED)
         expected = {'CRC': 'acknowledge / no error', 'CTR': 0x27, \
-                    'protection_status': 'false', \
+                    'protection_status': False, \
                     'seed_data': '0x14151617'}
         self.assertEqual(parsed, expected)
 
@@ -606,13 +606,13 @@ class TestCcpMessageParsing(unittest.TestCase):
         GetSStatus_CRM_no_addl_info = b'\xff\x00\x32\x81\x00\x90\x90\x90'
         parsed = ccp._parse_Command_Return_Message(GetSStatus_CRM_no_addl_info, CCP_GET_S_STATUS)
         expected = {'CRC': 'acknowledge / no error', 'CTR': 0x32, \
-                    'session_status': 0x81, 'addl_info_bool': 'false'}
+                    'session_status': 0x81, 'addl_info_bool': False}
         self.assertEqual(parsed, expected)
 
         GetSStatus_CRM = b'\xff\x00\x33\x83\x01\x12\x34\x45'
         parsed = ccp._parse_Command_Return_Message(GetSStatus_CRM, CCP_GET_S_STATUS)
         expected = {'CRC': 'acknowledge / no error', 'CTR': 0x33, \
-                    'session_status': 0x83, 'addl_info_bool': 'true',
+                    'session_status': 0x83, 'addl_info_bool': True,
                     'addl_info': 'not implemented yet'}
         self.assertEqual(parsed, expected)
 
