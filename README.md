@@ -312,7 +312,7 @@ In [3]: cf = ccp.CCPFollower(c) # if you are acting as a follower device, commun
 ```
 
 CanCat's CCP module implements "parse" and "generate" functions for each of the CCP commands defined in the CCP specification (https://automotivetechis.files.wordpress.com/2012/06/ccp211.pdf) unless otherwise noted:
-* Leader-side parsing of received event messages (errors) and data acquistion CRMs have not been implemented at this time.
+* Leader-side parsing of received event messages (errors) and data acquisition CRMs have not been implemented at this time.
 * Data Acquisition (DAQ) functions have been added to the follower according to the spec but have not been tested.
 
 In addition to the "parse" and "generate" functions, CCP sequences are defined at the end of `ccp_leader.py`.

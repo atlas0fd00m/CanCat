@@ -9,6 +9,26 @@ import utils
 
 CRM_START_VAL = 0xff
 
+'''
+    MESSAGE TYPES:
+
+    CRO (Command Receive Object): message sent from the leader device to the
+        follower device(s).
+    DTO (Data Transmission Object): message sent from the follower device to the
+        leader device (Command Return Message or Event Message or Data Acquisition Message).
+    CRM (Command Return Message): one type of message sent from the follower device
+        to the leader device containing command / error code and command counter.
+
+    FYI:
+        For all data transfered by the CCP, no byte order for the protocol itself
+        is defined. Because the data organization depends on the ECU's CPU,
+        the byte ordering is defined in the follower device description file.
+        The only exceptions are the station addresses in the TEST, CONNECT
+        and DISCONNECT commands.
+
+    Spec: https://automotivetechis.files.wordpress.com/2012/06/ccp211.pdf
+'''
+
 class CCPFollower(object):
     def __init__(self, c, tx_arbid=None, rx_arbid=None, verbose=True, extflag=0):
         self.c = c
@@ -27,45 +47,47 @@ class CCPFollower(object):
     |               Command Receive Object helper functions               |
     |                                                                     |
     +---------------------------------------------------------------------+
+    |   Use these to parse messages sent from the leader to a follower    |
+    +---------------------------------------------------------------------+
     '''
+
     def _parse_CRO(self, msg):
-        # Get out the first byte
         CCP_CRO_Type = msg[0];
 
         if CCP_CRO_Type == CCP_CONNECT:
-            parsed_msg = self._parse_connect_CRO(CCP_message)
+            parsed_msg = self._parse_connect_CRO(msg)
         elif CCP_CRO_Type == CCP_DISCONNECT:
-            parsed_msg = self._parse_disconnect_CRO(CCP_message)
+            parsed_msg = self._parse_disconnect_CRO(msg)
         elif CCP_CRO_Type == CCP_SET_MTA:
-            parsed_msg = self._parse_setMTA_CRO(CCP_message)
+            parsed_msg = self._parse_setMTA_CRO(msg)
         elif CCP_CRO_Type == CCP_DNLOAD:
-            parsed_msg = self._parse_dnload_CRO(CCP_message)
+            parsed_msg = self._parse_dnload_CRO(msg)
         elif CCP_CRO_Type == CCP_UPLOAD:
-            parsed_msg = self._parse_upload_CRO(CCP_message)
+            parsed_msg = self._parse_upload_CRO(msg)
         elif CCP_CRO_Type == CCP_SHORT_UP:
-            parsed_msg = self._parse_upload_CRO(CCP_message)
+            parsed_msg = self._parse_short_upload_CRO(msg)
         elif CCP_CRO_Type == CCP_CLEAR_MEMORY:
-            parsed_msg = self._parse_clear_memory_CRO(CCP_message)
+            parsed_msg = self._parse_clear_memory_CRO(msg)
         elif CCP_CRO_Type == CCP_MOVE:
-            parsed_msg = self._parse_move_CRO(CCP_message)
+            parsed_msg = self._parse_move_CRO(msg)
         elif CCP_CRO_Type == CCP_TEST:
-            parsed_msg = self._parse_test_CRO(CCP_message)
+            parsed_msg = self._parse_test_CRO(msg)
         elif CCP_CRO_Type == CCP_PROGRAM:
-            parsed_msg = self._parse_program_CRO(CCP_message)
+            parsed_msg = self._parse_program_CRO(msg)
         elif CCP_CRO_Type == CCP_EXCHANGE_ID:
-            parsed_msg = self._parse_exchangeID_CRO(CCP_message)
+            parsed_msg = self._parse_exchangeID_CRO(msg)
         elif CCP_CRO_Type == CCP_GET_CCP_VERSION:
-            parsed_msg = self._parse_ccp_version_CRO(CCP_message)
+            parsed_msg = self._parse_ccp_version_CRO(msg)
         elif CCP_CRO_Type == CCP_GET_SEED:
-            parsed_msg = self._parse_get_seed_CRO(CCP_message)
+            parsed_msg = self._parse_get_seed_CRO(msg)
         elif CCP_CRO_Type == CCP_BUILD_CHKSUM:
-            parsed_msg = self._parse_build_chksum_CRO(CCP_message)
+            parsed_msg = self._parse_build_chksum_CRO(msg)
         elif CCP_CRO_Type == CCP_UNLOCK:
-            parsed_msg = self._parse_unlock_CRO(CCP_message)
+            parsed_msg = self._parse_unlock_CRO(msg)
         elif CCP_CRO_Type == CCP_SET_S_STATUS:
-            parsed_msg = self._parse_set_s_status_CRO(CCP_message)
+            parsed_msg = self._parse_set_s_status_CRO(msg)
         elif CCP_CRO_Type == CCP_GET_S_STATUS:
-            parsed_msg = self._parse_get_s_status_CRO(CCP_message)
+            parsed_msg = self._parse_get_s_status_CRO(msg)
         else:
             raise Exception("Cannot parse message type ", CCP_CRO_Type)
 
@@ -862,6 +884,8 @@ class CCPFollower(object):
     |                                                                     |
     |                 DTO CRM generation helper functions                 |
     |                                                                     |
+    +---------------------------------------------------------------------+
+    |  Use these to generate messages from a follower back to a leader    |
     +---------------------------------------------------------------------+
     '''
 

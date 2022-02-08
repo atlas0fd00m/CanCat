@@ -1,5 +1,5 @@
 import unittest
-from ccp_leader import CCPLeader
+from ccp_leader import CCPLeader, DTO_TYPE
 from cancat import CanInterface
 from utils import *
 
@@ -390,16 +390,31 @@ class TestCcpMessageParsing(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             too_short_message = b'\xFF\x02\x03\x04'
-            ccp._parse_DTO(too_short_message)
+            ccp._parse_DTO_type(too_short_message)
 
         self.assertTrue('CCP message should have length 8' in str(context.exception))
 
         with self.assertRaises(Exception) as context:
             too_long_message = b'\xFF\x02\x03\x04\x05\x06\x07\x08\x09'
-            ccp._parse_DTO(too_long_message)
+            ccp._parse_DTO_type(too_long_message)
 
         self.assertTrue('CCP message should have length 8' in str(context.exception))
-        
+
+    def test_parse_message_should_interpret_first_byte(self):
+        ccp = CCPLeader(c=None)
+
+        message = b'\xff\x00\x03\x04\x05\x06\x07\x08'
+        ret = ccp._parse_DTO_type(message)
+        self.assertEqual(ret, DTO_TYPE.CRO_TYPE)
+
+        message = b'\xfe\x00\x03\x04\x05\x06\x07\x08'
+        ret = ccp._parse_DTO_type(message)
+        self.assertEqual(ret, DTO_TYPE.EVENT_TYPE)
+
+        message = b'\xad\x00\x03\x04\x05\x06\x07\x08'
+        ret = ccp._parse_DTO_type(message)
+        self.assertEqual(ret, DTO_TYPE.DAQ_TYPE)
+
     def test_parse_Connect_CRM(self):
         ccp = CCPLeader(c=None)
 

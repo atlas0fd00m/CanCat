@@ -6,18 +6,17 @@ import struct
 import threading
 from utils import *
 import utils
-
-COUNTER_VAL = 0x20
+from vstruct.primitives import *
 
 '''
     MESSAGE TYPES:
 
     CRO (Command Receive Object): message sent from the leader device to the
         follower device(s).
-    CRM (Command Return Message): one type of message sent from the follower device
-        to the leader device containing command / error code and command counter.
     DTO (Data Transmission Object): message sent from the follower device to the
         leader device (Command Return Message or Event Message or Data Acquisition Message).
+    CRM (Command Return Message): one type of message sent from the follower device
+        to the leader device containing command / error code and command counter.
 
     FYI:
         For all data transfered by the CCP, no byte order for the protocol itself
@@ -28,6 +27,13 @@ COUNTER_VAL = 0x20
 
     Spec: https://automotivetechis.files.wordpress.com/2012/06/ccp211.pdf
 '''
+
+COUNTER_VAL = 0x20
+
+DTO_TYPE = v_enum()
+DTO_TYPE.CRO_TYPE        = 0xFF
+DTO_TYPE.EVENT_TYPE      = 0xFE
+DTO_TYPE.DAQ_TYPE        = 0xFD
 
 class CCPLeader(object):
     def __init__(self, c, tx_arbid=None, rx_arbid=None, verbose=True, extflag=0):
@@ -52,10 +58,19 @@ class CCPLeader(object):
             if len(msgs):
                 try:
                     for msg in msgs:
-                        # TODO will need to change this later to support Event Messages and DAQ, and call _parse_DTO instead
-                        return self._parse_Command_Return_Message(msg, command_type)
+                        msg_type = self._parse_DTO_type(msg)
+
+                        if msg_type == DTO_TYPE.CRO_TYPE:
+                            return self._parse_Command_Return_Message(msg, command_type)
+                        elif msg_type == DTO_TYPE.EVENT_TYPE:
+                            return self._parse_EventMessage(CCP_message)
+                        elif msg_type == DTO_TYPE.DAQ_TYPE:
+                            return self._parse_DAQMessage(CCP_message)
+                        else:
+                            raise Exception("Error sorting message type")
+
                 except Exception as e:
-                    pass
+                    raise Exception("Something went wrong: ", e)
 
             lasttime = time.time()
 
@@ -766,9 +781,11 @@ class CCPLeader(object):
     |                 Data Transmission Object functions                  |
     |                                                                     |
     +---------------------------------------------------------------------+
+    |   Use these to parse messages sent by a follower, back to a leader  |
+    +---------------------------------------------------------------------+
     '''
 
-    def _parse_DTO(self, CCP_message):
+    def _parse_DTO_type(self, CCP_message):
         '''
         Data Transmission Object (DTO): message sent from follower to leader
 
@@ -781,14 +798,15 @@ class CCPLeader(object):
         if len(CCP_message) != 8:
             raise Exception("CCP message should have length 8")
 
-        if CCP_message[0] == b'\xFF':
-            self._parse_Command_Return_Message(CCP_message)
-        elif CCP_message[0] == b'\xFE':
-            self._parse_EventMessage(CCP_message)
-        elif (b'\x00' < CCP_message[0]) and (CCP_message[0] < b'\xFD'):
-            self._parse_DAQMessage(CCP_message)
+        if CCP_message[0] == DTO_TYPE.CRO_TYPE:
+            return DTO_TYPE.CRO_TYPE
+        elif CCP_message[0] == DTO_TYPE.EVENT_TYPE:
+            return DTO_TYPE.EVENT_TYPE
+        elif (0x00 < CCP_message[0]) and (CCP_message[0] < 0xFD):
+            return DTO_TYPE.DAQ_TYPE
         else:
             raise Exception("CCP message has invalid starting byte")
+
 
     def _parse_Command_Return_Message(self, CCP_message, CCP_CRO_Type):
         '''

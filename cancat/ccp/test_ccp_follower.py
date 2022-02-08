@@ -2,11 +2,110 @@ import unittest
 from ccp_follower import CCPFollower
 from cancat import CanInterface
 from utils import *
+from unittest.mock import MagicMock
 
 class TestCcpFollowerMessageParsing(unittest.TestCase):
 
     def runTest(self):
         unittest.main()
+
+    def test_parse_CRO(self):
+        # this tests top-level if/elif block for correct parsing
+
+        ccp = CCPFollower(c=None)
+
+        ccp._parse_connect_CRO = MagicMock()
+        ccp._parse_disconnect_CRO = MagicMock()
+        ccp._parse_setMTA_CRO = MagicMock()
+        ccp._parse_dnload_CRO = MagicMock()
+        ccp._parse_upload_CRO = MagicMock()
+        ccp._parse_short_upload_CRO = MagicMock()
+        ccp._parse_clear_memory_CRO = MagicMock()
+        ccp._parse_move_CRO = MagicMock()
+        ccp._parse_test_CRO = MagicMock()
+        ccp._parse_program_CRO = MagicMock()
+        ccp._parse_exchangeID_CRO = MagicMock()
+        ccp._parse_ccp_version_CRO = MagicMock()
+        ccp._parse_get_seed_CRO = MagicMock()
+        ccp._parse_build_chksum_CRO = MagicMock()
+        ccp._parse_unlock_CRO = MagicMock()
+        ccp._parse_set_s_status_CRO = MagicMock()
+        ccp._parse_get_s_status_CRO = MagicMock()
+
+        msg = b'\x01\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_connect_CRO.called)
+
+        msg = b'\x07\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_disconnect_CRO.called)
+
+        msg = b'\x02\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_setMTA_CRO.called)
+
+        msg = b'\x03\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_dnload_CRO.called)
+
+        msg = b'\x04\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_upload_CRO.called)
+
+        msg = b'\x0f\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_short_upload_CRO.called)
+
+        msg = b'\x10\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_clear_memory_CRO.called)
+
+        msg = b'\x19\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_move_CRO.called)
+
+        msg = b'\x05\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_test_CRO.called)
+
+        msg = b'\x18\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_program_CRO.called)
+
+        msg = b'\x17\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_exchangeID_CRO.called)
+
+        msg = b'\x1b\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_ccp_version_CRO.called)
+
+        msg = b'\x12\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_get_seed_CRO.called)
+
+        msg = b'\x0e\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_build_chksum_CRO.called)
+
+        msg = b'\x13\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_unlock_CRO.called)
+
+        msg = b'\x0c\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_set_s_status_CRO.called)
+
+        msg = b'\x0d\x90\x90\x90\x90\x90\x90\x90'
+        ccp._parse_CRO(msg)
+        self.assertTrue(ccp._parse_get_s_status_CRO.called)
+
+        with self.assertRaises(Exception) as context:
+            invalid_msg = b'\xff\x90\x90\x90\x90\x90\x90\x90'
+            ccp._parse_CRO(invalid_msg)
+
+        self.assertTrue('Cannot parse message type' in str(context.exception))
+
 
     def test_parse_connect_CRO(self):
         ccp = CCPFollower(c=None)
