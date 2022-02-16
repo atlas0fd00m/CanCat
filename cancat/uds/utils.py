@@ -5,7 +5,7 @@ import string
 import struct
 from contextlib import contextmanager
 
-from cancat import uds
+from cancat import uds, ARBID_29BIT
 from cancat.uds import UDS
 from cancat.utils import log
 from cancat.utils.types import ECUAddress, _range_func
