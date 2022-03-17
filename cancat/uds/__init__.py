@@ -162,6 +162,8 @@ RESP_CODES.update(NEG_RESP_REPR)
 RESP_CODES.update(POS_RESP_CODES)
 
 
+class TimeoutException(Exception): pass
+
 class NegativeResponseException(Exception):
     def __init__(self, neg_code, svc, msg):
         self.neg_code = neg_code
@@ -196,28 +198,31 @@ class UDS(object):
     def xmit_recv(self, data, extflag=0, count=1, service=None):
         msg, idx = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, extflag, self.timeout, count, service)
 
-        # check if the response is something we know about and can help out
-        if msg != None and len(msg):
-            svc = data[0]
-            svc_resp = msg[0]
-            errcode = 0
-            if len(msg) >= 3:
-                errcode = msg[2]
+        # Process response
+        svc = data[0]
+        while True:
+            if msg is None:
+                raise TimeoutException()
 
+            svc_resp = msg[0]
             if svc_resp == svc + 0x40:
                 if self.verbose:
                     print("Positive Response!")
-
-            negresprepr = NEG_RESP_CODES.get(errcode)
-            if negresprepr != None and svc_resp != svc + 0x40:
+                break
+            else:
+                # Some sort of error has occurred
+                errcode = msg[2]
                 if self.verbose > 1:
+                    negresprepr = NEG_RESP_CODES.get(errcode)
                     print(negresprepr + "\n")
-                # TODO: Implement getting final message if ResponseCorrectlyReceivedResponsePending is received
-                if errcode != 0x78: # Don't throw an exception for ResponseCorrectlyReceivedResponsePending
-                    raise NegativeResponseException(errcode, svc, msg)
-                else:
+
+                # Don't throw an exception for
+                # ResponseCorrectlyReceivedResponsePending
+                if errcode == 0x78:
                     # Try again but increment the start index
-                    msg, idx = self.c._isotp_get_msg(self.rx_arbid, start_index = idx+1, service = service, timeout = self.timeout)
+                    msg, idx = self.c._isotp_get_msg(self.rx_arbid, start_index=idx+1, service=service, timeout=self.timeout)
+                else:
+                    raise NegativeResponseException(errcode, svc, msg)
 
         return msg
 
@@ -290,14 +295,13 @@ class UDS(object):
         '''
         Assumes correct Diagnostics Session and SecurityAccess
         '''
-        # Figure out the right address and data length formats
-        pack_fmt_str = ">BB"
-        try:
-            pack_fmt_str += {1:"B", 2:"H", 4:"I"}.get(addr_format >> 4) + {1:"B", 2:"H", 4:"I"}.get(addr_format & 0xf)
-        except TypeError:
-            print("Cannot parse addressAndLengthFormatIdentifier", hex(addr_format))
-            return None
-        msg = self.xmit_recv(b"\x34" + struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data)), extflag=self.extflag, service = 0x74)
+        # Figure out the right address and data length formats. The standard
+        # size formats are 1, 2, and 4 but some ECUs use other values
+        addr_data = struct.pack('>Q', addr)[8-(addr_format >> 4):]
+        addr_len_data = struct.pack('>Q', len(data))[8-(addr_format & 0xF):]
+
+        req_data = b"\x34" + struct.pack('>BB', data_format, addr_format) + addr_data + addr_len_data
+        msg = self.xmit_recv(req_data, extflag=self.extflag, service = 0x74)
 
         # Parse the response
         if msg[0] != 0x74:
