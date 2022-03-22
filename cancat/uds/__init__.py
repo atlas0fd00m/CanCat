@@ -162,7 +162,7 @@ RESP_CODES.update(NEG_RESP_REPR)
 RESP_CODES.update(POS_RESP_CODES)
 
 
-class TimeoutException(Exception): pass
+class UDSTimeout(Exception): pass
 
 class NegativeResponseException(Exception):
     def __init__(self, neg_code, svc, msg):
@@ -202,7 +202,7 @@ class UDS(object):
         svc = data[0]
         while True:
             if msg is None:
-                raise TimeoutException()
+                raise UDSTimeout()
 
             svc_resp = msg[0]
             if svc_resp == svc + 0x40:

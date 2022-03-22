@@ -83,6 +83,8 @@ def new_session(u, session, prereq_sessions=None, tester_present=False):
             u.StartTesterPresent(request_response=False)
 
         yield msg
+    except uds.UDSTimeout as e:
+        return None
     finally:
         if tester_present:
             u.StopTesterPresent()
@@ -196,6 +198,8 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
                     for rx_arbid, msg in responses:
                         log.warn('{}: {}'.format(hex(rx_arbid), msg.hex()))
                     possible_ecus.append(ECUAddress(arb_id, rx_arbid, ext))
+        except uds.UDSTimeout as e:
+            pass
         except uds.NegativeResponseException as e:
             log.debug('{} DID {}: {}'.format(addr, hex(did), e))
             log.msg('found {}'.format(addr))
@@ -330,6 +334,8 @@ def try_read_did(u, did):
         resp = u.ReadDID(did)
         if resp is not None:
             data = { 'resp':resp }
+    except uds.UDSTimeout as e:
+        pass
     except uds.NegativeResponseException as e:
         # 0x12:'SubFunctionNotSupported' - not standard, but I've seen it
         # 0x31:'RequestOutOfRange'       - means the DID is not valid
@@ -368,6 +374,8 @@ def try_write_did(u, did, datg):
         resp = u.WriteDID(i, data)
         if resp is not None:
             did = { 'resp':resp }
+    except uds.UDSTimeout as e:
+        pass
     except uds.NegativeResponseException as e:
         # 0x31:'RequestOutOfRange' usually means the DID is not valid
         if e.neg_code != 0x31:
@@ -403,12 +411,15 @@ def try_session(u, sess_num):
         with new_session(u, sess_num) as resp:
             if resp is not None:
                 session = { 'resp':resp }
+    except uds.UDSTimeout as e:
+        pass
     except uds.NegativeResponseException as e:
         # 0x11:'ServiceNotSupported'
         # 0x12:'SubFunctionNotSupported'
         if e.neg_code not in [0x11, 0x12]:
             session = { 'err':e.neg_code }
     return session
+
 
 def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=None, recursive_scan=True, try_ecu_reset=True, try_sess_ctrl_reset=True):
     log.debug('Starting session scan for range: {}'.format(session_range))
@@ -427,6 +438,9 @@ def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=No
         try:
             for prereq in prereq_sessions:
                 enter_session(u, prereq)
+        except uds.UDSTimeout as e:
+            log.detail('SESSION ({}) TIMEOUT: Can\'t enter prereqs, stopping session scan'.format(prereq_sessions))
+            return sessions
         except uds.NegativeResponseException as e:
             # 0x7f:'ServiceNotSupportedInActiveSession'
             if e.neg_code == 0x7f:
@@ -503,6 +517,8 @@ def try_auth(u, level, secret):
         resp = u.SecurityAccess(level, secret)
         if resp is not None:
             auth_data = { 'resp':resp }
+    except uds.UDSTimeout as e:
+        pass
     except uds.NegativeResponseException as e:
         # 0x12:'SubFunctionNotSupported',
         if e.neg_code != 0x12:
