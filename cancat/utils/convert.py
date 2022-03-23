@@ -8,14 +8,17 @@ import re
 
 def cancat2candump(session, output):
     with open(session, 'rb') as f:
-        sess = pickle.load(f)
+        sess = pickle.load(f, encoding='latin1')
 
     with open(output, 'w') as f:
         for msg_time, msg in sess['messages'].get(cancat.CMD_CAN_RECV, None):
+            if isinstance(msg, str):
+                msg = bytes(msg, 'latin1')
+
             line = '({:.6f}) vcan0 {}#{}\n'.format(
                 msg_time,
-                msg[0:4].encode('HEX'),
-                msg[4:].encode('HEX')
+                msg[0:4].hex(),
+                msg[4:].hex(),
             )
             f.write(line)
 
@@ -25,10 +28,13 @@ def cancat2pcap(session, output):
     import scapy.packet
     import scapy.utils
 
-    sess = pickle.load(session)
+    sess = pickle.load(session, encoding='latin1')
 
     msgs = []
     for msg_time, msg in sess['messages'].get(cancat.CMD_CAN_RECV, None):
+        if isinstance(msg, str):
+            msg = bytes(msg, 'latin1')
+
         arb = struct.unpack_from('>L', msg)[0] | 0x80000000
         msg_data = msg[4:]
         msg_len = len(msg_data)
