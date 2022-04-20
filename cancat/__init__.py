@@ -1165,21 +1165,21 @@ class CanInterface(object):
 
     def setCanBookmarkName(self, bkmk_index, name):
         info = self.bookmark_info[bkmk_index]
-        info[name] = name
+        info['name'] = name
 
     def setCanBookmarkComment(self, bkmk_index, comment):
         info = self.bookmark_info[bkmk_index]
-        info[name] = name
+        info['comment'] = comment
 
     def setCanBookmarkNameByMsgIndex(self, msg_index, name):
         bkmk_index = self.bookmarks.index(msg_index)
         info = self.bookmark_info[bkmk_index]
-        info[name] = name
+        info['name'] = name
 
     def setCanBookmarkCommentByMsgIndex(self, msg_index, comment):
         bkmk_index = self.bookmarks.index(msg_index)
         info = self.bookmark_info[bkmk_index]
-        info[name] = name
+        info['comment'] = comment
 
     def snapshotCanMessages(self, name=None, comment=None):
         '''
@@ -2321,6 +2321,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
                 ipsh.mainloop(intro)
             except ImportError as e:
                 print(e)
+                import code
                 shell = code.InteractiveConsole(gbls)
                 shell.interact(intro)
 
