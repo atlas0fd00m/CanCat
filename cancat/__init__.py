@@ -612,7 +612,7 @@ class CanInterface(object):
 
         return msg
 
-    def _isotp_enable_flowcontrol(self, tx_arbid, rx_arbid, extflag):
+    def _isotp_enable_flowcontrol(self, tx_arbid, rx_arbid, extflag, timeout=3):
         msg = struct.pack('>IIB', tx_arbid, rx_arbid, extflag)
         self._send(CMD_CAN_RECV_ISOTP, msg)
         ts, result = self.recv(CMD_CAN_RECV_ISOTP_RESULT, timeout)
