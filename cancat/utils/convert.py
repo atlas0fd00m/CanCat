@@ -38,7 +38,7 @@ def cancat2pcap(session, output):
         arb = struct.unpack_from('>L', msg)[0] | 0x80000000
         msg_data = msg[4:]
         msg_len = len(msg_data)
-        raw = struct.pack('<LL', arb, msg_len) + msg_data + '\x00' * (8 - msg_len)
+        raw = struct.pack('<LL', arb, msg_len) + msg_data + b'\x00' * (8 - msg_len)
 
         pkt = scapy.layers.l2.CookedLinux(
                 pkttype=1,
