@@ -176,6 +176,7 @@ def keystop(delay=0):
     if os.name == 'posix':
         return len(select.select([sys.stdin],[],[],delay)[0])
     else:
+        import msvcrt
         return msvcrt.kbhit()
 
 class SPECIAL_CASE(object):
