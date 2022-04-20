@@ -153,16 +153,16 @@ def handleLogHexToScreen(message, canbuf):
     num = struct.unpack("<L", message)
     print('LOG: %x' % num)
 
-def handleCanMsgsDuringSniff(message, canbuf, arbids=None):
+def handleCanMsgsDuringSniff(message, canbuf, arbids=None, canidx=0):
     ts = time.time()
     idx = canbuf._submitMessage(CMD_CAN_RECV, (ts, message))
     arbid, data = canbuf._splitCanMsg(message)
 
     if arbids:
         if arbid in arbids:
-            print(reprCanMsg(idx, ts, arbid, data))
+            print(reprCanMsg(canidx, idx, ts, arbid, data))
     else:
-        print(reprCanMsg(idx, ts, arbid, data))
+        print(reprCanMsg(canidx, idx, ts, arbid, data))
 
 default_cmdhandlers = {
         CMD_LOG : handleLogToScreen,
@@ -766,7 +766,7 @@ class CanInterface(object):
             delta_correction = newstamp - laststamp
 
             if timing == TIMING_INTERACTIVE:
-                char = input("Transmit this message? %s (Y/n)" % reprCanMsg(idx, ts, arbid, data))
+                char = input("Transmit this message? %s (Y/n)" % reprCanMsg(0, idx, ts, arbid, data))
 
                 if char is not None and len(char) > 0 and char[0] == 'n':
                     return
@@ -1494,7 +1494,7 @@ class CanInterface(object):
         '''
         for idx, ts, arbid, msg in self.genCanMsgs():
             if hasAscii(msg, minbytes=minbytes, strict=strict):
-                print(reprCanMsg(idx, ts, arbid, msg, repr(msg)))
+                print(reprCanMsg(0, idx, ts, arbid, msg, repr(msg)))
 
     def reprBookmarks(self):
         '''
@@ -1708,11 +1708,11 @@ def hasAscii(msg, minbytes=3, strict=False):
             ascii_count = 0
     return ascii_match
 
-def reprCanMsg(idx, ts, arbid, data, comment=None):
+def reprCanMsg(canidx, idx, ts, arbid, data, comment=None):
     #TODO: make some repr magic that spits out known ARBID's and other subdata
     if comment == None:
         comment = ''
-    return "%.8d %8.3f ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, arbid, len(data), binascii.hexlify(data), comment)
+    return "%.8d %8.3f (can%d) ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, canidx, arbid, len(data), binascii.hexlify(data), comment)
 
 class FordInterface(CanInterface):
     def setCanBaudHSCAN(self):
@@ -2205,7 +2205,7 @@ class CanInTheMiddleInterface(CanInterface):
         '''
         for idx, ts, arbid, msg in self.genCanMsgsIso():
             if hasAscii(msg, minbytes=minbytes, strict=strict):
-                print(reprCanMsgIso(idx, ts, arbid, msg, repr(msg)))
+                print(reprCanMsg(1, idx, ts, arbid, msg, repr(msg)))
 
     def reprBookmarksIso(self):
         '''
