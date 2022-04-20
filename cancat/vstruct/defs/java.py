@@ -1,5 +1,4 @@
-import cancat import vstruct
-
+from cancat import vstruct
 from cancat.vstruct.primitives import *
 
 

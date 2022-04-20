@@ -1936,24 +1936,24 @@ class CanInTheMiddleInterface(CanInterface):
     def setCanBookmarkNameIso(self, bkmk_index, name):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         info = self.bookmark_info_iso[bkmk_index]
-        info[name] = name
+        info['name'] = name
 
     def setCanBookmarkCommentIso(self, bkmk_index, comment):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         info = self.bookmark_info_iso[bkmk_index]
-        info[name] = name
+        info['comment'] = comment
 
     def setCanBookmarkNameByMsgIndexIso(self, msg_index, name):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         bkmk_index = self.bookmarks_iso.index(msg_index)
         info = self.bookmark_info_iso[bkmk_index]
-        info[name] = name
+        info['name'] = name
 
     def setCanBookmarkCommentByMsgIndexIso(self, msg_index, comment):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
         bkmk_index = self.bookmarks_iso.index(msg_index)
         info = self.bookmark_info_iso[bkmk_index]
-        info[name] = name
+        info['comment'] = comment
 
     def snapshotCanMessagesIso(self, name=None, comment=None):
         # FIXME: move to "indexed" CAN interfaces, to allow for up to 10 or more without new code.
