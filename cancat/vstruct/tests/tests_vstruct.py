@@ -1,7 +1,7 @@
 import unittest
 
-import vstruct
-import vstruct.primitives as p
+from cancat import vstruct
+from cancat.vstruct import primitives as p
 
 class NNestedStruct(vstruct.VStruct):
     def __init__(self):

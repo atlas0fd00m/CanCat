@@ -3,8 +3,8 @@ from past.builtins import xrange
 
 import unittest
 
-import vstruct
-from vstruct.primitives import *
+from cancat import vstruct
+from cancat.vstruct.primitives import *
 
 from cStringIO import StringIO
 
