@@ -147,15 +147,15 @@ class ECU(object):
             # Attempt to handle a few common errors
             if 'err' in resp and resp['err'] == 0x36:
                 # 0x36:'ExceedNumberOfAttempts'
-                log.detail('Retrying session {}, auth {}, length {}'.format(sess, lvl, keylen))
-                resp = utils.try_auth(u, level, key)
+                #log.detail('Retrying session {}, auth {}, length {}'.format(sess, lvl, keylen))
+                resp = utils.try_auth(u, auth_level, key)
                 log.detail('resp: {}'.format(resp))
 
             elif 'err' in resp and resp['err'] == 0x37:
                 # 0x37:'RequiredTimeDelayNotExpired'
                 time.sleep(1.0)
-                log.detail('Retrying session {}, auth {}, length {}'.format(sess, lvl, keylen))
-                resp = utils.try_auth(u, level, key)
+                #log.detail('Retrying session {}, auth {}, length {}'.format(sess, lvl, keylen))
+                resp = utils.try_auth(u, auth_level, key)
                 log.detail('resp: {}'.format(resp))
         return resp
 
@@ -195,7 +195,7 @@ class ECU(object):
                         for keylen in len_range:
                             key = '\x00' * keylen
                             log.detail('Trying session {}, auth {}, key \'{}\''.format(sess, lvl, key))
-                            self.c.placeCanBookmark('SecurityAccess({}, {})'.format(i, repr(key)))
+                            self.c.placeCanBookmark('SecurityAccess({}, {})'.format(sess, repr(key)))
                             resp = self._try_key(u, lvl, key)
                             self._sessions[sess]['auth'][lvl].update(resp)
 

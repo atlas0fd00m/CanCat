@@ -361,7 +361,7 @@ class UDS(object):
 
         lenlenbyte = (lenlen << 4) | addrlen
 
-        data = struct.pack('<BI' + lfmt, lenlenbyte, address, length)
+        data = struct.pack('<BI' + lfmt, lenlenbyte, address, lenlenbyte)
         #data = "3d".decode('hex') + struct.pack('<BI' + lfmt, lenlenbyte, address, length)
 
         msg = self._do_Function(SVC_WRITE_MEMORY_BY_ADDRESS, data=data, service=0x63)

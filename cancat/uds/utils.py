@@ -17,7 +17,7 @@ def get_uds_29bit_srcid(arbid):
 
 
 def get_uds_29bit_destid(arbid):
-    consts = uds.ARBID_CONSTS[ARBID_11BIT]
+    consts = uds.ARBID_CONSTS[ARBID_29BIT]
     return (arbid & consts['destid_mask']) >> consts['destid_shift']
 
 
