@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 from cancat.scripts.cancat2pcap import main
 main()
