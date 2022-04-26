@@ -3,7 +3,7 @@ import time
 import cancat
 import struct
 from . import utils
-from vstruct.primitives import v_enum
+from cancat.vstruct.primitives import v_enum
 
 '''
     MESSAGE TYPES:
