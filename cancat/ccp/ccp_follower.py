@@ -1,11 +1,5 @@
 #!/usr/bin/env python
-import sys
-import time
-import cancat
-import struct
-import threading
-from utils import *
-import utils
+from . import utils
 
 CRM_START_VAL = 0xff
 
@@ -29,6 +23,7 @@ CRM_START_VAL = 0xff
     Spec: https://automotivetechis.files.wordpress.com/2012/06/ccp211.pdf
 '''
 
+
 class CCPFollower(object):
     def __init__(self, c, tx_arbid=None, rx_arbid=None, verbose=True, extflag=0):
         self.c = c
@@ -51,45 +46,45 @@ class CCPFollower(object):
     +---------------------------------------------------------------------+
     '''
 
-    def _parse_CRO(self, msg):
-        CCP_CRO_Type = msg[0];
+    def _parse_CRO(self, msg):  # noqa: C901
+        CCP_CRO_Type = msg[0]
 
-        if CCP_CRO_Type == CCP_CONNECT:
+        if CCP_CRO_Type == utils.CCP_CONNECT:
             parsed_msg = self._parse_connect_CRO(msg)
-        elif CCP_CRO_Type == CCP_DISCONNECT:
+        elif CCP_CRO_Type == utils.CCP_DISCONNECT:
             parsed_msg = self._parse_disconnect_CRO(msg)
-        elif CCP_CRO_Type == CCP_SET_MTA:
+        elif CCP_CRO_Type == utils.CCP_SET_MTA:
             parsed_msg = self._parse_setMTA_CRO(msg)
-        elif CCP_CRO_Type == CCP_DNLOAD:
+        elif CCP_CRO_Type == utils.CCP_DNLOAD:
             parsed_msg = self._parse_dnload_CRO(msg)
-        elif CCP_CRO_Type == CCP_UPLOAD:
+        elif CCP_CRO_Type == utils.CCP_UPLOAD:
             parsed_msg = self._parse_upload_CRO(msg)
-        elif CCP_CRO_Type == CCP_SHORT_UP:
+        elif CCP_CRO_Type == utils.CCP_SHORT_UP:
             parsed_msg = self._parse_short_upload_CRO(msg)
-        elif CCP_CRO_Type == CCP_CLEAR_MEMORY:
+        elif CCP_CRO_Type == utils.CCP_CLEAR_MEMORY:
             parsed_msg = self._parse_clear_memory_CRO(msg)
-        elif CCP_CRO_Type == CCP_MOVE:
+        elif CCP_CRO_Type == utils.CCP_MOVE:
             parsed_msg = self._parse_move_CRO(msg)
-        elif CCP_CRO_Type == CCP_TEST:
+        elif CCP_CRO_Type == utils.CCP_TEST:
             parsed_msg = self._parse_test_CRO(msg)
-        elif CCP_CRO_Type == CCP_PROGRAM:
+        elif CCP_CRO_Type == utils.CCP_PROGRAM:
             parsed_msg = self._parse_program_CRO(msg)
-        elif CCP_CRO_Type == CCP_EXCHANGE_ID:
+        elif CCP_CRO_Type == utils.CCP_EXCHANGE_ID:
             parsed_msg = self._parse_exchangeID_CRO(msg)
-        elif CCP_CRO_Type == CCP_GET_CCP_VERSION:
+        elif CCP_CRO_Type == utils.CCP_GET_CCP_VERSION:
             parsed_msg = self._parse_ccp_version_CRO(msg)
-        elif CCP_CRO_Type == CCP_GET_SEED:
+        elif CCP_CRO_Type == utils.CCP_GET_SEED:
             parsed_msg = self._parse_get_seed_CRO(msg)
-        elif CCP_CRO_Type == CCP_BUILD_CHKSUM:
+        elif CCP_CRO_Type == utils.CCP_BUILD_CHKSUM:
             parsed_msg = self._parse_build_chksum_CRO(msg)
-        elif CCP_CRO_Type == CCP_UNLOCK:
+        elif CCP_CRO_Type == utils.CCP_UNLOCK:
             parsed_msg = self._parse_unlock_CRO(msg)
-        elif CCP_CRO_Type == CCP_SET_S_STATUS:
+        elif CCP_CRO_Type == utils.CCP_SET_S_STATUS:
             parsed_msg = self._parse_set_s_status_CRO(msg)
-        elif CCP_CRO_Type == CCP_GET_S_STATUS:
+        elif CCP_CRO_Type == utils.CCP_GET_S_STATUS:
             parsed_msg = self._parse_get_s_status_CRO(msg)
         else:
-            raise Exception("Cannot parse message type ", CCP_CRO_Type)
+            raise Exception("Cannot parse message type ", utils.CCP_CRO_Type)
 
         return parsed_msg
 
@@ -178,7 +173,7 @@ class CCPFollower(object):
 
         address = utils._parse_4_byte_value(msg[4:])
 
-        parsed = {'CMD': cmd, 'CTR': ctr, 'mta_number': mta_number, \
+        parsed = {'CMD': cmd, 'CTR': ctr, 'mta_number': mta_number,
                   'address_extension': address_extension, 'address': address}
 
         return parsed
@@ -484,7 +479,7 @@ class CCPFollower(object):
         ctr = utils._parse_byte(msg[1])
 
         # Key length is not specified, just return everything
-        key = utils._parse_6_byte_value(msg[2:]) #'0x' + msg[2:].hex()
+        key = utils._parse_6_byte_value(msg[2:])  # '0x' + msg[2:].hex()
 
         parsed = {'CMD': cmd, 'CTR': ctr, 'key': key}
 
@@ -675,7 +670,7 @@ class CCPFollower(object):
         diag_service_num = utils._parse_2_byte_value(msg[2:4])
         params = utils._parse_4_byte_value(msg[4:])
 
-        parsed = {'CMD': cmd, 'CTR': ctr, 'diag_service_num': diag_service_num, \
+        parsed = {'CMD': cmd, 'CTR': ctr, 'diag_service_num': diag_service_num,
                   'params': params}
 
         return parsed
@@ -705,7 +700,7 @@ class CCPFollower(object):
         action_service_num = utils._parse_2_byte_value(msg[2:4])
         params = utils._parse_4_byte_value(msg[4:])
 
-        parsed = {'CMD': cmd, 'CTR': ctr, 'action_service_num': action_service_num, \
+        parsed = {'CMD': cmd, 'CTR': ctr, 'action_service_num': action_service_num,
                   'params': params}
 
         return parsed
@@ -739,7 +734,7 @@ class CCPFollower(object):
         can_dto_id = utils._parse_4_byte_value(msg[4:])
 
         parsed = {'CMD': cmd, 'CTR': ctr, 'daq_list_num': daq_list_num,
-                  'can_dto_id': can_dto_id }
+                  'can_dto_id': can_dto_id}
 
         return parsed
 
@@ -770,7 +765,7 @@ class CCPFollower(object):
         odt_num = utils._parse_byte(msg[3])
         odt_elem_num = utils._parse_byte(msg[4])
 
-        parsed = {'CMD': cmd, 'CTR': ctr, 'daq_list_num': daq_list_num, \
+        parsed = {'CMD': cmd, 'CTR': ctr, 'daq_list_num': daq_list_num,
                   'odt_num': odt_num, 'odt_elem_num': odt_elem_num}
 
         return parsed
@@ -803,7 +798,7 @@ class CCPFollower(object):
         address_ext = utils._parse_byte(msg[3])
         address = utils._parse_4_byte_value(msg[4:])
 
-        parsed = {'CMD': cmd, 'CTR': ctr, 'daq_elem_size': daq_elem_size, \
+        parsed = {'CMD': cmd, 'CTR': ctr, 'daq_elem_size': daq_elem_size,
                   'address_ext': address_ext, 'address': address}
 
         return parsed
@@ -848,9 +843,9 @@ class CCPFollower(object):
         event_chan_num = utils._parse_byte(msg[5])
         prescaler = utils._parse_2_byte_value_motorola(msg[6:8])
 
-        parsed = {'CMD': cmd, 'CTR': ctr, 'mode': mode, 'daq_list_num': daq_list_num, \
-                  'last_odt_num': last_odt_num, 'event_chan_num': event_chan_num, \
-                  'prescaler': prescaler }
+        parsed = {'CMD': cmd, 'CTR': ctr, 'mode': mode, 'daq_list_num': daq_list_num,
+                  'last_odt_num': last_odt_num, 'event_chan_num': event_chan_num,
+                  'prescaler': prescaler}
 
         return parsed
 
@@ -875,7 +870,7 @@ class CCPFollower(object):
         ctr = utils._parse_byte(msg[1])
         mode = utils._parse_byte(msg[2])
 
-        parsed = {'CMD': cmd, 'CTR': ctr, 'mode': mode }
+        parsed = {'CMD': cmd, 'CTR': ctr, 'mode': mode}
 
         return parsed
 
@@ -903,7 +898,7 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
@@ -921,7 +916,7 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
@@ -939,7 +934,7 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
@@ -961,7 +956,7 @@ class CCPFollower(object):
         address = utils._gen_4_byte_val(mta_address)
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(mta_extension) + address
+            utils._gen_byte(counter) + utils._gen_byte(mta_extension) + address
 
         return msg
 
@@ -982,7 +977,7 @@ class CCPFollower(object):
         address = utils._gen_4_byte_val(mta_address)
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(mta_extension) + address
+            utils._gen_byte(counter) + utils._gen_byte(mta_extension) + address
 
         return msg
 
@@ -1003,7 +998,7 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_4_byte_val(data) + utils._gen_byte(DONT_CARE_VAL)
+            utils._gen_byte(counter) + utils._gen_4_byte_val(data) + utils._gen_byte(utils.DONT_CARE_VAL)
 
         return msg
 
@@ -1020,7 +1015,7 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
@@ -1037,7 +1032,7 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
@@ -1054,11 +1049,12 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
-    def _generate_exchangeID_CRM(self, return_code, counter, follower_device_id_length, data_type_qualifier, availability_mask, protection_mask):
+    def _generate_exchangeID_CRM(self, return_code, counter, follower_device_id_length,
+                                 data_type_qualifier, availability_mask, protection_mask):
         '''
         Possible return codes:
         - 0x00:  acknowledge (no error)
@@ -1093,9 +1089,9 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(follower_device_id_length) + \
-              utils._gen_byte(data_type_qualifier) + utils._gen_byte(availability_mask) + \
-              utils._gen_byte(protection_mask) + utils._gen_byte(DONT_CARE_VAL)
+            utils._gen_byte(counter) + utils._gen_byte(follower_device_id_length) + \
+            utils._gen_byte(data_type_qualifier) + utils._gen_byte(availability_mask) + \
+            utils._gen_byte(protection_mask) + utils._gen_byte(utils.DONT_CARE_VAL)
 
         return msg
 
@@ -1121,8 +1117,8 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(main_protocol) + \
-              utils._gen_byte(minor_protocol) + utils._gen_byte(DONT_CARE_VAL)*3
+            utils._gen_byte(counter) + utils._gen_byte(main_protocol) + \
+            utils._gen_byte(minor_protocol) + utils._gen_byte(utils.DONT_CARE_VAL)*3
 
         return msg
 
@@ -1143,8 +1139,8 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(protection_status) + \
-              utils._gen_4_byte_val(seed_data)
+            utils._gen_byte(counter) + utils._gen_byte(protection_status) + \
+            utils._gen_4_byte_val(seed_data)
 
         return msg
 
@@ -1163,8 +1159,8 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(checksum_data_size) + \
-              utils._gen_4_byte_val(checksum_data)
+            utils._gen_byte(counter) + utils._gen_byte(checksum_data_size) + \
+            utils._gen_4_byte_val(checksum_data)
 
         return msg
 
@@ -1183,8 +1179,8 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(resource_mask) + \
-              utils._gen_byte(DONT_CARE_VAL)*4
+            utils._gen_byte(counter) + utils._gen_byte(resource_mask) + \
+            utils._gen_byte(utils.DONT_CARE_VAL)*4
 
         return msg
 
@@ -1201,7 +1197,7 @@ class CCPFollower(object):
         +-------+--------+-----------------------------------------------+
         '''
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
@@ -1220,11 +1216,11 @@ class CCPFollower(object):
         |  5..7 |  bytes |  additional status information (optional)     |
         +-------+--------+-----------------------------------------------+
         '''
-        addl_info_bytes = utils._gen_byte(DONT_CARE_VAL)*3
+        addl_info_bytes = utils._gen_byte(utils.DONT_CARE_VAL)*3
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(session_status) + \
-              utils._gen_byte(addl_status_qual) + addl_info_bytes
+            utils._gen_byte(counter) + utils._gen_byte(session_status) + \
+            utils._gen_byte(addl_status_qual) + addl_info_bytes
 
         return msg
 
@@ -1244,7 +1240,7 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
@@ -1264,8 +1260,8 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(address_ext) + \
-              utils._gen_4_byte_val(address)
+            utils._gen_byte(counter) + utils._gen_byte(address_ext) + \
+            utils._gen_4_byte_val(address)
 
         return msg
 
@@ -1292,8 +1288,8 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(return_len) + \
-              utils._gen_byte(data_type_qual) + utils._gen_byte(DONT_CARE_VAL)*3
+            utils._gen_byte(counter) + utils._gen_byte(return_len) + \
+            utils._gen_byte(data_type_qual) + utils._gen_byte(utils.DONT_CARE_VAL)*3
 
         return msg
 
@@ -1320,8 +1316,8 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(return_len) + \
-              utils._gen_byte(data_type_qual) + utils._gen_byte(DONT_CARE_VAL)*3
+            utils._gen_byte(counter) + utils._gen_byte(return_len) + \
+            utils._gen_byte(data_type_qual) + utils._gen_byte(utils.DONT_CARE_VAL)*3
 
         return msg
 
@@ -1346,8 +1342,8 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(daq_list_size) + \
-              utils._gen_byte(first_pid) + utils._gen_byte(DONT_CARE_VAL)*3
+            utils._gen_byte(counter) + utils._gen_byte(daq_list_size) + \
+            utils._gen_byte(first_pid) + utils._gen_byte(utils.DONT_CARE_VAL)*3
 
         return msg
 
@@ -1363,7 +1359,7 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
@@ -1382,7 +1378,7 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
@@ -1401,7 +1397,7 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg
 
@@ -1417,6 +1413,6 @@ class CCPFollower(object):
         '''
 
         msg = utils._gen_byte(CRM_START_VAL) + utils._gen_byte(return_code) + \
-              utils._gen_byte(counter) + utils._gen_byte(DONT_CARE_VAL)*5
+            utils._gen_byte(counter) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         return msg

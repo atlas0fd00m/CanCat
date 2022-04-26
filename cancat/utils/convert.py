@@ -91,8 +91,8 @@ def _import_pcap(filename):
     import scapy.utils
 
     msgs = []
-    can_pkts = [p for p in scapy.utils.rdpcap(filename) \
-            if scapy.layers.l2.CookedLinux in p and p.proto == 12]
+    can_pkts = [p for p in scapy.utils.rdpcap(filename)
+                if scapy.layers.l2.CookedLinux in p and p.proto == 12]
     for pkt in can_pkts:
         [arb_id, data_len] = struct.unpack_from('<LL', pkt.load)
 

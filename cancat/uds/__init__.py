@@ -3,7 +3,6 @@ from builtins import input
 
 import sys
 import time
-import cancat
 import struct
 import threading
 
@@ -85,76 +84,76 @@ ISO_14229_DIDS = {
 }
 
 NEG_RESP_CODES = {
-    0x10:'GeneralReject',
-    0x11:'ServiceNotSupported',
-    0x12:'SubFunctionNotSupported',
-    0x13:'IncorrectMesageLengthOrInvalidFormat',
-    0x14:'ResponseTooLong',
-    0x21:'BusyRepeatRequest',
-    0x22:'ConditionsNotCorrect',
-    0x24:'RequestSequenceError',
-    0x25:'NoResponseFromSubnetComponent',
-    0x26:'FailurePreventsExecutionOfRequestedAction',
-    0x31:'RequestOutOfRange',
-    0x33:'SecurityAccessDenied',
-    0x35:'InvalidKey',
-    0x36:'ExceedNumberOfAttempts',
-    0x37:'RequiredTimeDelayNotExpired',
-    0x70:'UploadDownloadNotAccepted',
-    0x71:'TransferDataSuspended',
-    0x72:'GeneralProgrammingFailure',
-    0x73:'WrongBlockSequenceCounter',
-    0x78:'RequestCorrectlyReceived-ResponsePending',
-    0x7e:'SubFunctionNotSupportedInActiveSession',
-    0x7f:'ServiceNotSupportedInActiveSession',
-    0x81:'RpmTooHigh',
-    0x82:'RpmTooLow',
-    0x83:'EngineIsRunning',
-    0x84:'EngineIsNotRunning',
-    0x85:'EngineRunTimeTooLow',
-    0x86:'TemperatureTooHigh',
-    0x87:'TemperatureTooLow',
-    0x88:'VehicleSpeedTooHigh',
-    0x89:'VehicleSpeedTooLow',
-    0x8a:'ThrottlePedalTooHigh',
-    0x8b:'ThrottlePedalTooLow',
-    0x8c:'TransmissionRangeNotInNeutral',
-    0x8d:'TransmissionRangeNotInGear',
-    0x8f:'BrakeSwitchsNotClosed',
-    0x90:'ShifterLeverNotInPark',
-    0x91:'TorqueConverterClutchLocked',
-    0x92:'VoltageTooHigh',
-    0x93:'VoltageTooLow',
+    0x10: 'GeneralReject',
+    0x11: 'ServiceNotSupported',
+    0x12: 'SubFunctionNotSupported',
+    0x13: 'IncorrectMesageLengthOrInvalidFormat',
+    0x14: 'ResponseTooLong',
+    0x21: 'BusyRepeatRequest',
+    0x22: 'ConditionsNotCorrect',
+    0x24: 'RequestSequenceError',
+    0x25: 'NoResponseFromSubnetComponent',
+    0x26: 'FailurePreventsExecutionOfRequestedAction',
+    0x31: 'RequestOutOfRange',
+    0x33: 'SecurityAccessDenied',
+    0x35: 'InvalidKey',
+    0x36: 'ExceedNumberOfAttempts',
+    0x37: 'RequiredTimeDelayNotExpired',
+    0x70: 'UploadDownloadNotAccepted',
+    0x71: 'TransferDataSuspended',
+    0x72: 'GeneralProgrammingFailure',
+    0x73: 'WrongBlockSequenceCounter',
+    0x78: 'RequestCorrectlyReceived-ResponsePending',
+    0x7e: 'SubFunctionNotSupportedInActiveSession',
+    0x7f: 'ServiceNotSupportedInActiveSession',
+    0x81: 'RpmTooHigh',
+    0x82: 'RpmTooLow',
+    0x83: 'EngineIsRunning',
+    0x84: 'EngineIsNotRunning',
+    0x85: 'EngineRunTimeTooLow',
+    0x86: 'TemperatureTooHigh',
+    0x87: 'TemperatureTooLow',
+    0x88: 'VehicleSpeedTooHigh',
+    0x89: 'VehicleSpeedTooLow',
+    0x8a: 'ThrottlePedalTooHigh',
+    0x8b: 'ThrottlePedalTooLow',
+    0x8c: 'TransmissionRangeNotInNeutral',
+    0x8d: 'TransmissionRangeNotInGear',
+    0x8f: 'BrakeSwitchsNotClosed',
+    0x90: 'ShifterLeverNotInPark',
+    0x91: 'TorqueConverterClutchLocked',
+    0x92: 'VoltageTooHigh',
+    0x93: 'VoltageTooLow',
 }
 
-SVC_DIAGNOSTICS_SESSION_CONTROL =           0x10
-SVC_ECU_RESET =                             0x11
-SVC_CLEAR_DIAGNOSTICS_INFORMATION =         0x14
-SVC_READ_DTC_INFORMATION =                  0x19
-SVC_READ_DATA_BY_IDENTIFIER =               0x22
-SVC_READ_MEMORY_BY_ADDRESS =                0x23
-SVC_SECURITY_ACCESS =                       0x27
-SVC_READ_DATA_BY_PERIODIC_IDENTIFIER =      0x2a
-SVC_DYNAMICALLY_DEFINE_DATA_IDENTIFIER =    0x2c
-SVC_WRITE_DATA_BY_IDENTIFIER =              0x2e
-SVC_INPUT_OUTPUT_CONTROL_BY_IDENTIFIER =    0x2f
-SVC_ROUTINE_CONTROL =                       0x31
-SVC_REQUEST_DOWNLOAD =                      0x34
-SVC_REQUEST_UPLOAD =                        0x35
-SVC_TRANSFER_DATA =                         0x36
-SVC_REQUEST_TRANSFER_EXIT =                 0x37
-SVC_WRITE_MEMORY_BY_ADDRESS =               0x3d
-SVC_TESTER_PRESENT =                        0x3e
-SVC_NEGATIVE_RESPONSE =                     0x7f
-SVC_CONTROL_DTC_SETTING =                   0x85
+SVC_DIAGNOSTICS_SESSION_CONTROL = 0x10
+SVC_ECU_RESET = 0x11
+SVC_CLEAR_DIAGNOSTICS_INFORMATION = 0x14
+SVC_READ_DTC_INFORMATION = 0x19
+SVC_READ_DATA_BY_IDENTIFIER = 0x22
+SVC_READ_MEMORY_BY_ADDRESS = 0x23
+SVC_SECURITY_ACCESS = 0x27
+SVC_READ_DATA_BY_PERIODIC_IDENTIFIER = 0x2a
+SVC_DYNAMICALLY_DEFINE_DATA_IDENTIFIER = 0x2c
+SVC_WRITE_DATA_BY_IDENTIFIER = 0x2e
+SVC_INPUT_OUTPUT_CONTROL_BY_IDENTIFIER = 0x2f
+SVC_ROUTINE_CONTROL = 0x31
+SVC_REQUEST_DOWNLOAD = 0x34
+SVC_REQUEST_UPLOAD = 0x35
+SVC_TRANSFER_DATA = 0x36
+SVC_REQUEST_TRANSFER_EXIT = 0x37
+SVC_WRITE_MEMORY_BY_ADDRESS = 0x3d
+SVC_TESTER_PRESENT = 0x3e
+SVC_NEGATIVE_RESPONSE = 0x7f
+SVC_CONTROL_DTC_SETTING = 0x85
 
-UDS_SVCS = { v:k for k,v in globals().items() if k.startswith('SVC_') }
+UDS_SVCS = {v: k for k, v in globals().items() if k.startswith('SVC_')}
 
-POS_RESP_CODES = { (k|0x40) : "OK_" + v.lower() for k,v in UDS_SVCS.items() }
+POS_RESP_CODES = {(k | 0x40): "OK_" + v.lower() for k, v in UDS_SVCS.items()}
 POS_RESP_CODES[0] = 'Success'
 
 NEG_RESP_REPR = {}
-for k,v in NEG_RESP_CODES.items():
+for k, v in NEG_RESP_CODES.items():
     NEG_RESP_REPR[k] = 'ERR_' + v
 
 RESP_CODES = {}
@@ -187,8 +186,8 @@ class UDS(object):
         self.extflag = extflag
         self.timeout = timeout
 
-        if rx_arbid == None:
-            rx_arbid = tx_arbid + 8 # by UDS spec
+        if rx_arbid is None:
+            rx_arbid = tx_arbid + 8  # by UDS spec
 
         self.tx_arbid = tx_arbid
         self.rx_arbid = rx_arbid
@@ -197,7 +196,7 @@ class UDS(object):
         msg, idx = self.c.ISOTPxmit_recv(self.tx_arbid, self.rx_arbid, data, extflag, self.timeout, count, service)
 
         # check if the response is something we know about and can help out
-        if msg != None and len(msg):
+        if msg is not None and len(msg):
             svc = data[0]
             svc_resp = msg[0]
             errcode = 0
@@ -209,25 +208,25 @@ class UDS(object):
                     print("Positive Response!")
 
             negresprepr = NEG_RESP_CODES.get(errcode)
-            if negresprepr != None and svc_resp != svc + 0x40:
+            if negresprepr is not None and svc_resp != svc + 0x40:
                 if self.verbose > 1:
                     print(negresprepr + "\n")
                 # TODO: Implement getting final message if ResponseCorrectlyReceivedResponsePending is received
-                if errcode != 0x78: # Don't throw an exception for ResponseCorrectlyReceivedResponsePending
+                if errcode != 0x78:  # Don't throw an exception for ResponseCorrectlyReceivedResponsePending
                     raise NegativeResponseException(errcode, svc, msg)
                 else:
                     # Try again but increment the start index
-                    msg, idx = self.c._isotp_get_msg(self.rx_arbid, start_index = idx+1, service = service, timeout = self.timeout)
+                    msg, idx = self.c._isotp_get_msg(self.rx_arbid, start_index=idx + 1, service=service, timeout=self.timeout)
 
         return msg
 
     def _do_Function(self, func, data=None, subfunc=None, service=None):
-        if subfunc != None:
+        if subfunc is not None:
             omsg = struct.pack('>BB', func, subfunc)
         else:
             omsg = struct.pack('>B', func)
 
-        if data != None:
+        if data is not None:
             omsg += data
 
         msg = self.xmit_recv(omsg, extflag=self.extflag, service=service)
@@ -243,8 +242,8 @@ class UDS(object):
 
     def StartTesterPresent(self, request_response=True):
         self.TesterPresent = True
-        self.TesterPresentRequestsResponse=request_response
-        self.t = threading.Thread(target = self.SendTesterPresent)
+        self.TesterPresentRequestsResponse = request_response
+        self.t = threading.Thread(target=self.SendTesterPresent)
         self.t.setDaemon(True)
         self.t.start()
 
@@ -258,13 +257,12 @@ class UDS(object):
             self.t = None
 
     def DiagnosticSessionControl(self, session):
-        currIdx = self.c.getCanMsgCount()
-        return self._do_Function(SVC_DIAGNOSTICS_SESSION_CONTROL, data=struct.pack('>B', session), service=0x50)
+        data = struct.pack('>B', session)
+        return self._do_Function(SVC_DIAGNOSTICS_SESSION_CONTROL, data=data, service=0x50)
 
     def ReadMemoryByAddress(self, address, size):
-        currIdx = self.c.getCanMsgCount()
-        return self._do_Function(SVC_READ_MEMORY_BY_ADDRESS, subfunc=0x24, data=struct.pack(">IH", address, size), service = 0x63)
-        #return self.xmit_recv("\x23\x24" + struct.pack(">I", address) + struct.pack(">H", size), service = 0x63)
+        data = struct.pack(">IH", address, size)
+        return self._do_Function(SVC_READ_MEMORY_BY_ADDRESS, subfunc=0x24, data=data, service=0x63)
 
     def ReadDID(self, did):
         '''
@@ -273,7 +271,6 @@ class UDS(object):
         Returns: The response ISO-TP message as a string
         '''
         msg = self._do_Function(SVC_READ_DATA_BY_IDENTIFIER, struct.pack('>H', did), service=0x62)
-        #msg = self.xmit_recv("22".decode('hex') + struct.pack('>H', did), service=0x62)
         return msg
 
     def WriteDID(self, did, data):
@@ -282,30 +279,30 @@ class UDS(object):
 
         Returns: The response ISO-TP message as a string
         '''
-        msg = self._do_Function(SVC_WRITE_DATA_BY_IDENTIFIER,struct.pack('>H', did) + data, service=0x62)
-        #msg = self.xmit_recv("22".decode('hex') + struct.pack('>H', did), service=0x62)
+        msg = self._do_Function(SVC_WRITE_DATA_BY_IDENTIFIER, struct.pack('>H', did) + data, service=0x62)
         return msg
 
-    def RequestDownload(self, addr, data, data_format = 0x00, addr_format = 0x44):
+    def RequestDownload(self, addr, data, data_format=0x00, addr_format=0x44):
         '''
         Assumes correct Diagnostics Session and SecurityAccess
         '''
         # Figure out the right address and data length formats
-        pack_fmt_str = ">BB"
+        pack_fmt_str = "BB"
         try:
-            pack_fmt_str += {1:"B", 2:"H", 4:"I"}.get(addr_format >> 4) + {1:"B", 2:"H", 4:"I"}.get(addr_format & 0xf)
+            pack_fmt_str += {1: "B", 2: "H", 4: "I"}.get(addr_format >> 4) + {1: "B", 2: "H", 4: "I"}.get(addr_format & 0xf)
         except TypeError:
             print("Cannot parse addressAndLengthFormatIdentifier", hex(addr_format))
             return None
-        msg = self.xmit_recv(b"\x34" + struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data)), extflag=self.extflag, service = 0x74)
+        alf = struct.pack(pack_fmt_str, data_format, addr_format, addr, len(data))
+        msg = self.xmit_recv(b"\x34" + alf, extflag=self.extflag, service=0x74)
 
         # Parse the response
         if msg[0] != 0x74:
             print("Error received: {}".format(msg.encode('hex')))
             return msg
-        max_txfr_num_bytes = msg[1] >> 4 # number of bytes in the max tranfer length parameter
+        max_txfr_num_bytes = msg[1] >> 4  # number of bytes in the max tranfer length parameter
         max_txfr_len = 0
-        for i in range(2,2+max_txfr_num_bytes):
+        for i in range(2, 2 + max_txfr_num_bytes):
             max_txfr_len <<= 8
             max_txfr_len += msg[i]
 
@@ -313,7 +310,8 @@ class UDS(object):
         data_idx = 0
         block_idx = 1
         while data_idx < len(data):
-            msg = self.xmit_recv(b"\x36" + struct.pack('>B', block_idx) + data[data_idx:data_idx+max_txfr_len-2], extflag=self.extflag, service = 0x76)
+            data_chunk = struct.pack('>B', block_idx) + data[data_idx:data_idx + max_txfr_len - 2]
+            msg = self.xmit_recv(b"\x36" + data_chunk, extflag=self.extflag, service=0x76)
             data_idx += max_txfr_len - 2
             block_idx += 1
             if block_idx > 0xff:
@@ -333,7 +331,7 @@ class UDS(object):
             # TODO: need to figure out how to get 2nd isotp message to verify that this worked
 
         # Send RequestTransferExit
-        self._do_Function(SVC_REQUEST_TRANSFER_EXIT, service = 0x77)
+        self._do_Function(SVC_REQUEST_TRANSFER_EXIT, service=0x77)
 
     def readMemoryByAddress(self, address, length, lenlen=1, addrlen=4):
         '''
@@ -346,7 +344,8 @@ class UDS(object):
 
         lenlenbyte = (lenlen << 4) | addrlen
 
-        msg = self._do_Function(SVC_READ_MEMORY_BY_ADDRESS, data=struct.pack('<BI' + lfmt, lenlenbyte, address, length), service=0x63)
+        data = struct.pack('<BI' + lfmt, lenlenbyte, address, length)
+        msg = self._do_Function(SVC_READ_MEMORY_BY_ADDRESS, data=data, service=0x63)
 
         return msg
 
@@ -362,19 +361,24 @@ class UDS(object):
         lenlenbyte = (lenlen << 4) | addrlen
 
         data = struct.pack('<BI' + lfmt, lenlenbyte, address, lenlenbyte)
-        #data = "3d".decode('hex') + struct.pack('<BI' + lfmt, lenlenbyte, address, length)
 
         msg = self._do_Function(SVC_WRITE_MEMORY_BY_ADDRESS, data=data, service=0x63)
-        #msg = self.xmit_recv(data, service=0x63)
 
         return msg
 
-
-    def RequestUpload(self, addr, length, data_format = 0x00, addr_format = 0x44):
+    def RequestUpload(self, addr, length, data_format=0x00, addr_format=0x44):
         '''
         Work in progress!
         '''
-        msg = self._do_Function(SVC_REQUEST_UPLOAD, subfunc=data_format, data = chr(addr_format) + struct.pack('>I', addr)[1:] +  struct.pack('>I', length)[1:])
+        # Figure out the right address and data length formats
+        pack_fmt_str = "BB"
+        try:
+            pack_fmt_str += {1: "B", 2: "H", 4: "I"}.get(addr_format >> 4) + {1: "B", 2: "H", 4: "I"}.get(addr_format & 0xf)
+        except TypeError:
+            print("Cannot parse addressAndLengthFormatIdentifier", hex(addr_format))
+            return None
+        alf = struct.pack(pack_fmt_str, data_format, addr_format, addr, length)
+        msg = self.xmit_recv(b"\x35" + alf, extflag=self.extflag, service=0x74)
 
         sid, lfmtid, maxnumblocks = struct.unpack('>BBH', msg[:4])
 
@@ -398,19 +402,25 @@ class UDS(object):
 
     def ClearDiagnosticInformation(self):
         pass
+
     def ReadDTCInfomation(self):
         pass
+
     def ReadDataByPeriodicIdentifier(self, pdid):
         pass
+
     def DynamicallyDefineDataIdentifier(self):
         pass
+
     def InputOutputControlByIdentifier(self, iodid):
         pass
 
     def TransferData(self, did):
         pass
+
     def RequestTransferExit(self):
         pass
+
     def ControlDTCSetting(self):
         pass
 
@@ -453,13 +463,12 @@ class UDS(object):
 
         return success
 
-
-    def SecurityAccess(self, level, secret = ""):
+    def SecurityAccess(self, level, secret=""):
         """Send and receive the UDS messages to switch SecurityAccess levels.
             @level = the SecurityAccess level to switch to
             @secret = a SecurityAccess algorithm specific secret used to generate the key
         """
-        msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service = 0x67)
+        msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service=0x67)
         if msg is None:
             return msg
         if msg[0] == 0x7f:
@@ -473,9 +482,8 @@ class UDS(object):
             else:
                 key = bytes(self._key_from_seed(seed, secret))
 
-            msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level+1, data=key, service = 0x67)
+            msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level + 1, data=key, service=0x67)
             return msg
-
 
     def _key_from_seed(self, seed, secret):
         """Generates the key for a specific SecurityAccess seed request.
@@ -489,8 +497,8 @@ class UDS(object):
 
 
 def printUDSSession(c, tx_arbid, rx_arbid=None, paginate=45):
-    if rx_arbid == None:
-        rx_arbid = tx_arbid + 8 # by UDS spec
+    if rx_arbid is None:
+        rx_arbid = tx_arbid + 8  # by UDS spec
 
     msgs = [msg for msg in c.genCanMsgs(arbids=[tx_arbid, rx_arbid])]
 
@@ -499,15 +507,14 @@ def printUDSSession(c, tx_arbid, rx_arbid=None, paginate=45):
     linect = 1
     while msgs_idx < len(msgs):
         arbid, isotpmsg, count = cisotp.msg_decode(msgs, msgs_idx)
-        #print("Message: (%s:%s) \t %s" % (count, msgs_idx, isotpmsg.encode('hex')))
         svc = isotpmsg[0]
-        mtype = (RESP_CODES, UDS_SVCS)[arbid==tx_arbid].get(svc, '')
+        mtype = (RESP_CODES, UDS_SVCS)[arbid == tx_arbid].get(svc, '')
 
         print("Message: (%s:%s) \t %-30s %s" % (count, msgs_idx, isotpmsg.encode('hex'), mtype))
         msgs_idx += count
 
         if paginate:
-            if (linect % paginate)==0:
+            if linect % paginate == 0:
                 input("%x)  PRESS ENTER" % linect)
 
         linect += 1

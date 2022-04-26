@@ -64,12 +64,14 @@ class SecurityAccessKeyRange(SparseHexRange):
         # The auth levels alternate
         return super(SecurityAccessKeyRange, cls).__new__(cls, val, 2)
 
+
 class PayloadLength(SparseHexRange):
     def __new__(cls, val):
         # Ensure that values are <= than 0xFFF (4095)
         if any(int(n, 16) > 0xFFF for n in re.findall(r'[A-Za-z0-9]+', val)):
             raise ValueError('range {} exceeds max payload length of 0xFFF'.format(val))
         return super(PayloadLength, cls).__new__(cls, val)
+
 
 class OneOrMoreOf(argparse.Action):
     def __init__(self, option_strings, dest, choices, nargs, **kwargs):
@@ -110,6 +112,7 @@ def _get_baud_options():
     bauds = [b[4:-3] for b in dir(cancat) if b.startswith('CAN_') and b.endswith('BPS')]
     return bauds
 
+
 def _get_baud_value(baud):
     ret = getattr(cancat, "CAN_{}BPS".format(baud))
     return ret
@@ -125,71 +128,70 @@ def udsmap_parse_args():
             prog='udsmap',
             description='CAN bus network mapping tool')
     parser.add_argument('-s', '--scan', required=True,
-            #choices='EDWSAL', nargs='+', action=OneOrMoreOf,
-            #help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (W) write DIDs, (S) diagnostic Sessions, (A) seed/key Authentication levels, (L) authentication key Length')
-            # re-enable only after security access levels and key length scanning has been tested
-            #choices='EDSAL', nargs='+', action=OneOrMoreOf,
-            #help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (S) diagnostic Sessions, (A) security Authentication levels, (L) authentication key Length')
-            choices='EDS', nargs='+', action=OneOrMoreOf,
-            help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (S) diagnostic Sessions')
+                        # choices='EDWSAL', nargs='+', action=OneOrMoreOf,
+                        # help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (W) write DIDs, (S) diagnostic Sessions, (A) seed/key Authentication levels, (L) authentication key Length')  # noqa: E501
+                        choices='EDS', nargs='+', action=OneOrMoreOf,
+                        help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (S) diagnostic Sessions')
     parser.add_argument('-p', '--port', default='/dev/ttyACM0',
-            help='System device to use to communicate to the CanCat hardware (/dev/ttyACM0)')
+                        help='System device to use to communicate to the CanCat hardware (/dev/ttyACM0)')
     parser.add_argument('-b', '--baud',
-            choices=_get_baud_options(), default='AUTO',
-            help='Set the CAN Bus Speed')
+                        choices=_get_baud_options(), default='AUTO',
+                        help='Set the CAN Bus Speed')
     parser.add_argument('-t', '--discovery-type',
-            choices=['did', 'session'], default='did',
-            help='ECU discovery method: attempt to read a DID (F190), or enter diagnostic session 2')
+                        choices=['did', 'session'], default='did',
+                        help='ECU discovery method: attempt to read a DID (F190), or enter diagnostic session 2')
     parser.add_argument('-m', '--bus-mode',
-            choices=['std', 'ext', 'both'], default='both',
-            help='Bus mode, only run standard 11-bit ECU discovery, extended 29-bit discovery or both - in the default "both" mode a standard 11-bit scan is run and then an exgtended 29-bit scan')
+                        choices=['std', 'ext', 'both'], default='both',
+                        help='Bus mode, only run standard 11-bit ECU discovery, extended 29-bit discovery or both - in the default "both" mode a standard 11-bit scan is run and then an exgtended 29-bit scan')  # noqa: E501
     parser.add_argument('-n', '--no-recursive-session-scanning', action='store_true',
-            help='Disable recursive session scanning')
+                        help='Disable recursive session scanning')
     parser.add_argument('-E', metavar='<ECU Range>',
-            type=ECURange, default='00-FF',
-            help='ECU address range to search')
+                        type=ECURange, default='00-FF',
+                        help='ECU address range to search')
     parser.add_argument('-D', metavar='<DID Read Range>',
-            type=DIDRange, default='F180-F18E,F190-F1FF',
-            help='DID range to search, by default restricted to the ISO14229 specified DIDs (F180-F18E,F190-F1FF), large DID ranges may take a long time')
+                        type=DIDRange, default='F180-F18E,F190-F1FF',
+                        help='DID range to search, by default restricted to the ISO14229 specified DIDs (F180-F18E,F190-F1FF), large DID ranges may take a long time')  # noqa: E501
     parser.add_argument('-S', metavar='<Diagnostic Session Range>',
-            type=DiagnosticSessionRange, default='02-7F',
-            help='Diagnostic Sessions to search for')
-    #parser.add_argument('-A', metavar='<Security Access Key Range>',
-    #        type=SecurityAccessKeyRange, default='01-41,61-7D',
-    #        help='Security Access Key range to test, by default Security Sessions 43-60 are not tested, those values are used for end-of-life airbag deployment and may cause damage.')
+                        type=DiagnosticSessionRange, default='02-7F',
+                        help='Diagnostic Sessions to search for')
+    # parser.add_argument('-A', metavar='<Security Access Key Range>',
+    #                   type=SecurityAccessKeyRange, default='01-41,61-7D',
+    #                   help='Security Access Key range to test, by default Security Sessions 43-60 are not tested, those values are used for end-of-life airbag deployment and may cause damage.')  # noqa: E501
 
     # According to ISO 14229 there is no upper bound on the size of the key
     # (that I could see) aside from the constraints of the ISO-TP protocol
     # itself. But for sanity's sake the default will be to stop trying when we
     # reach 32 bytes.
-    #parser.add_argument('-L', metavar='<Key Length Range>',
-    #        type=PayloadLength, default='01-20',
-    #        help='Key Length range to test')
+    # parser.add_argument('-L', metavar='<Key Length Range>',
+    #                   type=PayloadLength, default='01-20',
+    #                   help='Key Length range to test')
 
     parser.add_argument('-T', '--timeout', type=float, default=0.2,
-            help='UDS Timeout, 3 seconds is the ISO14229 standard, standard for this tool is 200 msec (0.2)')
+                        help='UDS Timeout, 3 seconds is the ISO14229 standard, standard for this tool is 200 msec (0.2)')
     parser.add_argument('-w', '--startup-wait', type=float, nargs='?', const=2.0,
-            help='Wait to receive CAN messages before starting the scan')
+                        help='Wait to receive CAN messages before starting the scan')
     parser.add_argument('-d', '--scan-delay', type=float, default=0.0,
-            help='Wait a small time between requests, helps prevent flooding the bus')
+                        help='Wait a small time between requests, helps prevent flooding the bus')
     parser.add_argument('-r', '--rescan', action='store_true',
-            help='Run a full rescan and merge new results with any existing data')
-    #parser.add_argument('-f', '--force', action='store_true',
-    #        help='Force udsmap to scan with potentially harmful options')
-    #parser.add_argument('-y', '--yes', action='store_true',
-    #        help='Automatically answer "yes" to any questions the tool asks')
+                        help='Run a full rescan and merge new results with any existing data')
+    # parser.add_argument('-f', '--force', action='store_true',
+    #                   help='Force udsmap to scan with potentially harmful
+    #                   options')
+    # parser.add_argument('-y', '--yes', action='store_true',
+    #                   help='Automatically answer "yes" to any questions the
+    #                   tool asks')
     parser.add_argument('-v', '--verbose', action='count',
-            help='Verbose logging, use -vv for extra verbosity')
+                        help='Verbose logging, use -vv for extra verbosity')
     parser.add_argument('-l', '--log-file', nargs='?', const='canmap_%Y%m%d-%H%M%S.log',
-            help='Log filename to write to, log filename can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.log"')
+                        help='Log filename to write to, log filename can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.log"')  # noqa: E501
     parser.add_argument('-o', '--output-file', nargs='?', const='canmap_%Y%m%d-%H%M%S.yml',
-            help='Scan results output filename, can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.yml"')
+                        help='Scan results output filename, can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.yml"')  # noqa: E501
     parser.add_argument('-c', '--can-session-file', nargs='?', const='canmap_%Y%m%d-%H%M%S.sess',
-            help='Filename for saving raw cancat session, can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.sess"')
+                        help='Filename for saving raw cancat session, can contain "time.strftime" formatting like "canmap_%%Y%%m%%d-%%H%%M%%S.sess"')  # noqa: E501
     parser.add_argument('-i', '--input-file',
-            help='Input file containing previous scan results')
+                        help='Input file containing previous scan results')
     parser.add_argument('-u', '--uds-class',
-            help='Custom UDS class, allows for implementing key/seed unlock functions or testing, example: cancat.uds.test.TestUDS')
+                        help='Custom UDS class, allows for implementing key/seed unlock functions or testing, example: cancat.uds.test.TestUDS')  # noqa: E501
     return parser.parse_args()
 
 
@@ -234,7 +236,7 @@ def import_results(args, c, scancls):
         for e in imported_data['ECUs']:
             addr = ECUAddress(**e)
             config['ECUs'][addr] = ECU(c, addr, uds_class=scancls,
-                    timeout=config['config']['timeout'], delay=args.scan_delay, **e)
+                                       timeout=config['config']['timeout'], delay=args.scan_delay, **e)
         return config
 
 
@@ -243,10 +245,12 @@ def save_results(results, filename=None):
         import yaml
 
         try:
-            class literal_unicode(unicode): pass
+            class literal_unicode(unicode):
+                pass
         except NameError:
             # in python3 just use "str"
-            class literal_unicode(str): pass
+            class literal_unicode(str):
+                pass
 
         def literal_unicode_representer(dumper, data):
             return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
@@ -290,6 +294,7 @@ def save_results(results, filename=None):
         with open(filename, 'w') as f:
             f.write(yaml.dump(output_data))
 
+
 def save():
     global _config, _output_filename, _can_session_filename
     if _output_filename:
@@ -311,7 +316,7 @@ def sigint_handler(signum, frame):
     save_and_exit(1)
 
 
-def scan(config, args, c, scancls):
+def scan(config, args, c, scancls):  # noqa: C901
     if 'E' in args.scan:
         log_and_save(_config, 'ECU scan started @ {}'.format(config['start_time']))
 
@@ -320,21 +325,21 @@ def scan(config, args, c, scancls):
             if args.discovery_type == 'did':
                 if args.bus_mode in ['std', 'both']:
                     ecus.extend(ecu_did_scan(c, args.E, ext=0, udscls=scancls,
-                        timeout=config['config']['timeout'], delay=args.scan_delay))
+                                             timeout=config['config']['timeout'], delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
                     ecus.extend(ecu_did_scan(c, args.E, ext=1, udscls=scancls,
-                        timeout=config['config']['timeout'], delay=args.scan_delay))
+                                             timeout=config['config']['timeout'], delay=args.scan_delay))
             else:
                 if args.bus_mode in ['std', 'both']:
                     ecus.extend(ecu_session_scan(c, args.E, ext=0, udscls=scancls,
-                        timeout=config['config']['timeout'], delay=args.scan_delay))
+                                                 timeout=config['config']['timeout'], delay=args.scan_delay))
                 if args.bus_mode in ['ext', 'both']:
                     ecus.extend(ecu_session_scan(c, args.E, ext=1, udscls=scancls,
-                        timeout=config['config']['timeout'], delay=args.scan_delay))
+                                                 timeout=config['config']['timeout'], delay=args.scan_delay))
 
             for addr in ecus:
                 _config['ECUs'][addr] = ECU(c, addr, uds_class=scancls,
-                        timeout=config['config']['timeout'], delay=args.scan_delay)
+                                            timeout=config['config']['timeout'], delay=args.scan_delay)
 
     if 'D' in args.scan:
         log_and_save(_config, 'DID read scan started @ {}'.format(now()))
@@ -342,7 +347,7 @@ def scan(config, args, c, scancls):
         for ecu in _config['ECUs'].values():
             ecu.did_read_scan(args.D, args.rescan)
 
-    #if 'W' in args.scan:
+    # if 'W' in args.scan:
     #    log_and_save(_config, 'DID write scan started @ {}'.format(now()))
     #
     #    for ecu in _config['ECUs'].values():
@@ -372,12 +377,12 @@ def scan(config, args, c, scancls):
             ecu.key_length_scan(args.L, args.rescan)
 
 
-def main():
+def main():  # noqa: C901
     args = udsmap_parse_args()
 
     # TODO: move this to it's own class in cancat.utils, the config/args global
     #       data thing will be better handled that way
-    #cancat.utils.canmap(args)
+    # cancat.utils.canmap(args)
 
     if args.verbose == 1:
         loglevel = log.DEBUG
@@ -404,7 +409,7 @@ def main():
     #                   worst case with both std & ext = (247 + 255) * 0.1 =
     #                   50 sec = ~ 1 minute
     #   - DID Scan:
-    #log.warning('ECU scan {} may take up to 25 minutes to complete'.format(args.E))
+    # log.warning('ECU scan {} may take up to 25 minutes to complete'.format(args.E))
 
     global c
 
