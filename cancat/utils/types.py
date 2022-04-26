@@ -10,12 +10,14 @@ try:
 except NameError:
     _range_func = range
 
+
 def _dec_range(val, increment=1):
     parts = re.split(r'-', val)
     if len(parts) == 1:
         return int(parts[0])
     else:
         return _range_func(int(parts[0]), int(parts[1]) + 1, increment)
+
 
 def _hex_range(val, increment=1):
     parts = re.split(r'-', val)
@@ -64,7 +66,7 @@ class SparseHexRange(SparseRange):
 
 
 class ECUAddress(object):
-    # Add the kwargs param so we can construct an ECUAddress out of a dictionary 
+    # Add the kwargs param so we can construct an ECUAddress out of a dictionary
     # that has extra stuff in it
     def __init__(self, tx_arbid, rx_arbid, extflag, *args, **kwargs):
         self.tx_arbid = tx_arbid
@@ -75,7 +77,7 @@ class ECUAddress(object):
         return hash((self.tx_arbid, self.rx_arbid, self.extflag))
 
     def __repr__(self):
-        return 'ECU({}, {}, {})'.format( hex(self.tx_arbid), hex(self.rx_arbid), self.extflag)
+        return 'ECU({}, {}, {})'.format(hex(self.tx_arbid), hex(self.rx_arbid), self.extflag)
 
     def __iter__(self):
         return iter((self.tx_arbid, self.rx_arbid, self.extflag))

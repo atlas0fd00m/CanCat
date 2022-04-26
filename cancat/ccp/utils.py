@@ -55,30 +55,30 @@ COMMAND_CODES = {
     0x02: 'SET_MTA',
     0x03: 'DNLOAD',
     0x04: 'UPLOAD',
-    0x05: 'TEST', # optional
+    0x05: 'TEST',  # optional
     0x06: 'START_STOP',
     0x07: 'DISCONNECT',
-    0x08: 'START_STOP_ALL', # optional
-    0x09: 'GET_ACTIVE_CAL_PAGE', # optional
-    0x0C: 'SET_S_STATUS', # optional
-    0x0D: 'GET_S_STATUS', # optional
-    0x0E: 'BUILD_CHKSUM', # optional
-    0x0F: 'SHORT_UP', # optional
-    0x10: 'CLEAR_MEMORY', # optional
-    0x11: 'SELECT_CAL_PAGE', # optional
-    0x12: 'GET_SEED', # optional
-    0x13: 'UNLOCK', # optional
+    0x08: 'START_STOP_ALL',  # optional
+    0x09: 'GET_ACTIVE_CAL_PAGE',  # optional
+    0x0C: 'SET_S_STATUS',  # optional
+    0x0D: 'GET_S_STATUS',  # optional
+    0x0E: 'BUILD_CHKSUM',  # optional
+    0x0F: 'SHORT_UP',  # optional
+    0x10: 'CLEAR_MEMORY',  # optional
+    0x11: 'SELECT_CAL_PAGE',  # optional
+    0x12: 'GET_SEED',  # optional
+    0x13: 'UNLOCK',  # optional
     0x14: 'GET_DAQ_SIZE',
     0x15: 'SET_DAQ_PTR',
     0x16: 'WRITE_DAQ',
     0x17: 'EXCHANGE_ID',
-    0x18: 'PROGRAM', # optional
-    0x19: 'MOVE', # optional
+    0x18: 'PROGRAM',  # optional
+    0x19: 'MOVE',  # optional
     0x1B: 'GET_CCP_VERSION',
-    0x20: 'DIAG_SERVICE', # optional
-    0x21: 'ACTION_SERVICE', # optional
-    0x22: 'PROGRAM_6', # optional
-    0x23: 'DNLOAD_6', # optional
+    0x20: 'DIAG_SERVICE',  # optional
+    0x21: 'ACTION_SERVICE',  # optional
+    0x22: 'PROGRAM_6',  # optional
+    0x23: 'DNLOAD_6',  # optional
 }
 
 '''
@@ -113,8 +113,10 @@ the endianness shown in examples is implementation specific and not necessarily
 internally consistent across command types.
 '''
 
+
 def _gen_byte(value):
     return struct.pack('B', value)
+
 
 def _parse_byte(value):
     if isinstance(value, six.string_types):
@@ -125,10 +127,12 @@ def _parse_byte(value):
     else:
         return value
 
+
 def _gen_2_byte_val(value):
     # As noted elsewhere, CCP spec examples are not consistent between
     # little endian and big endian
     return struct.pack('<H', value)
+
 
 def _parse_2_byte_value(value):
     # All the CCP examples show 2 byte values -> little endian,
@@ -136,14 +140,18 @@ def _parse_2_byte_value(value):
     # Again, implementation specific.
     return hex(struct.unpack('<H', value)[0])
 
+
 def _parse_2_byte_value_motorola(value):
     return hex(struct.unpack('>H', value)[0])
+
 
 def _gen_4_byte_val(value):
     return struct.pack('>I', value)
 
+
 def _parse_4_byte_value(value):
     return hex(struct.unpack('>I', value)[0])
+
 
 def _parse_6_byte_value(value):
     if isinstance(value, six.string_types):
@@ -153,6 +161,7 @@ def _parse_6_byte_value(value):
             return '0x' + value.hex()
     else:
         return '0x' + value.hex()
+
 
 def _bytesHelper(msg):
     if isinstance(msg, six.string_types):

@@ -7,7 +7,7 @@ from cancat.utils import convert
 
 def main():
     argv = sys.argv[1:]
-                                                                                  
+
     parser = argparse.ArgumentParser(
             prog='candump2cancat',
             description='Utility to convert a candump log into a CanCat session')
