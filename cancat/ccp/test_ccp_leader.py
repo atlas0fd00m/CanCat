@@ -1,5 +1,5 @@
 import unittest
-from ccp_leader import CCPLeader, DTO_TYPE
+from .ccp_leader import CCPLeader, DTO_TYPE
 from . import utils
 
 

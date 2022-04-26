@@ -191,7 +191,7 @@ def udsmap_parse_args():
     parser.add_argument('-i', '--input-file',
                         help='Input file containing previous scan results')
     parser.add_argument('-u', '--uds-class',
-                        help='Custom UDS class, allows for implementing key/seed unlock functions or testing, example: cancat.uds.test.TestUDS')  # noqa: E501
+                        help='Custom UDS class, allows for implementing key/seed unlock functions or testing, example: cancat.uds.test.FakeUDS')  # noqa: E501
     return parser.parse_args()
 
 

@@ -1,5 +1,5 @@
 import unittest
-from ccp_follower import CCPFollower
+from .ccp_follower import CCPFollower
 from unittest.mock import MagicMock
 
 

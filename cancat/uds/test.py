@@ -33,7 +33,7 @@ class CanInterface(object):
         return []
 
 
-class TestUDS(ScanClass):
+class FakeUDS(ScanClass):
     DIDs = {
         0x711: {
             0x0042: '\x62\x00\x42ANSWER',
@@ -61,15 +61,15 @@ class TestUDS(ScanClass):
     }
 
     def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0, timeout=3.0):
-        super(TestUDS, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag, timeout=timeout)
+        super(FakeUDS, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag, timeout=timeout)
         self._session = 1
-        if self.tx_arbid in TestUDS.DIDs and not extflag:
-            self._dids = TestUDS.DIDs[self.tx_arbid]
+        if self.tx_arbid in FakeUDS.DIDs and not extflag:
+            self._dids = FakeUDS.DIDs[self.tx_arbid]
         else:
             self._dids = {}
 
-        if self.tx_arbid in TestUDS.SEEDs and not extflag:
-            self._sessions = TestUDS.SEEDs[self.tx_arbid]
+        if self.tx_arbid in FakeUDS.SEEDs and not extflag:
+            self._sessions = FakeUDS.SEEDs[self.tx_arbid]
         else:
             self._sessions = {}
 
