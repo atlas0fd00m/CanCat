@@ -1,12 +1,9 @@
 #!/usr/bin/env python
-import sys
 import time
 import cancat
 import struct
-import threading
-from utils import *
-import utils
-from vstruct.primitives import *
+from . import utils
+from cancat.vstruct.primitives import v_enum
 
 '''
     MESSAGE TYPES:
@@ -31,9 +28,10 @@ from vstruct.primitives import *
 COUNTER_VAL = 0x20
 
 DTO_TYPE = v_enum()
-DTO_TYPE.CRO_TYPE        = 0xFF
-DTO_TYPE.EVENT_TYPE      = 0xFE
-DTO_TYPE.DAQ_TYPE        = 0xFD
+DTO_TYPE.CRO_TYPE = 0xFF
+DTO_TYPE.EVENT_TYPE = 0xFE
+DTO_TYPE.DAQ_TYPE = 0xFD
+
 
 class CCPLeader(object):
     def __init__(self, c, tx_arbid=None, rx_arbid=None, verbose=True, extflag=0):
@@ -47,7 +45,6 @@ class CCPLeader(object):
     def _do_Function(self, msg, command_type, currIdx, timeout=1):
         self.c._send(cancat.CMD_CAN_SEND, msg)
 
-        found = False
         complete = False
         starttime = lasttime = time.time()
 
@@ -63,9 +60,9 @@ class CCPLeader(object):
                         if msg_type == DTO_TYPE.CRO_TYPE:
                             return self._parse_Command_Return_Message(msg, command_type)
                         elif msg_type == DTO_TYPE.EVENT_TYPE:
-                            return self._parse_EventMessage(CCP_message)
+                            return self._parse_EventMessage(msg)
                         elif msg_type == DTO_TYPE.DAQ_TYPE:
-                            return self._parse_DAQMessage(CCP_message)
+                            return self._parse_DAQMessage(msg)
                         else:
                             raise Exception("Error sorting message type")
 
@@ -107,9 +104,9 @@ class CCPLeader(object):
         '''
         station_address = utils._gen_2_byte_val(stat_addr)
 
-        data = station_address + utils._gen_byte(DONT_CARE_VAL)*4
+        data = station_address + utils._gen_byte(utils.DONT_CARE_VAL)*4
 
-        msg = self._constructCRO(CCP_CONNECT, counter, data)
+        msg = self._constructCRO(utils.CCP_CONNECT, counter, data)
 
         return msg
 
@@ -136,12 +133,12 @@ class CCPLeader(object):
                 raise Exception("Leader ID info cannot be longer than 6 bytes")
             else:
                 padding = 6 - leader_id_information
-                dont_care = utils._gen_byte(DONT_CARE_VAL)*padding
+                dont_care = utils._gen_byte(utils.DONT_CARE_VAL)*padding
                 data = leader_id_information + dont_care
         else:
-            data = utils._gen_byte(DONT_CARE_VAL)*6
+            data = utils._gen_byte(utils.DONT_CARE_VAL)*6
 
-        msg = self._constructCRO(CCP_EXCHANGE_ID, counter, data)
+        msg = self._constructCRO(utils.CCP_EXCHANGE_ID, counter, data)
 
         return msg
 
@@ -167,12 +164,12 @@ class CCPLeader(object):
         '''
 
         if mta_number != 0 and mta_number != 1:
-            raise Exception("Invalid mta_number.  Must be either 1 for MTA1 " \
-            "(MOVE) or 1 for MTA0 (all other read/write commands)")
+            raise Exception("Invalid mta_number.  Must be either 1 for MTA1 "
+                            "(MOVE) or 1 for MTA0 (all other read/write commands)")
 
         data = utils._gen_byte(mta_number) + utils._gen_byte(address_extension) + utils._gen_4_byte_val(address)
 
-        msg = self._constructCRO(CCP_SET_MTA, counter, data)
+        msg = self._constructCRO(utils.CCP_SET_MTA, counter, data)
 
         return msg
 
@@ -199,11 +196,11 @@ class CCPLeader(object):
 
         if data_block_size < 5:
             padding = 5 - data_block_size
-            dont_care = utils._gen_byte(DONT_CARE_VAL)*padding
+            dont_care = utils._gen_byte(utils.DONT_CARE_VAL)*padding
 
         data = utils._gen_byte(data_block_size) + utils._gen_4_byte_val(data_to_download) + dont_care
 
-        msg = self._constructCRO(CCP_DNLOAD, counter, data)
+        msg = self._constructCRO(utils.CCP_DNLOAD, counter, data)
 
         return msg
 
@@ -231,9 +228,9 @@ class CCPLeader(object):
         if data_block_size > 5:
             raise Exception("Cannot upload data block larger than 5")
 
-        data = utils._gen_byte(data_block_size) + utils._gen_byte(DONT_CARE_VAL)*5
+        data = utils._gen_byte(data_block_size) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
-        msg = self._constructCRO(CCP_UPLOAD, counter, data)
+        msg = self._constructCRO(utils.CCP_UPLOAD, counter, data)
 
         return msg
 
@@ -259,12 +256,12 @@ class CCPLeader(object):
 
         station_address = utils._gen_2_byte_val(stat_addr)
 
-        dont_care = utils._gen_byte(DONT_CARE_VAL)
+        dont_care = utils._gen_byte(utils.DONT_CARE_VAL)
 
-        data = utils._gen_byte(disconnect_type) + dont_care \
-               + station_address + dont_care*2
+        data = utils._gen_byte(disconnect_type) + dont_care + \
+            station_address + dont_care*2
 
-        msg = self._constructCRO(CCP_DISCONNECT, counter, data)
+        msg = self._constructCRO(utils.CCP_DISCONNECT, counter, data)
 
         return msg
 
@@ -293,11 +290,11 @@ class CCPLeader(object):
 
         if data_block_size < 5:
             padding = 5 - data_block_size
-            dont_care = utils._gen_byte(DONT_CARE_VAL)*padding
+            dont_care = utils._gen_byte(utils.DONT_CARE_VAL)*padding
 
         data = utils._gen_byte(data_block_size) + utils._gen_4_byte_val(data_to_program) + dont_care
 
-        msg = self._constructCRO(CCP_PROGRAM, counter, data)
+        msg = self._constructCRO(utils.CCP_PROGRAM, counter, data)
 
         return msg
 
@@ -321,11 +318,11 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
 
-        dont_care = utils._gen_byte(DONT_CARE_VAL)*2
+        dont_care = utils._gen_byte(utils.DONT_CARE_VAL)*2
 
         data = utils._gen_4_byte_val(data_block_size) + dont_care
 
-        msg = self._constructCRO(CCP_MOVE, counter, data)
+        msg = self._constructCRO(utils.CCP_MOVE, counter, data)
 
         return msg
 
@@ -348,11 +345,11 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
 
-        dont_care = utils._gen_byte(DONT_CARE_VAL)*2
+        dont_care = utils._gen_byte(utils.DONT_CARE_VAL)*2
 
         data = utils._gen_4_byte_val(data_block_size) + dont_care
 
-        msg = self._constructCRO(CCP_CLEAR_MEMORY, counter, data)
+        msg = self._constructCRO(utils.CCP_CLEAR_MEMORY, counter, data)
 
         return msg
 
@@ -375,11 +372,11 @@ class CCPLeader(object):
 
         station_address = utils._gen_2_byte_val(stat_addr)
 
-        dont_care = utils._gen_byte(DONT_CARE_VAL)*4
+        dont_care = utils._gen_byte(utils.DONT_CARE_VAL)*4
 
         data = station_address + dont_care
 
-        msg = self._constructCRO(CCP_TEST, counter, data)
+        msg = self._constructCRO(utils.CCP_TEST, counter, data)
 
         return msg
 
@@ -406,11 +403,11 @@ class CCPLeader(object):
 
         min_version = utils._gen_byte(minor_version)
 
-        dont_care = utils._gen_byte(DONT_CARE_VAL)*4
+        dont_care = utils._gen_byte(utils.DONT_CARE_VAL)*4
 
         data = maj_version + min_version + dont_care
 
-        msg = self._constructCRO(CCP_GET_CCP_VERSION, counter, data)
+        msg = self._constructCRO(utils.CCP_GET_CCP_VERSION, counter, data)
 
         return msg
 
@@ -444,13 +441,13 @@ class CCPLeader(object):
 
         '''
 
-        dont_care = utils._gen_byte(DONT_CARE_VAL)*5
+        dont_care = utils._gen_byte(utils.DONT_CARE_VAL)*5
 
         resource = utils._gen_byte(requested_resource)
 
         data = resource + dont_care
 
-        msg = self._constructCRO(CCP_GET_SEED, counter, data)
+        msg = self._constructCRO(utils.CCP_GET_SEED, counter, data)
 
         return msg
 
@@ -476,11 +473,11 @@ class CCPLeader(object):
 
         if len(key) <= 6:
             padding = 6 - len(key)
-            dont_care = utils._gen_byte(DONT_CARE_VAL)*padding
+            dont_care = utils._gen_byte(utils.DONT_CARE_VAL)*padding
 
         data = utils._bytesHelper(key) + dont_care
 
-        msg = self._constructCRO(CCP_UNLOCK, counter, data)
+        msg = self._constructCRO(utils.CCP_UNLOCK, counter, data)
 
         return msg
 
@@ -500,11 +497,11 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
 
-        dont_care = utils._gen_byte(DONT_CARE_VAL)*2
+        dont_care = utils._gen_byte(utils.DONT_CARE_VAL)*2
 
         data = utils._gen_4_byte_val(data_block_size) + dont_care
 
-        msg = self._constructCRO(CCP_BUILD_CHKSUM, counter, data)
+        msg = self._constructCRO(utils.CCP_BUILD_CHKSUM, counter, data)
 
         return msg
 
@@ -531,7 +528,7 @@ class CCPLeader(object):
 
         data = utils._gen_byte(data_block_size) + utils._gen_byte(address_extension) + utils._gen_4_byte_val(address)
 
-        msg = self._constructCRO(CCP_SHORT_UP, counter, data)
+        msg = self._constructCRO(utils.CCP_SHORT_UP, counter, data)
 
         return msg
 
@@ -544,9 +541,9 @@ class CCPLeader(object):
         |  2..7 |  bytes |  don't care                                   |
         +-------+--------+-----------------------------------------------+
         '''
-        data = utils._gen_byte(DONT_CARE_VAL)*6
+        data = utils._gen_byte(utils.DONT_CARE_VAL)*6
 
-        msg = self._constructCRO(CCP_GET_S_STATUS, counter, data)
+        msg = self._constructCRO(utils.CCP_GET_S_STATUS, counter, data)
 
         return msg
 
@@ -578,9 +575,9 @@ class CCPLeader(object):
         CAL:  Calibration data initialized
         '''
 
-        data = utils._gen_byte(session_status_mask) + utils._gen_byte(DONT_CARE_VAL)*5
+        data = utils._gen_byte(session_status_mask) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
-        msg = self._constructCRO(CCP_GET_S_STATUS, counter, data)
+        msg = self._constructCRO(utils.CCP_GET_S_STATUS, counter, data)
 
         return msg
 
@@ -594,9 +591,9 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
 
-        data = utils._gen_byte(DONT_CARE_VAL)*6
+        data = utils._gen_byte(utils.DONT_CARE_VAL)*6
 
-        msg = self._constructCRO(CCP_SELECT_CAL_PAGE, counter, data)
+        msg = self._constructCRO(utils.CCP_SELECT_CAL_PAGE, counter, data)
 
         return msg
 
@@ -610,9 +607,9 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
 
-        data = utils._gen_byte(DONT_CARE_VAL)*6
+        data = utils._gen_byte(utils.DONT_CARE_VAL)*6
 
-        msg = self._constructCRO(CCP_GET_ACTIVE_CAL_PAGE, counter, data)
+        msg = self._constructCRO(utils.CCP_GET_ACTIVE_CAL_PAGE, counter, data)
 
         return msg
 
@@ -633,9 +630,9 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
 
-        data = utils._gen_byte(diagnostic_service_num) + utils._gen_byte(DONT_CARE_VAL)*5
+        data = utils._gen_byte(diagnostic_service_num) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
-        msg = self._constructCRO(CCP_DIAG_SERVICE, counter, data)
+        msg = self._constructCRO(utils.CCP_DIAG_SERVICE, counter, data)
 
         return msg
 
@@ -656,9 +653,9 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
 
-        data = utils._gen_byte(action_service_num) + utils._gen_byte(parameters) + utils._gen_byte(DONT_CARE_VAL)*4
+        data = utils._gen_byte(action_service_num) + utils._gen_byte(parameters) + utils._gen_byte(utils.DONT_CARE_VAL)*4
 
-        msg = self._constructCRO(CCP_ACTION_SERVICE, counter, data)
+        msg = self._constructCRO(utils.CCP_ACTION_SERVICE, counter, data)
 
         return msg
 
@@ -677,10 +674,10 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
 
-        data = utils._gen_byte(daq_list_number) + utils._gen_byte(DONT_CARE_VAL) + \
-               utils._gen_4_byte_val(can_identifier)
+        data = utils._gen_byte(daq_list_number) + utils._gen_byte(utils.DONT_CARE_VAL) + \
+            utils._gen_4_byte_val(can_identifier)
 
-        msg = self._constructCRO(CCP_GET_DAQ_SIZE, counter, data)
+        msg = self._constructCRO(utils.CCP_GET_DAQ_SIZE, counter, data)
 
         return msg
 
@@ -701,9 +698,9 @@ class CCPLeader(object):
         '''
 
         data = utils._gen_byte(daq_list_number) + utils._gen_byte(odt_number) + \
-               utils._gen_byte(odt_element_number) + utils._gen_byte(DONT_CARE_VAL)*3 \
+            utils._gen_byte(odt_element_number) + utils._gen_byte(utils.DONT_CARE_VAL)*3 \
 
-        msg = self._constructCRO(CCP_SET_DAQ_PTR, counter, data)
+        msg = self._constructCRO(utils.CCP_SET_DAQ_PTR, counter, data)
 
         return msg
 
@@ -722,9 +719,9 @@ class CCPLeader(object):
         '''
 
         data = utils._gen_byte(daq_element_size) + utils._gen_byte(daq_element_addr_extension) + \
-               utils._gen_4_byte_val(daq_element_addr)
+            utils._gen_4_byte_val(daq_element_addr)
 
-        msg = self._constructCRO(CCP_WRITE_DAQ, counter, data)
+        msg = self._constructCRO(utils.CCP_WRITE_DAQ, counter, data)
 
         return msg
 
@@ -750,10 +747,10 @@ class CCPLeader(object):
         trans_rate_prescaler = struct.pack('>H', transmission_rate_prescaler)
 
         data = utils._gen_byte(mode) + utils._gen_byte(daq_list_number) + \
-               utils._gen_byte(last_odt_num) + utils._gen_byte(event_chan_num) + \
-               trans_rate_prescaler
+            utils._gen_byte(last_odt_num) + utils._gen_byte(event_chan_num) + \
+            trans_rate_prescaler
 
-        msg = self._constructCRO(CCP_START_STOP, counter, data)
+        msg = self._constructCRO(utils.CCP_START_STOP, counter, data)
 
         return msg
 
@@ -769,9 +766,9 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
 
-        data = utils._gen_byte(start_or_stop) + utils._gen_byte(DONT_CARE_VAL)*5
+        data = utils._gen_byte(start_or_stop) + utils._gen_byte(utils.DONT_CARE_VAL)*5
 
-        msg = self._constructCRO(CCP_START_STOP_ALL, counter, data)
+        msg = self._constructCRO(utils.CCP_START_STOP_ALL, counter, data)
 
         return msg
 
@@ -807,8 +804,7 @@ class CCPLeader(object):
         else:
             raise Exception("CCP message has invalid starting byte")
 
-
-    def _parse_Command_Return_Message(self, CCP_message, CCP_CRO_Type):
+    def _parse_Command_Return_Message(self, CCP_message, CCP_CRO_Type):  # noqa: C901
         '''
         Command Return Messages return data based on the command type originally
         sent to the follower device.
@@ -831,39 +827,39 @@ class CCPLeader(object):
         *There are other types, like EventMessage, but these are not supported yet.
         '''
 
-        if CCP_CRO_Type == CCP_CONNECT:
+        if CCP_CRO_Type == utils.CCP_CONNECT:
             parsed_msg = self._parse_connect_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_DISCONNECT:
+        elif CCP_CRO_Type == utils.CCP_DISCONNECT:
             parsed_msg = self._parse_disconnect_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_SET_MTA:
+        elif CCP_CRO_Type == utils.CCP_SET_MTA:
             parsed_msg = self._parse_setMTA_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_DNLOAD:
+        elif CCP_CRO_Type == utils.CCP_DNLOAD:
             parsed_msg = self._parse_dnload_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_UPLOAD:
+        elif CCP_CRO_Type == utils.CCP_UPLOAD:
             parsed_msg = self._parse_upload_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_SHORT_UP:
+        elif CCP_CRO_Type == utils.CCP_SHORT_UP:
             parsed_msg = self._parse_upload_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_CLEAR_MEMORY:
+        elif CCP_CRO_Type == utils.CCP_CLEAR_MEMORY:
             parsed_msg = self._parse_clear_memory_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_MOVE:
+        elif CCP_CRO_Type == utils.CCP_MOVE:
             parsed_msg = self._parse_move_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_TEST:
+        elif CCP_CRO_Type == utils.CCP_TEST:
             parsed_msg = self._parse_test_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_PROGRAM:
+        elif CCP_CRO_Type == utils.CCP_PROGRAM:
             parsed_msg = self._parse_program_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_EXCHANGE_ID:
+        elif CCP_CRO_Type == utils.CCP_EXCHANGE_ID:
             parsed_msg = self._parse_exchangeID_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_GET_CCP_VERSION:
+        elif CCP_CRO_Type == utils.CCP_GET_CCP_VERSION:
             parsed_msg = self._parse_ccp_version_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_GET_SEED:
+        elif CCP_CRO_Type == utils.CCP_GET_SEED:
             parsed_msg = self._parse_get_seed_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_BUILD_CHKSUM:
+        elif CCP_CRO_Type == utils.CCP_BUILD_CHKSUM:
             parsed_msg = self._parse_build_chksum_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_UNLOCK:
+        elif CCP_CRO_Type == utils.CCP_UNLOCK:
             parsed_msg = self._parse_unlock_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_SET_S_STATUS:
+        elif CCP_CRO_Type == utils.CCP_SET_S_STATUS:
             parsed_msg = self._parse_set_s_status_CRM(CCP_message)
-        elif CCP_CRO_Type == CCP_GET_S_STATUS:
+        elif CCP_CRO_Type == utils.CCP_GET_S_STATUS:
             parsed_msg = self._parse_get_s_status_CRM(CCP_message)
         else:
             raise Exception("Cannot parse message type ", CCP_CRO_Type)
@@ -931,7 +927,7 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         if crc_byte == 0x00:
@@ -958,7 +954,7 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         if crc_byte == 0x00:
@@ -987,7 +983,7 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         if crc_byte == 0x00:
@@ -1075,7 +1071,7 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         follower_deviceID_length = utils._parse_byte(CCP_message[3])
@@ -1083,13 +1079,14 @@ class CCPLeader(object):
         resource_availability_mask = utils._parse_byte(CCP_message[5])
         resource_protection_mask = utils._parse_byte(CCP_message[6])
 
-        return {'CRC': crc_tuple[0], \
-                'CTR': counter, \
-                'follower_deviceID_length': follower_deviceID_length, \
-                'follower_deviceID_data_type_qual': follower_deviceID_data_type_qual, \
-                'resource_availability_mask': resource_availability_mask, \
-                'resource_protection_mask': resource_protection_mask, \
-               }
+        return {
+            'CRC': crc_tuple[0],
+            'CTR': counter,
+            'follower_deviceID_length': follower_deviceID_length,
+            'follower_deviceID_data_type_qual': follower_deviceID_data_type_qual,
+            'resource_availability_mask': resource_availability_mask,
+            'resource_protection_mask': resource_protection_mask,
+        }
 
     def _parse_ccp_version_CRM(self, CCP_message):
         '''
@@ -1113,17 +1110,18 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         main_protocol = utils._parse_byte(CCP_message[3])
         minor_protocol = utils._parse_byte(CCP_message[4])
 
-        return {'CRC': crc_tuple[0], \
-                'CTR': counter, \
-                'main_protocol': main_protocol, \
-                'minor_protocol': minor_protocol,
-               }
+        return {
+            'CRC': crc_tuple[0],
+            'CTR': counter,
+            'main_protocol': main_protocol,
+            'minor_protocol': minor_protocol,
+        }
 
     def _parse_get_seed_CRM(self, CCP_message):
         '''
@@ -1142,7 +1140,7 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         protection_status_bool = utils._parse_byte(CCP_message[3])
@@ -1153,11 +1151,12 @@ class CCPLeader(object):
 
         seed_data = utils._parse_4_byte_value(CCP_message[4:])
 
-        return {'CRC': crc_tuple[0], \
-                'CTR': counter, \
-                'protection_status': protection_status, \
-                'seed_data': seed_data,
-               }
+        return {
+            'CRC': crc_tuple[0],
+            'CTR': counter,
+            'protection_status': protection_status,
+            'seed_data': seed_data,
+        }
 
     def _parse_build_chksum_CRM(self, CCP_message):
         '''
@@ -1173,7 +1172,7 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         chksum_size = utils._parse_byte(CCP_message[3])
@@ -1185,11 +1184,12 @@ class CCPLeader(object):
         else:
             raise Exception("Invalid checksum size")
 
-        return {'CRC': crc_tuple[0], \
-                'CTR': counter, \
-                'chksum_size': chksum_size, \
-                'chksum_data': chksum_data \
-                }
+        return {
+            'CRC': crc_tuple[0],
+            'CTR': counter,
+            'chksum_size': chksum_size,
+            'chksum_data': chksum_data,
+        }
 
     def _parse_unlock_CRM(self, CCP_message):
         '''
@@ -1206,15 +1206,16 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         resource_mask = utils._parse_byte(CCP_message[3])
 
-        return {'CRC': crc_tuple[0], \
-                'CTR': counter, \
-                'resource_mask': resource_mask, \
-                }
+        return {
+            'CRC': crc_tuple[0],
+            'CTR': counter,
+            'resource_mask': resource_mask,
+        }
 
     def _parse_set_s_status_CRM(self, CCP_message):
         '''
@@ -1246,19 +1247,27 @@ class CCPLeader(object):
         +-------+--------+-----------------------------------------------+
         '''
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         session_status = utils._parse_byte(CCP_message[3])
         addl_info_bool = utils._parse_byte(CCP_message[4])
 
         if addl_info_bool == 0:
-            return {'CRC': crc_tuple[0], 'CTR': counter, \
-                    'session_status': session_status, 'addl_info_bool': False, }
+            return {
+                'CRC': crc_tuple[0],
+                'CTR': counter,
+                'session_status': session_status,
+                'addl_info_bool': False,
+            }
 
-        return {'CRC': crc_tuple[0], 'CTR': counter, \
-                'session_status': session_status, 'addl_info_bool': True, \
-                'addl_info': 'not implemented yet' }
+        return {
+            'CRC': crc_tuple[0],
+            'CTR': counter,
+            'session_status': session_status,
+            'addl_info_bool': True,
+            'addl_info': 'not implemented yet'
+        }
 
     def _parse_select_cal_page_CRM(self, CCP_message):
         '''
@@ -1281,7 +1290,7 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         address_ext = utils._parse_byte(CCP_message[3])
@@ -1305,13 +1314,18 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         length_of_return_info = utils._parse_byte(CCP_message[3])
         data_type_qual = utils._parse_byte(CCP_message[4])
 
-        msg = {'CRC': crc_tuple[0], 'CTR': counter, 'length_of_return_info': length_of_return_info, 'data_type_qual': data_type_qual}
+        msg = {
+            'CRC': crc_tuple[0],
+            'CTR': counter,
+            'length_of_return_info': length_of_return_info,
+            'data_type_qual': data_type_qual,
+        }
 
         return msg
 
@@ -1329,13 +1343,18 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         length_of_return_info = utils._parse_byte(CCP_message[3])
         data_type_qual = utils._parse_byte(CCP_message[4])
 
-        msg = {'CRC': crc_tuple[0], 'CTR': counter, 'length_of_return_info': length_of_return_info, 'data_type_qual': data_type_qual}
+        msg = {
+            'CRC': crc_tuple[0],
+            'CTR': counter,
+            'length_of_return_info': length_of_return_info,
+            'data_type_qual': data_type_qual
+        }
 
         return msg
 
@@ -1352,13 +1371,18 @@ class CCPLeader(object):
         '''
 
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         daq_list_size = utils._parse_byte(CCP_message[3])
         first_pid = utils._parse_byte(CCP_message[4])
 
-        msg = {'CRC': crc_tuple[0], 'CTR': counter, 'daq_list_size': daq_list_size, 'first_pid': first_pid}
+        msg = {
+            'CRC': crc_tuple[0],
+            'CTR': counter,
+            'daq_list_size': daq_list_size,
+            'first_pid': first_pid,
+        }
 
         return msg
 
@@ -1404,7 +1428,7 @@ class CCPLeader(object):
 
     def _CRM_parser_status_ctr_only(self, CCP_message):
         crc_byte = utils._parse_byte(CCP_message[1])
-        crc_tuple = COMMAND_RET_CODES.get(crc_byte)
+        crc_tuple = utils.COMMAND_RET_CODES.get(crc_byte)
         counter = utils._parse_byte(CCP_message[2])
 
         return {'CRC': crc_tuple[0], 'CTR': counter}
@@ -1428,163 +1452,166 @@ class CCPLeader(object):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._connect_CRO(counter=counter, stat_addr=stat_addr)
-        return self._do_Function(msg=msg, command_type=CCP_CONNECT, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_CONNECT, currIdx=currIdx)
 
     def Send_Disconnect_Command(self, disconnect_type, stat_addr, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._disconnect_CRO(counter=counter, disconnect_type=disconnect_type, stat_addr=stat_addr)
-        return self._do_Function(msg=msg, command_type=CCP_DISCONNECT, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_DISCONNECT, currIdx=currIdx)
 
     def Send_SetMTA_Command(self, mta_number, address_extension, address, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._set_MTA_CRO(counter=counter, mta_number=mta_number, address_extension=address_extension, address=address)
-        return self._do_Function(msg=msg, command_type=CCP_SET_MTA, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_SET_MTA, currIdx=currIdx)
 
     def Send_ExchangeId_Command(self, leader_id_information=None, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._exchangeID_CRO(counter=counter, leader_id_information=leader_id_information)
-        return self._do_Function(msg=msg, command_type=CCP_EXCHANGE_ID, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_EXCHANGE_ID, currIdx=currIdx)
 
     def Send_Download_Command(self, data_to_download, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._download_CRO(counter=counter, data_to_download=data_to_download)
-        return self._do_Function(msg=msg, command_type=CCP_DNLOAD, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_DNLOAD, currIdx=currIdx)
 
     def Send_Upload_Command(self, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._upload_CRO(counter=counter)
-        return self._do_Function(msg=msg, command_type=CCP_UPLOAD, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_UPLOAD, currIdx=currIdx)
 
     def Send_Program_Command(self, data_to_program, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._program_CRO(counter=counter, data_to_program=data_to_program)
-        return self._do_Function(msg=msg, command_type=CCP_PROGRAM, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_PROGRAM, currIdx=currIdx)
 
     def Send_Move_Command(self, data_block_size, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._move_CRO(counter=counter, data_block_size=data_block_size)
-        return self._do_Function(msg=msg, command_type=CCP_MOVE, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_MOVE, currIdx=currIdx)
 
     def Send_ClearMemory_Command(self, data_block_size, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._clear_memory_CRO(counter=counter, data_block_size=data_block_size)
-        return self._do_Function(msg=msg, command_type=CCP_CLEAR_MEMORY, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_CLEAR_MEMORY, currIdx=currIdx)
 
     def Send_Test_Command(self, stat_addr, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._test_CRO(counter=counter, stat_addr=stat_addr)
-        return self._do_Function(msg=msg, command_type=CCP_TEST, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_TEST, currIdx=currIdx)
 
     def Send_GetCCPVersion_Command(self, major_version, minor_version, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._get_ccp_version_CRO(counter=counter, major_version=major_version, minor_version=minor_version)
-        return self._do_Function(msg=msg, command_type=CCP_GET_CCP_VERSION, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_GET_CCP_VERSION, currIdx=currIdx)
 
     def Send_GetSeed_Command(self, requested_resource, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._get_seed_CRO(counter=counter, requested_resource=requested_resource)
-        return self._do_Function(msg=msg, command_type=CCP_GET_SEED, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_GET_SEED, currIdx=currIdx)
 
     def Send_Unlock_Command(self, key, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._unlock_CRO(counter=counter, key=key)
-        return self._do_Function(msg=msg, command_type=CCP_UNLOCK, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_UNLOCK, currIdx=currIdx)
 
     def Send_BuildChksum_Command(self, data_block_size, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._build_chksum_CRO(counter=counter, data_block_size=data_block_size)
-        return self._do_Function(msg=msg, command_type=CCP_BUILD_CHKSUM, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_BUILD_CHKSUM, currIdx=currIdx)
 
     def Send_UploadShort_Command(self, address, address_extension, data_block_size=4, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
-        msg = self._short_upload_CRO(counter=counter, address=address, address_extension=address_extension, data_block_size=data_block_size)
-        return self._do_Function(msg=msg, command_type=CCP_SHORT_UP, currIdx=currIdx)
+        msg = self._short_upload_CRO(counter=counter, address=address,
+                                     address_extension=address_extension, data_block_size=data_block_size)
+        return self._do_Function(msg=msg, command_type=utils.CCP_SHORT_UP, currIdx=currIdx)
 
     def Send_GetSStatus_Command(self, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._get_s_status_CRO(counter=counter)
-        return self._do_Function(msg=msg, command_type=CCP_GET_S_STATUS, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_GET_S_STATUS, currIdx=currIdx)
 
     def Send_SetSStatus_Command(self, session_status_mask, counter=COUNTER_VAL, timeout=1):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._set_s_status_CRO(counter=counter, session_status_mask=session_status_mask)
-        return self._do_Function(msg=msg, command_type=CCP_SET_S_STATUS, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_SET_S_STATUS, currIdx=currIdx)
 
     def Send_SelectCalPage_Command(self, counter):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._select_cal_page_CRO(self, counter)
 
-        return self._do_Function(msg=msg, command_type=CCP_SELECT_CAL_PAGE, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_SELECT_CAL_PAGE, currIdx=currIdx)
 
     def Send_GetActiveCalPage_Command(self, counter):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._get_active_cal_page_CRO(self, counter)
 
-        return self._do_Function(msg=msg, command_type=CCP_GET_ACTIVE_CAL_PAGE, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_GET_ACTIVE_CAL_PAGE, currIdx=currIdx)
 
     def Send_DiagService_Command(self, counter, diagnostic_service_num, parameters=None):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._diag_service_CRO(self, counter, diagnostic_service_num, parameters)
 
-        return self._do_Function(msg=msg, command_type=CCP_DIAG_SERVICE, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_DIAG_SERVICE, currIdx=currIdx)
 
     def Send_ActionService_Command(self, counter, action_service_num, parameters):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._action_service_CRO(self, counter, action_service_num, parameters)
 
-        return self._do_Function(msg=msg, command_type=CCP_ACTION_SERVICE, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_ACTION_SERVICE, currIdx=currIdx)
 
     def Send_GetDaqSize_Command(self, counter, daq_list_number, can_identifier):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._get_daq_size_CRO(self, counter, daq_list_number, can_identifier)
 
-        return self._do_Function(msg=msg, command_type=CCP_GET_DAQ_SIZE, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_GET_DAQ_SIZE, currIdx=currIdx)
 
     def Send_SetDaqPtr_Command(self, counter, daq_list_number, odt_number, odt_element_number):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._set_daq_ptr_CRO(self, counter, daq_list_number, odt_number, odt_element_number)
 
-        return self._do_Function(msg=msg, command_type=CCP_SET_DAQ_PTR, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_SET_DAQ_PTR, currIdx=currIdx)
 
     def Send_WriteDaq_Command(self, counter, daq_element_size, daq_element_addr_extension, daq_element_addr):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._write_daq_CRO(self, counter, daq_element_size, daq_element_addr_extension, daq_element_addr)
 
-        return self._do_Function(msg=msg, command_type=CCP_WRITE_DAQ, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_WRITE_DAQ, currIdx=currIdx)
 
-    def Send_StartStop_Command(self, counter, mode, daq_list_number, last_odt_num, event_chan_num, transmission_rate_prescaler):
+    def Send_StartStop_Command(self, counter, mode, daq_list_number,
+                               last_odt_num, event_chan_num, transmission_rate_prescaler):
         currIdx = self.c.getCanMsgCount()
 
-        msg = self._start_stop_CRO(self, counter, mode, daq_list_number, last_odt_num, event_chan_num, transmission_rate_prescaler)
+        msg = self._start_stop_CRO(self, counter, mode, daq_list_number, last_odt_num,
+                                   event_chan_num, transmission_rate_prescaler)
 
-        return self._do_Function(msg=msg, command_type=CCP_START_STOP, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_START_STOP, currIdx=currIdx)
 
     def Send_StartStopAll_Command(self, counter, start_or_stop):
         currIdx = self.c.getCanMsgCount()
 
         msg = self._start_stop_all_CRO(self, counter, start_or_stop)
 
-        return self._do_Function(msg=msg, command_type=CCP_START_STOP_ALL, currIdx=currIdx)
+        return self._do_Function(msg=msg, command_type=utils.CCP_START_STOP_ALL, currIdx=currIdx)

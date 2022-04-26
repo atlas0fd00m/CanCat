@@ -17,7 +17,7 @@ def get_uds_29bit_srcid(arbid):
 
 
 def get_uds_29bit_destid(arbid):
-    consts = uds.ARBID_CONSTS[ARBID_11BIT]
+    consts = uds.ARBID_CONSTS[ARBID_29BIT]
     return (arbid & consts['destid_mask']) >> consts['destid_shift']
 
 
@@ -62,10 +62,10 @@ def enter_session(u, session, prereq_sessions=None):
     # Enter any required preq sessions
     if prereq_sessions:
         for prereq in prereq_sessions:
-            #u.DiagnosticSessionControl(prereq)
             enter_session(u, prereq)
 
     return u.DiagnosticSessionControl(session)
+
 
 @contextmanager
 def new_session(u, session, prereq_sessions=None, tester_present=False):
@@ -73,7 +73,6 @@ def new_session(u, session, prereq_sessions=None, tester_present=False):
         # Enter any required preq sessions
         if prereq_sessions:
             for prereq in prereq_sessions:
-                #u.DiagnosticSessionControl(prereq)
                 enter_session(u, prereq)
 
         msg = u.DiagnosticSessionControl(session)
@@ -154,7 +153,8 @@ def did_str(did):
         return hex(did)
 
 
-def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, delay=None, verbose_flag=False):
+def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0,  # noqa: C901
+                 delay=None, verbose_flag=False):
     scan_type = ''
     if ext:
         scan_type = ' ext'
@@ -179,7 +179,7 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
         arb_id, resp_id = gen_arbids(i, ext)
         addr = ECUAddress(arb_id, resp_id, ext)
         u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
-                verbose=verbose_flag, timeout=timeout)
+                   verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
 
         try:
@@ -191,8 +191,7 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
 
                 ecus.append(addr)
             else:
-                tx_msg, responses = find_possible_resp(u, start_index, arb_id,
-                        uds.SVC_READ_DATA_BY_IDENTIFIER, did, timeout)
+                tx_msg, responses = find_possible_resp(u, start_index, arb_id, uds.SVC_READ_DATA_BY_IDENTIFIER, did, timeout)
                 if responses:
                     log.warn('Possible non-standard responses for {} found:'.format(hex(addr.tx_arbid)))
                     for rx_arbid, msg in responses:
@@ -221,7 +220,7 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
             continue
 
         u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
-                verbose=verbose_flag, timeout=timeout)
+                   verbose=verbose_flag, timeout=timeout)
         log.detail('Checking for possible ECU {}'.format(addr))
         try:
             msg = u.ReadDID(did)
@@ -243,7 +242,8 @@ def ecu_did_scan(c, arb_id_range, ext=0, did=0xf190, udscls=None, timeout=3.0, d
     return ecus
 
 
-def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0, delay=None, verbose_flag=False):
+def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0,  # noqa: C901
+                     delay=None, verbose_flag=False):
     scan_type = ''
     if ext:
         scan_type = ' ext'
@@ -267,6 +267,8 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
 
         arb_id, resp_id = gen_arbids(i, ext)
         addr = ECUAddress(arb_id, resp_id, ext)
+        u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
+                   verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
 
         try:
@@ -278,8 +280,8 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
 
                     ecus.append(addr)
                 else:
-                    tx_msg, responses = find_possible_resp(u, start_index, arb_id,
-                            uds.SVC_DIAGNOSTICS_SESSION_CONTROL, session, timeout)
+                    tx_msg, responses = find_possible_resp(
+                            u, start_index, arb_id, uds.SVC_DIAGNOSTICS_SESSION_CONTROL, session, timeout)
                     if responses:
                         log.warn('Possible non-standard responses for {} found:'.format(hex(addr.tx_arbid)))
                         for rx_arbid, msg in responses:
@@ -306,16 +308,16 @@ def ecu_session_scan(c, arb_id_range, ext=0, session=1, udscls=None, timeout=3.0
             continue
 
         u = udscls(c, addr.tx_arbid, addr.rx_arbid, extflag=addr.extflag,
-                verbose=verbose_flag, timeout=timeout)
+                   verbose=verbose_flag, timeout=timeout)
         log.detail('Trying {}'.format(addr))
         try:
-            with new_session(u, sess) as msg:
+            with new_session(u, session) as msg:
                 if msg is not None:
-                    log.debug('{} session {}: {}'.format(addr, sess, repr(msg)))
+                    log.debug('{} session {}: {}'.format(addr, session, repr(msg)))
                     log.msg('found {}'.format(addr))
                     ecus.append(addr)
         except uds.NegativeResponseException as e:
-            log.debug('{} session {}: {}'.format(addr, sess, e))
+            log.debug('{} session {}: {}'.format(addr, session, e))
             log.msg('found {}'.format(addr))
 
             # If a negative response happened, that means an ECU is present
@@ -333,14 +335,14 @@ def try_read_did(u, did):
     try:
         resp = u.ReadDID(did)
         if resp is not None:
-            data = { 'resp':resp }
+            data = {'resp': resp}
     except uds.UDSTimeout as e:
         pass
     except uds.NegativeResponseException as e:
         # 0x12:'SubFunctionNotSupported' - not standard, but I've seen it
         # 0x31:'RequestOutOfRange'       - means the DID is not valid
         if e.neg_code not in [0x12, 0x31]:
-            data = { 'err':e.neg_code }
+            data = {'err': e.neg_code}
     return data
 
 
@@ -368,19 +370,19 @@ def did_read_scan(u, did_range, delay=None):
     return dids
 
 
-def try_write_did(u, did, datg):
-    did = None
+def try_write_did(u, did, data):
+    out = None
     try:
-        resp = u.WriteDID(i, data)
+        resp = u.WriteDID(did, data)
         if resp is not None:
-            did = { 'resp':resp }
+            out = {'resp': resp}
     except uds.UDSTimeout as e:
         pass
     except uds.NegativeResponseException as e:
         # 0x31:'RequestOutOfRange' usually means the DID is not valid
         if e.neg_code != 0x31:
-            did = { 'err':e.neg_code }
-    return did
+            out = {'err': e.neg_code}
+    return out
 
 
 def did_write_scan(u, did_range, write_data, delay=None):
@@ -410,18 +412,18 @@ def try_session(u, sess_num):
     try:
         with new_session(u, sess_num) as resp:
             if resp is not None:
-                session = { 'resp':resp }
+                session = {'resp': resp}
     except uds.UDSTimeout as e:
         pass
     except uds.NegativeResponseException as e:
         # 0x11:'ServiceNotSupported'
         # 0x12:'SubFunctionNotSupported'
         if e.neg_code not in [0x11, 0x12]:
-            session = { 'err':e.neg_code }
+            session = {'err': e.neg_code}
     return session
 
-
-def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=None, recursive_scan=True, try_ecu_reset=True, try_sess_ctrl_reset=True):
+def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=None,  # noqa: C901
+                     recursive_scan=True, try_ecu_reset=True, try_sess_ctrl_reset=True):
     log.debug('Starting session scan for range: {}'.format(session_range))
     u.c.placeCanBookmark('session_scan({}, delay={})'.format(session_range, delay))
     sessions = {}
@@ -476,7 +478,7 @@ def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=No
                 try:
                     # Try just changing back to session 1
                     new_session(u, 1)
-                except uds.NegativeResponseException as e:
+                except uds.NegativeResponseException:
                     # The default method to try returning to session 1 is EcuReset, if
                     # EcuReset doesn't work (or isn't enabled), then try using the
                     # DiagnosticSessionControl message to return to session 1, if that
@@ -498,8 +500,8 @@ def try_session_scan(u, session_range, prereq_sessions, found_sessions, delay=No
                 log.debug('Scanning for sessions from session {} ({})'.format(sess, prereq_sessions))
                 prereqs = prereq_sessions + [sess]
                 subsessions.update(try_session_scan(u, session_range, prereqs, sessions.keys(),
-                    delay=delay, recursive_scan=recursive_scan,
-                    try_ecu_reset=try_ecu_reset, try_sess_ctrl_reset=try_sess_ctrl_reset))
+                                   delay=delay, recursive_scan=recursive_scan, try_ecu_reset=try_ecu_reset,
+                                   try_sess_ctrl_reset=try_sess_ctrl_reset))
         sessions.update(subsessions)
 
     return sessions
@@ -516,13 +518,13 @@ def try_auth(u, level, secret):
     try:
         resp = u.SecurityAccess(level, secret)
         if resp is not None:
-            auth_data = { 'resp':resp }
+            auth_data = {'resp': resp}
     except uds.UDSTimeout as e:
         pass
     except uds.NegativeResponseException as e:
         # 0x12:'SubFunctionNotSupported',
         if e.neg_code != 0x12:
-            auth_data = { 'err':e.neg_code }
+            auth_data = {'err': e.neg_code}
     return auth_data
 
 

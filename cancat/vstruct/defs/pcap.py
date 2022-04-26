@@ -1,10 +1,11 @@
-from __future__ import print_function
-from io import open
+import logging
 
 import vstruct
 import vstruct.defs.inet as vs_inet
 
 from vstruct.primitives import *
+
+logger = logging.getLogger(__name__)
 
 PCAP_LINKTYPE_ETHER     = 1
 PCAP_LINKTYPE_RAW       = 101
@@ -168,7 +169,7 @@ class PCAPNG_INTERFACE_DESCRIPTION_BLOCK(PCAPNG_BLOCK_PARENT):
         #sys.stderr.write('PCAPNG_INTERFACE_DESCRIPTION_BLOCK: searching options')
         for i, opt in self.options:
             if opt.code == OPT_IF_TSRESOL:
-                self.tsresol = opt.bytes[0]
+                self.tsresol = ord(opt.bytes[0])
                 #sys.stderr.write('Got tsresol: 0x%x\n' % self.tsresol)
             elif opt.code == OPT_IF_TSOFFSET:
                 fmt = '<Q'
@@ -242,10 +243,10 @@ class PCAPNG_SIMPLE_PACKET_BLOCK(vstruct.VStruct):
         self.tvusec = 0
 
 def iterPcapFileName(filename, reuse=False):
-    fd = open(filename, 'rb')
-    for x in iterPcapFile(fd, reuse=reuse):
-        yield x
-    
+    with open(filename, 'rb') as fd:
+        for x in iterPcapFile(fd, reuse=reuse):
+            yield x
+
 def iterPcapFile(fd, reuse=False):
     '''
     Figure out if it's a tcpdump format, or pcapng
@@ -313,7 +314,6 @@ def _iterPcapFile(fd, reuse=False):
         elif linktype == PCAP_LINKTYPE_RAW:
             pass
 
-        #print(eII.tree())
         if not reuse:
             ipv4 = vs_inet.IPv4()
 
@@ -371,8 +371,7 @@ def _iterPcapFile(fd, reuse=False):
             yield pkt,ipv4,icmp_hdr,pdata
 
         else:
-            pass
-            #print('UNHANDLED IP PROTOCOL: %d' % ipv4.proto)
+            logger.warning('UNHANDLED IP PROTOCOL: %d', ipv4.proto)
 
 
 def _iterPcapNgFile(fd, reuse=False):
@@ -417,13 +416,12 @@ def _iterPcapNgFile(fd, reuse=False):
                 #if tup is None, just fall through & read next block
                 yield tup
 
-        #TODO: other blocks needed?
-        #PCAPNG_BLOCKTYPE_PACKET (obsolete)
-        #PCAPNG_BLOCKTYPE_NAME_RESOLUTION:
-        #PCAPNG_BLOCKTYPE_INTERFACE_STATS:
+            #TODO: other blocks needed?
+            #PCAPNG_BLOCKTYPE_PACKET (obsolete)
+            #PCAPNG_BLOCKTYPE_NAME_RESOLUTION:
+            #PCAPNG_BLOCKTYPE_INTERFACE_STATS:
         else:
-            #print('Unknown block type: 0x%08x: 0x%08x 0x%08x bytes' % (roff, header.blocktype, header.blocksize))
-            pass
+            logger.warning('Unknown block type: 0x%08x: 0x%08x 0x%08x bytes', roff, header.blocktype, header.blocksize)
         curroff = fd.tell()
         b0 = fd.read(len(header))
         fd.seek(curroff)
@@ -431,7 +429,7 @@ def _iterPcapNgFile(fd, reuse=False):
 def _parsePcapngPacketBytes(linktype, pkt):
     '''
     pkt is either a parsed PCAPNG_SIMPLE_PACKET_BLOCK or PCAPNG_ENHANCED_PACKET_BLOCK
-    On success Returns tuple (pcapng_pkt, ipv4_vstruct, transport_vstruc, pdata) 
+    On success Returns tuple (pcapng_pkt, ipv4_vstruct, transport_vstruc, pdata)
     Returns None if the packet can't be parsed
     '''
     if linktype not in (PCAP_LINKTYPE_ETHER, PCAP_LINKTYPE_RAW):
@@ -492,6 +490,5 @@ def _parsePcapngPacketBytes(linktype, pkt):
         pdata = b[offset:]
         return pkt,ipv4,icmp_hdr,pdata
     else:
-        pass
-        #print('UNHANDLED IP PROTOCOL: %d' % ipv4.proto)
+        logger.warning('UNHANDLED IP PROTOCOL: %d', ipv4.proto)
     return None

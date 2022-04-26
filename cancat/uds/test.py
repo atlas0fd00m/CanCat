@@ -1,8 +1,8 @@
-import time
 import struct
 
 from cancat.uds import NegativeResponseException
 from cancat.uds.ecu import ScanClass
+
 
 class CanInterface(object):
     """
@@ -33,7 +33,7 @@ class CanInterface(object):
         return []
 
 
-class TestUDS(ScanClass):
+class FakeUDS(ScanClass):
     DIDs = {
         0x711: {
             0x0042: '\x62\x00\x42ANSWER',
@@ -61,15 +61,15 @@ class TestUDS(ScanClass):
     }
 
     def __init__(self, c, tx_arbid, rx_arbid=None, verbose=True, extflag=0, timeout=3.0):
-        super(TestUDS, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag, timeout=timeout)
+        super(FakeUDS, self).__init__(c, tx_arbid, rx_arbid, verbose=verbose, extflag=extflag, timeout=timeout)
         self._session = 1
-        if self.tx_arbid in TestUDS.DIDs and extflag == False:
-            self._dids = TestUDS.DIDs[self.tx_arbid]
+        if self.tx_arbid in FakeUDS.DIDs and not extflag:
+            self._dids = FakeUDS.DIDs[self.tx_arbid]
         else:
             self._dids = {}
 
-        if self.tx_arbid in TestUDS.SEEDs and extflag == False:
-            self._sessions = TestUDS.SEEDs[self.tx_arbid]
+        if self.tx_arbid in FakeUDS.SEEDs and not extflag:
+            self._sessions = FakeUDS.SEEDs[self.tx_arbid]
         else:
             self._sessions = {}
 
@@ -81,9 +81,9 @@ class TestUDS(ScanClass):
             raise NegativeResponseException(
                         0x31, 0x22, struct.pack('>BHB', 0x27, did, 0x31))
         else:
-            # Using this timeout makes the test appear more realistic, but that 
+            # Using this timeout makes the test appear more realistic, but that
             # is silly for testing
-            #time.sleep(self.timeout)
+            #   time.sleep(self.timeout)
             return None
 
     def WriteDID(self, did, data):
@@ -104,15 +104,15 @@ class TestUDS(ScanClass):
             raise NegativeResponseException(
                     0x12, 0x10, struct.pack('>BBB', 0x10, session, 0x12))
         else:
-            # Using this timeout makes the test appear more realistic, but that 
+            # Using this timeout makes the test appear more realistic, but that
             # is silly for testing
-            #time.sleep(self.timeout)
+            #   time.sleep(self.timeout)
             return None
 
-    def RequestDownload(self, addr, data, data_format = 0x00, addr_format = 0x44):
+    def RequestDownload(self, addr, data, data_format=0x00, addr_format=0x44):
         pass
 
-    def RequestUpload(self, addr, length, data_format = 0x00, addr_format = 0x44):
+    def RequestUpload(self, addr, length, data_format=0x00, addr_format=0x44):
         pass
 
     def readMemoryByAddress(self, address, length, lenlen=1, addrlen=4):
@@ -144,7 +144,7 @@ class TestUDS(ScanClass):
             raise NegativeResponseException(
                     0x12, 0x27, struct.pack('>BBB', 0x27, level, 0x12))
         else:
-            # Using this timeout makes the test appear more realistic, but that 
+            # Using this timeout makes the test appear more realistic, but that
             # is silly for testing
-            #time.sleep(self.timeout)
+            #   time.sleep(self.timeout)
             return None

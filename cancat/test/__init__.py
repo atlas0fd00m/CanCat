@@ -216,7 +216,7 @@ class FakeCanCat:
         elif cmd == CMD_SET_FILT_MASK:
             logger.info(b'=CMD_SET_FILT_MASK:%r=' % data)
             self.log(b'=CMD_SET_FILT_MASK:%r=' % data)
-            self.CanCat_send(CMD_SET_FILT_MASK_RESULT, b'\x01')
+            self.CanCat_send(CMD_SET_FILT_MASK, b'\x01')
 
         elif cmd == CMD_CAN_SEND_ISOTP:
             logger.info(b'=CMD_CAN_SEND_ISOTP:%r=' % data)
