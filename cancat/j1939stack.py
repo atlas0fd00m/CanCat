@@ -143,6 +143,10 @@ pgn_pfs = {
 class J1939Interface(cancat.CanInterface):
     _msg_source_idx = J1939MSGS
     def __init__(self, port=None, baud=cancat.baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, process_can_msgs=True, promisc=True):
+
+        cancat.CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
+        self.register_handler(CMD_CAN_RECV, self._j1939_can_handler)
+
         self._last_recv_idx = -1
         self._threads = []
         self._j1939_filters = []
@@ -153,8 +157,6 @@ class J1939Interface(cancat.CanInterface):
         self._j1939_msg_listeners = []
         self.promisc = promisc
 
-        cancat.CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
-
         # setup the message handler event offload thread
         if self._config.get('myIDs') is None:
             self._config['myIDs'] = []
@@ -164,8 +166,6 @@ class J1939Interface(cancat.CanInterface):
         mhethread.setDaemon(True)
         mhethread.start()
         self._threads.append(mhethread)
-
-        self.register_handler(CMD_CAN_RECV, self._j1939_can_handler)
 
         if process_can_msgs:
             self.processCanMessages()

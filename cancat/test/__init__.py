@@ -126,6 +126,7 @@ class FakeCanCat:
                     msg_ts, datagram = curlist.pop(0)
 
                     # write message to the out queue
+                    #logger.warning("_runner: CanCat_send(CMD_CAN_RECV, %r", datagram)
                     self.CanCat_send(CMD_CAN_RECV, datagram)
 
                     # handle timing
@@ -142,6 +143,7 @@ class FakeCanCat:
                     # the list is done... get a new list if we have one.
                     if self._fake_can_msgs:
                         curlist = self._fake_can_msgs.get()
+                        #logger.warning('_runner: curlist: %r', repr(curlist))
 
                     next_duration = self._runner_sleep_delay
 
@@ -156,7 +158,8 @@ class FakeCanCat:
 
         example: cancat.test.test_messages.test_j1939_msgs
         '''
-        self._fake_can_msgs.put(msgs)
+        logger.warning("queueCanMessages(<size=%d>)", len(msgs))
+        self._fake_can_msgs.put(list(msgs))
 
 
     #### FAKE SERIAL DEVICE (interface to Python)
@@ -164,7 +167,7 @@ class FakeCanCat:
         if len(self._inbuf) < count:
             empty = False
             try:
-                #logger.info(b'===fccc: attempting to get from _inq:')
+                #logger.debug(b'===fccc: attempting to get from _inq:')
                 self._inbuf += self._inq.get(timeout = 1)
             except queue.Empty:
                 empty = True
