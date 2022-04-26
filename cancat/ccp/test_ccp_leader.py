@@ -31,7 +31,7 @@ class TestCcpMessageGeneration(unittest.TestCase):
         self.assertEqual(temporary_disconnect_msg, temporary_disconnect_expected)
 
         EOS_disconnect_msg = ccp._disconnect_CRO(CTR, utils.END_OF_SESSION_DISCONNECT, 0x200)
-        EOS_disconnect_expected = b'\x07\x24\x01\x90\x44\x04\x90\x90'
+        EOS_disconnect_expected = b'\x07\x23\x01\x90\x00\x02\x90\x90'
         self.assertEqual(EOS_disconnect_msg, EOS_disconnect_expected)
 
     def test_SetMTA_CRO(self):

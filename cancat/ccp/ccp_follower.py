@@ -84,7 +84,7 @@ class CCPFollower(object):
         elif CCP_CRO_Type == utils.CCP_GET_S_STATUS:
             parsed_msg = self._parse_get_s_status_CRO(msg)
         else:
-            raise Exception("Cannot parse message type ", utils.CCP_CRO_Type)
+            raise Exception("Cannot parse message type ", CCP_CRO_Type)
 
         return parsed_msg
 

@@ -103,6 +103,7 @@ class TestCcpFollowerMessageParsing(unittest.TestCase):
             invalid_msg = b'\xff\x90\x90\x90\x90\x90\x90\x90'
             ccp._parse_CRO(invalid_msg)
 
+        print(context.exception)
         self.assertTrue('Cannot parse message type' in str(context.exception))
 
     def test_parse_connect_CRO(self):
