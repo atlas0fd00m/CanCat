@@ -6,7 +6,6 @@ from operator import itemgetter
 
 import os
 import sys
-import cmd
 import time
 import serial
 import select
@@ -45,9 +44,9 @@ CMD_CHANGE_BAUD             = 0x42
 CMD_CAN_BAUD                = 0x43
 CMD_CAN_SEND                = 0x44
 CMD_CAN_MODE                = 0x45
-CMD_CAN_MODE_SNIFF_CAN0     = 0x00 # Start sniffing on can 0
-CMD_CAN_MODE_SNIFF_CAN1     = 0x01 # Start sniffing on can 1
-CMD_CAN_MODE_CITM           = 0x02 # Start CITM between can1 and can2
+CMD_CAN_MODE_SNIFF_CAN0     = 0x00  # Start sniffing on can 0
+CMD_CAN_MODE_SNIFF_CAN1     = 0x01  # Start sniffing on can 1
+CMD_CAN_MODE_CITM           = 0x02  # Start CITM between can1 and can2
 CMD_CAN_SEND_ISOTP          = 0x46
 CMD_CAN_RECV_ISOTP          = 0x47
 CMD_CAN_SENDRECV_ISOTP      = 0x48
@@ -63,7 +62,7 @@ CAN_RESP_GETTXBFTIMEOUT     = (6)
 CAN_RESP_SENDMSGTIMEOUT     = (7)
 CAN_RESP_FAIL               = (0xff)
 
-CAN_RESPS = { v: k for k,v in globals().items() if k.startswith('CAN_RESP_') }
+CAN_RESPS = {v: k for k, v in globals().items() if k.startswith('CAN_RESP_')}
 
 # constants for setting baudrate for the CAN bus
 CAN_AUTOBPS  = 0
@@ -146,13 +145,16 @@ Suzuki_messages = {
 Harley_messages = {
         }
 
+
 # helper functions for printing log messages from the CanCat Transceiver
 def handleLogToScreen(message, canbuf):
     print('LOG: %s' % repr(message))
 
+
 def handleLogHexToScreen(message, canbuf):
     num = struct.unpack("<L", message)
     print('LOG: %x' % num)
+
 
 def handleCanMsgsDuringSniff(message, canbuf, arbids=None, canidx=0):
     ts = time.time()
@@ -165,13 +167,16 @@ def handleCanMsgsDuringSniff(message, canbuf, arbids=None, canidx=0):
     else:
         print(reprCanMsg(canidx, idx, ts, arbid, data))
 
+
 default_cmdhandlers = {
-        CMD_LOG : handleLogToScreen,
-        CMD_LOG_HEX: handleLogHexToScreen,
-        }
+    CMD_LOG: handleLogToScreen,
+    CMD_LOG_HEX: handleLogHexToScreen,
+}
+
 
 def loadCanBuffer(filename):
     return pickle.load(open(filename))
+
 
 def keystop(delay=0):
     if os.name == 'posix':
@@ -180,12 +185,17 @@ def keystop(delay=0):
         import msvcrt
         return msvcrt.kbhit()
 
+
 class SPECIAL_CASE(object):
     pass
+
+
 DONT_PRINT_THIS_MESSAGE = SPECIAL_CASE
+
 
 class CanInterface(object):
     _msg_source_idx = CMD_CAN_RECV
+
     def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
         '''
         CAN Analysis Workspace
@@ -961,7 +971,7 @@ class CanInterface(object):
         canmsgs = self._messages.get(self._msg_source_idx, [])
         return len(canmsgs)
 
-    def printSessionStatsByBookmark(self, start=None, stop=None):
+    def printSessionStatsByBookmark(self, start=None, stop=None, reverse=True, sort=None):
         '''
         Prints session stats only for messages between two bookmarks
         '''
@@ -2274,6 +2284,7 @@ class CanInTheMiddleInterface(CanInterface):
 ######### administrative, supporting code ##########
 cs = []
 
+
 def cleanupInteractiveAtExit():
     global cs
     for c in cs:
@@ -2282,12 +2293,14 @@ def cleanupInteractiveAtExit():
         except:
             pass
 
+
 def getDeviceFile():
     import serial.tools.list_ports
 
     for n, (port, desc, hwid) in enumerate(sorted(serial.tools.list_ports.comports()), 1):
         if os.path.exists(port):
             return port
+
 
 def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
     global c
@@ -2297,7 +2310,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     atexit.register(cleanupInteractiveAtExit)
 
     if load_filename is None:
-        if can_baud != None:
+        if can_baud is not None:
             c.setCanBaud(can_baud)
         else:
             c.setCanBaud(CAN_500KBPS)
@@ -2309,8 +2322,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
         import IPython
         ipsh = IPython.embed(banner1=intro, colors="neutral")
 
-
-    except ImportError as e:
+    except ImportError:
         try:
             from IPython.terminal.interactiveshell import TerminalInteractiveShell
             from IPython.terminal.ipapp import load_default_config
@@ -2319,8 +2331,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
             ipsh.user_global_ns.update(lcls)
             ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!
             ipsh.mainloop(intro)
-        except ImportError as e:
-
+        except ImportError:
             try:
                 from IPython.frontend.terminal.interactiveshell import TerminalInteractiveShell
                 ipsh = TerminalInteractiveShell()
@@ -2333,4 +2344,3 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
                 import code
                 shell = code.InteractiveConsole(gbls)
                 shell.interact(intro)
-
