@@ -1082,12 +1082,14 @@ class CanInterface(object):
         loadedFile = open(filename, 'rb')
         me = pickle.load(loadedFile, encoding='latin1')
 
-        # Go through the msgs and turn them into bytes
+        # Go through the msgs and turn them into bytes to ensure any logs saved
+        # with python2 can be loaded in python3
         for cmd in me['messages']:
             for i in range(len(me['messages'][cmd])):
-                ts, msg = me['messages'][cmd][i]
-                if isinstance(msg, str):
-                    me['messages'][cmd][i] = (ts, msg.encode('latin-1'))
+                data = list(me['messages'][cmd][i])
+                if isinstance(data[-1], str):
+                    data[-1] = data[-1].encode('latin-1')
+                me['messages'][cmd][i] = tuple(data)
 
         self.restoreSession(me, force=force)
         self._filename = filename
