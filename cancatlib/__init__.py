@@ -2194,7 +2194,7 @@ class CanInTheMiddleInterface(CanInterface):
 
         out.append("Total Messages: %d  (repeat: %d / similar: %d)" % (msg_count, data_repeat, data_similar))
 
-        return "\n".join(out)
+        yield "\n".join(out)
 
     def printCanSessionsIso(self, arbid_list=None, advfilters=[]):
         '''
