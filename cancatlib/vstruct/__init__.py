@@ -561,7 +561,7 @@ def resolvepath(impmod, pathstr):
     return resolve(impmod, nameparts)
 
 # NOTE: Gotta import this *after* VStruct/VSArray defined
-import cancat.vstruct.defs as vs_defs
+import cancatlib.vstruct.defs as vs_defs
 
 def getStructure(sname):
     """

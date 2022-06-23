@@ -6,7 +6,7 @@ import time
 import struct
 import threading
 
-import cancat.iso_tp as cisotp
+import cancatlib.iso_tp as cisotp
 
 # In 11-bit CAN, an OBD2 tester typically sends requests with an ID of 7DF, and
 # can accept response messages on IDs 7E8 to 7EF, requests to a specific ECU can

@@ -113,7 +113,7 @@ you interact with the CanCat tool:
 
 ### Connect to the CAN-transceiver with CanCat [Linux and other systems]:
 ```python
->>> import cancat
+>>> import cancatlib
 
 >>> CANalysis = cancat.CanInterface('/dev/ttyACM0', 115200) # your device may vary
 

@@ -1,8 +1,8 @@
 from pycparser import c_parser
 import pycparser.c_ast as c_ast
 
-from cancat import vstruct
-import cancat.vstruct.primitives as vs_prim
+from cancatlib import vstruct
+import cancatlib.vstruct.primitives as vs_prim
 
 class StructParser:
 

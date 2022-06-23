@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import time
-import cancat
+import cancatlib
 import struct
 from . import utils
-from cancat.vstruct.primitives import v_enum
+from cancatlib.vstruct.primitives import v_enum
 
 '''
     MESSAGE TYPES:
@@ -43,7 +43,7 @@ class CCPLeader(object):
         self.rx_arbid = rx_arbid
 
     def _do_Function(self, msg, command_type, currIdx, timeout=1):
-        self.c._send(cancat.CMD_CAN_SEND, msg)
+        self.c._send(cancatlib.CMD_CAN_SEND, msg)
 
         complete = False
         starttime = lasttime = time.time()

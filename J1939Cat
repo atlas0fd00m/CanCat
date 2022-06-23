@@ -6,8 +6,8 @@ import rlcompleter
 readline.parse_and_bind("tab: complete")
 import os
 
-import cancat.j1939stack
-from cancat import *
+import cancatlib.j1939stack
+from cancatlib import *
 
 
 intro = """'CanCat, the greatest thing since J2534!'

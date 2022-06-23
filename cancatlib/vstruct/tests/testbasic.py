@@ -1,10 +1,10 @@
 import binascii
 import unittest
 
-from cancat import vstruct
-import cancat.vstruct.cparse as s_cparse
-from cancat.vstruct.primitives import *
-from cancat.vstruct.bitfield import *
+from cancatlib import vstruct
+import cancatlib.vstruct.cparse as s_cparse
+from cancatlib.vstruct.primitives import *
+from cancatlib.vstruct.bitfield import *
 
 from io import BytesIO
 

@@ -9,11 +9,11 @@ import signal
 import importlib
 import traceback
 
-import cancat
-from cancat.utils.types import SparseHexRange, ECUAddress
-from cancat.utils import log
-from cancat.uds.ecu import ECU
-from cancat.uds.utils import ecu_did_scan, ecu_session_scan
+import cancatlib
+from cancatlib.utils.types import SparseHexRange, ECUAddress
+from cancatlib.utils import log
+from cancatlib.uds.ecu import ECU
+from cancatlib.uds.utils import ecu_did_scan, ecu_session_scan
 
 c = None
 _config = None

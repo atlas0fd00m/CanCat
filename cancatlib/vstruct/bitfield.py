@@ -1,6 +1,6 @@
-import cancat.envi.bits as e_bits
-from cancat.vstruct import VStruct
-from cancat.vstruct.primitives import *
+import cancatlib.envi.bits as e_bits
+from cancatlib.vstruct import VStruct
+from cancatlib.vstruct.primitives import *
 from binascii import unhexlify
 
 class v_bits(v_number):
