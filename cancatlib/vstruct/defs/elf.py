@@ -1,5 +1,5 @@
-from cancat import vstruct
-from cancat.vstruct.primitives import *
+from cancatlib import vstruct
+from cancatlib.vstruct.primitives import *
 
 EI_NIDENT = 4
 EI_PADLEN = 7

@@ -1,7 +1,7 @@
 import struct
 
-from cancat.uds import NegativeResponseException
-from cancat.uds.ecu import ScanClass
+from cancatlib.uds import NegativeResponseException
+from cancatlib.uds.ecu import ScanClass
 
 
 class CanInterface(object):
@@ -9,7 +9,7 @@ class CanInterface(object):
     A fake CanInterface class for test purposes.
 
     All actual functions are just stubbed out, this is not a superclass of the
-    real cancat.CanInterface class.
+    real cancatlib.CanInterface class.
     """
     def __init__(self, *args, **kwargs):
         # required to make canmap think the bus is working

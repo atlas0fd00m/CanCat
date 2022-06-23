@@ -3,7 +3,7 @@
 
 import sys
 import argparse
-from cancat.utils import convert
+from cancatlib.utils import convert
 
 
 def main():

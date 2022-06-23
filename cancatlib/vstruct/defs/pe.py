@@ -1,6 +1,6 @@
 
-from cancat import vstruct
-from cancat.vstruct.primitives import *
+from cancatlib import vstruct
+from cancatlib.vstruct.primitives import *
 
 class IMAGE_BASE_RELOCATION(vstruct.VStruct):
     def __init__(self):

@@ -1,8 +1,8 @@
 
 # FIXME this is named wrong!
 
-from cancat import vstruct
-from cancat.vstruct.primitives import *
+from cancatlib import vstruct
+from cancatlib.vstruct.primitives import *
 
 MAX_PATH = 260
 

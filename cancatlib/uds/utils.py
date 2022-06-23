@@ -5,10 +5,10 @@ import string
 import struct
 from contextlib import contextmanager
 
-from cancat import uds, ARBID_29BIT
-from cancat.uds import UDS
-from cancat.utils import log
-from cancat.utils.types import ECUAddress, _range_func
+from cancatlib import uds, ARBID_29BIT
+from cancatlib.uds import UDS
+from cancatlib.utils import log
+from cancatlib.utils.types import ECUAddress, _range_func
 
 
 def get_uds_29bit_srcid(arbid):

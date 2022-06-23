@@ -1,5 +1,5 @@
-from cancat import vstruct
-from cancat.vstruct.primitives import *
+from cancatlib import vstruct
+from cancatlib.vstruct.primitives import *
 
 
 #const tag descriptions from wikipedia

@@ -2,8 +2,8 @@
 
 import time
 
-from cancat.uds import utils, UDS, SVC_SECURITY_ACCESS, NegativeResponseException
-from cancat.utils import log
+from cancatlib.uds import utils, UDS, SVC_SECURITY_ACCESS, NegativeResponseException
+from cancatlib.utils import log
 
 
 class ScanClass(UDS):

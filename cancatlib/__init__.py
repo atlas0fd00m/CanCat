@@ -15,7 +15,7 @@ import math
 import pickle
 import binascii
 
-from cancat import iso_tp
+from cancatlib import iso_tp
 
 baud = 4000000
 
@@ -281,7 +281,7 @@ class CanInterface(object):
 
         # SHIM to allow us to easily specify a Fake CanCat for testing
         if self.port == 'FakeCanCat':
-            import cancat.test as testcat
+            import cancatlib.test as testcat
             self._io = testcat.FakeCanCat()
 
         else:
