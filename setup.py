@@ -6,7 +6,7 @@ import setuptools
 VERSION = open('VERSION').read().strip()
 packages = ['cancat','cancat/vstruct']
 mods = []
-pkgdata = {}
+pkgdata = {'cancat': ['cancatlib/test/data/*']}
 scripts = ['CanCat', 'J1939Cat', 'canmap', 'cancat2candump', 'cancat2pcap', 'candump2cancat', 'pcap2cancat']
 
 dirn = os.path.abspath(os.path.dirname(__file__))

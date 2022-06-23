@@ -8,7 +8,7 @@ readline.parse_and_bind("tab: complete")
 import os
 from termcolor import colored, cprint
 
-from cancat import *
+from cancatlib import *
 
 
 intro = colored("""'CanCat, the greatest thing since J2534!'
@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     # Make it easy to find modules in CWD
     sys.path.append('.')
-    sys.path.append("./cancat")
+    sys.path.append("./cancatlib")
 
     interfaces = [iface[:-9] for iface in globals().keys() if iface.endswith('Interface')]
     interface_names = ', '.join(interfaces)

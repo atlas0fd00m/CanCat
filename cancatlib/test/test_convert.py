@@ -4,22 +4,22 @@ import pathlib
 import tempfile
 import unittest
 
-import cancat
+import cancatlib
 
-from cancat import *
-from cancat import CanInterface
-from cancat.test import test_messages
-from cancat.utils.types import ECUAddress
+from cancatlib import *
+from cancatlib import CanInterface
+from cancatlib.test import test_messages
+from cancatlib.utils.types import ECUAddress
 
 from binascii import unhexlify
-from cancat.utils import convert
+from cancatlib.utils import convert
 
 
 logger = logging.getLogger(__name__)
+basedir = os.path.dirname(cancatlib.__file__)
 
 class Convert_test(unittest.TestCase):
     def test_CanDump2CanCat(self):
-        basedir = os.path.dirname(cancat.__file__)
         excandump = os.sep.join([basedir, 'test', 'data', 'candump_example.txt'])
 
         outf0 = tempfile.mkstemp()
@@ -33,7 +33,6 @@ class Convert_test(unittest.TestCase):
 
 
     def test_Pcap2CanCat(self):
-        basedir = os.path.dirname(cancat.__file__)
         excandump = os.sep.join([basedir, 'test', 'data', 'candump_example.txt'])
 
         outf0 = tempfile.mkstemp()
