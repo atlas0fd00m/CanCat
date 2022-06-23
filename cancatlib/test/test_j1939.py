@@ -2,8 +2,8 @@ import time
 import logging
 import unittest
 
-from cancat.test.test_messages import *
-from cancat.j1939stack import J1939Interface
+from cancatlib.test.test_messages import *
+from cancatlib.j1939stack import J1939Interface
 
 from binascii import unhexlify
 

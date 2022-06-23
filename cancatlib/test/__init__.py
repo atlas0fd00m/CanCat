@@ -156,7 +156,7 @@ class FakeCanCat:
         Add a list of messages to the queue, to be delivered as if received by 
         the dongle.  Format:  [  (<timestamp-float>, b'data'), ...  ]
 
-        example: cancat.test.test_messages.test_j1939_msgs
+        example: cancatlib.test.test_messages.test_j1939_msgs
         '''
         logger.warning("queueCanMessages(<size=%d>)", len(msgs))
         self._fake_can_msgs.put(list(msgs))

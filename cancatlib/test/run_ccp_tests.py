@@ -3,8 +3,8 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 
-from cancat.ccp.test_ccp_leader import TestCcpMessageGeneration, TestCcpMessageParsing
-from cancat.ccp.test_ccp_follower import TestCcpFollowerMessageParsing, TestCCPFollowerMessageGeneration
+from cancatlib.ccp.test_ccp_leader import TestCcpMessageGeneration, TestCcpMessageParsing
+from cancatlib.ccp.test_ccp_follower import TestCcpFollowerMessageParsing, TestCCPFollowerMessageGeneration
 
 testrunner_leader_gen = TestCcpMessageGeneration()
 testrunner_leader_gen.runTest()

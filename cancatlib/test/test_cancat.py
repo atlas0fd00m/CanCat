@@ -1,10 +1,10 @@
 import logging
 import unittest
 
-from cancat import *
-from cancat import CanInterface
-from cancat.test import test_messages
-from cancat.utils.types import ECUAddress
+from cancatlib import *
+from cancatlib import CanInterface
+from cancatlib.test import test_messages
+from cancatlib.utils.types import ECUAddress
 
 from binascii import unhexlify
 

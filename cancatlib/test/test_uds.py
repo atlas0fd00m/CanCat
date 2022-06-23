@@ -1,9 +1,9 @@
 import unittest
 
-from cancat.utils.types import ECUAddress
-from cancat.uds.ecu import ECU
-from cancat.uds.utils import ecu_did_scan, ecu_session_scan
-from cancat.uds.test import CanInterface, FakeUDS
+from cancatlib.utils.types import ECUAddress
+from cancatlib.uds.ecu import ECU
+from cancatlib.uds.utils import ecu_did_scan, ecu_session_scan
+from cancatlib.uds.test import CanInterface, FakeUDS
 
 
 class UDStest(unittest.TestCase):
