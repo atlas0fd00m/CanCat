@@ -1,14 +1,12 @@
 import traceback
 from binascii import hexlify
 
-#from cancat.j1939 import *
-# we can move things into here if we decide this replaces the exiting j1939 modules
-import cancat
+import cancatlib
 import struct
-from cancat.j1939 import emitArbid
-from cancat.J1939db import *
-from cancat import *
-from cancat.vstruct.bitfield import *
+from cancatlib.j1939 import emitArbid
+from cancatlib.J1939db import *
+from cancatlib import *
+from cancatlib.vstruct.bitfield import *
 
 import queue
 import threading

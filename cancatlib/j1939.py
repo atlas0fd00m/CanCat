@@ -1,12 +1,12 @@
 from __future__ import print_function
 
 import queue
-import cancat
+import cancatlib
 import struct
-from cancat.J1939db import *
-from cancat import *
+from cancatlib.J1939db import *
+from cancatlib import *
 
-from cancat.vstruct.bitfield import *
+from cancatlib.vstruct.bitfield import *
 
 PF_RQST =       0xea
 PF_TP_DT =      0xeb
@@ -110,10 +110,10 @@ def pf_eb(idx, ts, arbtup, data, j1939):
 
     if j1939.skip_TPDT:
         if not len(nextline):
-            return cancat.DONT_PRINT_THIS_MESSAGE
+            return cancatlib.DONT_PRINT_THIS_MESSAGE
 
         else:
-            return (cancat.DONT_PRINT_THIS_MESSAGE, nextline)
+            return (cancatlib.DONT_PRINT_THIS_MESSAGE, nextline)
 
     if len(extmsgs['msgs']) > extmsgs['length']:
             #print("ERROR: too many messages in Extended Message between %.2x -> %.2x\n\t%r" % (sa, da, extmsgs['msgs']))
@@ -236,14 +236,14 @@ def pf_ec(idx, ts, arbtup, data, j1939):
 
         if cb_handler == None:
             if j1939.skip_TPDT:
-                return cancat.DONT_PRINT_THIS_MESSAGE
+                return cancatlib.DONT_PRINT_THIS_MESSAGE
 
             return 'TP.CM_%s' % subname
 
         newmsg = cb_handler(idx, ts, arbtup, data, j1939)
 
         if j1939.skip_TPDT:
-            return cancat.DONT_PRINT_THIS_MESSAGE
+            return cancatlib.DONT_PRINT_THIS_MESSAGE
 
         if newmsg == None:
             return 'TP.CM_%s' % subname
@@ -465,7 +465,7 @@ pfhandlers = {
 class TimeoutException(Exception):
     pass
 
-class J1939(cancat.CanInterface):
+class J1939(cancatlib.CanInterface):
     def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None):
         self.myIDs = []
         self.extMsgs = {}
@@ -511,7 +511,7 @@ class J1939(cancat.CanInterface):
 
         if handler is not None:
             enhanced = handler(idx, ts, arbtup, data, self)
-            if enhanced == cancat.DONT_PRINT_THIS_MESSAGE:
+            if enhanced == cancatlib.DONT_PRINT_THIS_MESSAGE:
                 return enhanced
 
             if enhanced is not None:
@@ -522,7 +522,7 @@ class J1939(cancat.CanInterface):
 
                     # if we get multiple lines and the first is DONT_PRINT_THIS_MESSAGE,
                     # then just return nextline
-                    if pfmeaning == cancat.DONT_PRINT_THIS_MESSAGE:
+                    if pfmeaning == cancatlib.DONT_PRINT_THIS_MESSAGE:
                         return nextline
 
                     nextline = '\n' + nextline
@@ -968,7 +968,7 @@ class J1939(cancat.CanInterface):
         for msg in msgs:
             try:
                 msgrepr = self._reprCanMsg(*msg)
-                if msgrepr != cancat.DONT_PRINT_THIS_MESSAGE:
+                if msgrepr != cancatlib.DONT_PRINT_THIS_MESSAGE:
                     print(msgrepr)
             except Exception as e:
                 print(e)

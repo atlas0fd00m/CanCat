@@ -9,7 +9,7 @@ import logging
 import platform
 import contextlib
 
-from cancat.envi.exc import *
+from cancatlib.envi.exc import *
 
 logger = logging.getLogger(__name__)
 
@@ -69,5 +69,5 @@ BR_TABLE = 1<<3  # The branch target is the base of a pointer array of jmp/call 
 BR_FALL  = 1<<4  # The branch is a "fall through" to the next instruction
 BR_ARCH  = 1<<5  # The branch *switches opcode formats*. ( ARCH_FOO in high bits )
 
-import cancat.envi.bits as e_bits
+import cancatlib.envi.bits as e_bits
 
