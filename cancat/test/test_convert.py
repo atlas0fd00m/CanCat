@@ -32,3 +32,20 @@ class Convert_test(unittest.TestCase):
         convert.cancat2candump(outf0[1], outf1[1])
 
 
+    def test_Pcap2CanCat(self):
+        basedir = os.path.dirname(cancat.__file__)
+        excandump = os.sep.join([basedir, 'test', 'data', 'candump_example.txt'])
+
+        outf0 = tempfile.mkstemp()
+        outf1 = tempfile.mkstemp()
+        outf2 = tempfile.mkstemp()
+
+        # first test from Candump to CanCat:
+        convert.candump2cancat(excandump, outf0[1])
+
+        # now convert to pcap
+        convert.cancat2pcap(outf0[1], outf1[1])
+
+        # now convert back
+        convert.pcap2cancat(outf1[1], outf2[1])
+

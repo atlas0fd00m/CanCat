@@ -29,7 +29,8 @@ def cancat2pcap(session, output):
     import scapy.packet
     import scapy.utils
 
-    sess = pickle.load(session, encoding='latin1')
+    with open(session, 'rb') as f:
+        sess = pickle.load(f, encoding='latin1')
 
     msgs = []
     for msg_time, msg in sess['messages'].get(cancat.CMD_CAN_RECV, None):
