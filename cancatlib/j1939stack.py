@@ -138,11 +138,11 @@ pgn_pfs = {
         }
 
 
-class J1939Interface(cancat.CanInterface):
+class J1939Interface(cancatlib.CanInterface):
     _msg_source_idx = J1939MSGS
-    def __init__(self, port=None, baud=cancat.baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, process_can_msgs=True, promisc=True):
+    def __init__(self, port=None, baud=cancatlib.baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, process_can_msgs=True, promisc=True):
 
-        cancat.CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
+        cancatlib.CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
         self.register_handler(CMD_CAN_RECV, self._j1939_can_handler)
 
         self._last_recv_idx = -1
@@ -250,7 +250,7 @@ class J1939Interface(cancat.CanInterface):
 
         if handler is not None:
             enhanced = handler(idx, ts, arbtup, data, self)
-            if enhanced == cancat.DONT_PRINT_THIS_MESSAGE:
+            if enhanced == cancatlib.DONT_PRINT_THIS_MESSAGE:
                 return enhanced
 
             if enhanced is not None:
@@ -261,7 +261,7 @@ class J1939Interface(cancat.CanInterface):
 
                     # if we get multiple lines and the first is DONT_PRINT_THIS_MESSAGE,
                     # then just return nextline
-                    if pfmeaning == cancat.DONT_PRINT_THIS_MESSAGE:
+                    if pfmeaning == cancatlib.DONT_PRINT_THIS_MESSAGE:
                         return nextline
 
                     nextline = '\n' + nextline
@@ -940,7 +940,7 @@ class J1939Interface(cancat.CanInterface):
         for msg in msgs:
             try:
                 msgrepr = self._reprCanMsg(*msg)
-                if msgrepr != cancat.DONT_PRINT_THIS_MESSAGE:
+                if msgrepr != cancatlib.DONT_PRINT_THIS_MESSAGE:
                     print(msgrepr)
             except Exception as e:
                 print(e)

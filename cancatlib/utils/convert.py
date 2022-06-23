@@ -2,7 +2,7 @@
 
 import re
 import pickle
-import cancat
+import cancatlib
 import struct
 
 from binascii import unhexlify
@@ -12,7 +12,7 @@ def cancat2candump(session, output):
         sess = pickle.load(f, encoding='latin1')
 
     with open(output, 'w') as f:
-        for msg_time, msg in sess['messages'].get(cancat.CMD_CAN_RECV, None):
+        for msg_time, msg in sess['messages'].get(cancatlib.CMD_CAN_RECV, None):
             if isinstance(msg, str):
                 msg = bytes(msg, 'latin1')
 
@@ -33,7 +33,7 @@ def cancat2pcap(session, output):
         sess = pickle.load(f, encoding='latin1')
 
     msgs = []
-    for msg_time, msg in sess['messages'].get(cancat.CMD_CAN_RECV, None):
+    for msg_time, msg in sess['messages'].get(cancatlib.CMD_CAN_RECV, None):
         if isinstance(msg, str):
             msg = bytes(msg, 'latin1')
 
@@ -80,7 +80,7 @@ def _import_candump(filename):
         'bookmarks': [],
         'comments': [],
         'messages': {
-            cancat.CMD_CAN_RECV: msgs,
+            cancatlib.CMD_CAN_RECV: msgs,
         },
     }
 
@@ -107,7 +107,7 @@ def _import_pcap(filename):
         'bookmarks': [],
         'comments': [],
         'messages': {
-            cancat.CMD_CAN_RECV: msgs,
+            cancatlib.CMD_CAN_RECV: msgs,
         },
     }
 

@@ -109,12 +109,12 @@ class OneOrMoreOf(argparse.Action):
 
 
 def _get_baud_options():
-    bauds = [b[4:-3] for b in dir(cancat) if b.startswith('CAN_') and b.endswith('BPS')]
+    bauds = [b[4:-3] for b in dir(cancatlib) if b.startswith('CAN_') and b.endswith('BPS')]
     return bauds
 
 
 def _get_baud_value(baud):
-    ret = getattr(cancat, "CAN_{}BPS".format(baud))
+    ret = getattr(cancatlib, "CAN_{}BPS".format(baud))
     return ret
 
 
@@ -191,7 +191,7 @@ def udsmap_parse_args():
     parser.add_argument('-i', '--input-file',
                         help='Input file containing previous scan results')
     parser.add_argument('-u', '--uds-class',
-                        help='Custom UDS class, allows for implementing key/seed unlock functions or testing, example: cancat.uds.test.FakeUDS')  # noqa: E501
+                        help='Custom UDS class, allows for implementing key/seed unlock functions or testing, example: cancatlib.uds.test.FakeUDS')  # noqa: E501
     return parser.parse_args()
 
 
@@ -380,9 +380,9 @@ def scan(config, args, c, scancls):  # noqa: C901
 def main():  # noqa: C901
     args = udsmap_parse_args()
 
-    # TODO: move this to it's own class in cancat.utils, the config/args global
+    # TODO: move this to it's own class in cancatlib.utils, the config/args global
     #       data thing will be better handled that way
-    # cancat.utils.canmap(args)
+    # cancatlib.utils.canmap(args)
 
     if args.verbose == 1:
         loglevel = log.DEBUG
@@ -413,7 +413,7 @@ def main():  # noqa: C901
 
     global c
 
-    ifaceclass = cancat.CanInterface
+    ifaceclass = cancatlib.CanInterface
     scancls = None
     if args.uds_class:
         pkg, cls = args.uds_class.rsplit('.', 1)
@@ -421,7 +421,7 @@ def main():  # noqa: C901
         scancls = getattr(scanlib, cls)
 
         # If the custom UDS class package has a "CanInterface" class, use that
-        # instead of the real cancat.CanInterface class
+        # instead of the real cancatlib.CanInterface class
         if hasattr(scanlib, 'CanInterface'):
             ifaceclass = getattr(scanlib, 'CanInterface')
     c = ifaceclass(port=args.port)
