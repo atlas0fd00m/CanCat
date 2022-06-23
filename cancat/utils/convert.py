@@ -1,10 +1,11 @@
 # Utility functions for CanCat
 
+import re
 import pickle
 import cancat
 import struct
-import re
 
+from binascii import unhexlify
 
 def cancat2candump(session, output):
     with open(session, 'rb') as f:
@@ -58,20 +59,20 @@ def cancat2pcap(session, output):
 
 def _import_candump(filename):
     msgs = []
-    with open(filename, 'r') as f:
-        pat = re.compile(r'\(([0-9]+\.[0-9]+)\) [A-Za-z0-9]+ ([A-Fa-f0-9]+)#([A-Fa-f0-9]+)')
+    with open(filename, 'rb') as f:
+        pat = re.compile(br'\(([0-9]+\.[0-9]+)\) [A-Za-z0-9]+ ([A-Fa-f0-9]+)#([A-Fa-f0-9]*)( *;.*)*')
         for line in f.readlines():
             match = pat.match(line.strip())
             if match is None:
                 raise ValueError('Invalid candump format: %s' % line)
 
-            time, arb_id, data = match.groups()
+            time, arb_id, data, comment = match.groups()
 
             # Ensure that the arbid is padded out to 4 bytes
             if len(arb_id) < 8:
                 arb_id = ('0' * (8 - len(arb_id))) + arb_id
 
-            msgs.append((float(time), arb_id.decode('hex') + data.decode('hex')))
+            msgs.append((float(time), unhexlify(arb_id) + unhexlify(data)))
 
     sess = {
         'bookmark_info': {},
@@ -113,10 +114,10 @@ def _import_pcap(filename):
 
 
 def candump2cancat(candumplog, output):
-    with open(output, 'w') as f:
+    with open(output, 'wb') as f:
         pickle.dump(_import_candump(candumplog), f)
 
 
 def pcap2cancat(pcapfile, output):
-    with open(output, 'w') as f:
+    with open(output, 'wb') as f:
         pickle.dump(_import_pcap(pcapfile), f)
