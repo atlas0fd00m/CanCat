@@ -1712,7 +1712,7 @@ def reprCanMsg(canidx, idx, ts, arbid, data, comment=None):
     #TODO: make some repr magic that spits out known ARBID's and other subdata
     if comment == None:
         comment = ''
-    return "%.8d %8.3f (can%d) ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, canidx, arbid, len(data), binascii.hexlify(data), comment)
+    return "%.8d %8.3f (can%d) ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, canidx, arbid, len(data), binascii.hexlify(data).decode(), comment)
 
 class FordInterface(CanInterface):
     def setCanBaudHSCAN(self):
