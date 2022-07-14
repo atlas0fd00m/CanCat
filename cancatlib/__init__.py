@@ -174,8 +174,21 @@ default_cmdhandlers = {
 }
 
 
-def loadCanBuffer(filename):
-    return pickle.load(open(filename))
+class CanCatUnPickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        '''
+        Gracefully handle the cancat->cancatlib module name change
+        '''
+        if module == 'cancat':
+            return super(CanCatUnPickler, self).find_class('cancatlib', name)
+        return super(CanCatUnPickler, self).find_class(module, name)
+
+
+def loadCanSession(filename):
+    with open(filename, 'rb') as f:
+        # gracefully handle python 2 to 3 conversion things
+        unpickler = CanCatUnPickler(f, fix_imports=True, encoding='latin1')
+        return unpickler.load()
 
 
 def keystop(delay=0):
@@ -1079,8 +1092,7 @@ class CanInterface(object):
         Load a previous analysis session from a saved file
         see: saveSessionToFile()
         '''
-        loadedFile = open(filename, 'rb')
-        me = pickle.load(loadedFile, encoding='latin1')
+        me = loadCanSession(filename)
 
         # Go through the msgs and turn them into bytes to ensure any logs saved
         # with python2 can be loaded in python3
