@@ -189,7 +189,7 @@ class J1939Interface(cancatlib.CanInterface):
             self._config['myIDs'].remove(curid)
 
     def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
-        if len(data) < 8:
+        if len(data) <= 8:
             arbid = emitArbid(prio, edp, dp, pf, ps, sa)
             # print("TX: %x : %r" % (arbid, hexlify(data)))
             self.CANxmit(arbid, data, extflag=1)
@@ -205,7 +205,7 @@ class J1939Interface(cancatlib.CanInterface):
         else:
             pgn0 = ps
 
-        msgs = ['%c'%(x+1) + message[x*7:(x*7)+7] for x in range((len(message)+6)//7)]
+        msgs = [b'%c'%(x+1) + message[x*7:(x*7)+7] for x in range((len(message)+6)//7)]
         if len(msgs) > 255:
             raise Exception("J1939xmit_tp: attempt to send message that's too large")
 
