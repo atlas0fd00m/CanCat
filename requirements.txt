@@ -1,0 +1,6 @@
+ipython
+pyserial
+pyusb
+termcolor
+future
+six

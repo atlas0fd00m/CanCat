@@ -1,0 +1,4 @@
+#!/usr/bin/env python2
+
+from cancatlib.scripts.candump2cancat import main
+main()

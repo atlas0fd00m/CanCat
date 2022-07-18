@@ -1,2 +1,12 @@
+sketches/**/*.bin
+*.elf
 *.pyc
 build/
+*.bin
+*.elf
+*~
+.*.sw?
+
+build/
+dist/
+cancat.egg-info/
