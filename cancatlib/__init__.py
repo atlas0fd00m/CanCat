@@ -1430,7 +1430,7 @@ class CanInterface(object):
                 if delta_ts >= .95:
                     yield ('')
 
-            msgrepr = self._reprCanMsg(idx, ts, arbid, msg, comment='\t'.join(diff))
+            msgrepr = self._reprCanMsg(0, idx, ts, arbid, msg, comment='\t'.join(diff))
             # allow _reprCanMsg to return None to skip printing the message
             if msgrepr != DONT_PRINT_THIS_MESSAGE:
                 yield msgrepr
@@ -2085,18 +2085,16 @@ class CanInTheMiddleInterface(CanInterface):
 
         Many functions wrap this one.
         '''
-        out = []
-
         if start_msg in self.bookmarks_iso:
             bkmk = self.bookmarks_iso.index(start_msg)
-            out.append("starting from bookmark %d: '%s'" %
+            yield ("starting from bookmark %d: '%s'" %
                     (bkmk,
                     self.bookmark_info_iso[bkmk].get('name'))
                     )
 
         if stop_msg in self.bookmarks_iso:
             bkmk = self.bookmarks_iso.index(stop_msg)
-            out.append("stoppng at bookmark %d: '%s'" %
+            yield ("stoppng at bookmark %d: '%s'" %
                     (bkmk,
                     self.bookmark_info_iso[bkmk].get('name'))
                     )
@@ -2127,7 +2125,7 @@ class CanInTheMiddleInterface(CanInterface):
 
             # insert bookmark names/comments in appropriate places
             while next_bkmk_idx < len(self.bookmarks_iso) and idx >= self.bookmarks_iso[next_bkmk_idx]:
-                out.append(self.reprBookmarkIso(next_bkmk_idx))
+                yield (self.reprBookmarkIso(next_bkmk_idx))
                 next_bkmk_idx += 1
 
             msg_count += 1
@@ -2169,13 +2167,11 @@ class CanInTheMiddleInterface(CanInterface):
             else:
                 diff.append("TS_delta: %.3f" % delta_ts)
 
-            out.append(reprCanMsg(0, idx, ts, arbid, msg, comment='\t'.join(diff)))
+            yield (reprCanMsg(0, idx, ts, arbid, msg, comment='\t'.join(diff)))
             last_ts = ts
             last_msg = msg
 
-        out.append("Total Messages: %d  (repeat: %d / similar: %d)" % (msg_count, data_repeat, data_similar))
-
-        return "\n".join(out)
+        yield ("Total Messages: %d  (repeat: %d / similar: %d)" % (msg_count, data_repeat, data_similar))
 
     def printCanSessionsIso(self, arbid_list=None, advfilters=[]):
         '''
