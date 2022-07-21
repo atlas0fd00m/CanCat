@@ -16,7 +16,7 @@ def getLoadedFakeJ1939Interface(**kwargs):
     c._io.queueCanMessages(test_j1939_msgs_0)
     c._io.queueCanMessages(test_j1939_msgs_1)
     return c
-        
+
 
 class J1939_test(unittest.TestCase):
     def test_basic_j1939_dongle(self):
@@ -37,7 +37,6 @@ class J1939_test(unittest.TestCase):
         c.printCanMsgs(advfilters=['len(data) > 8'])
         c.printCanMsgs(advfilters=['pgn == 0xfeca'])
 
-
         # make sure we have the correct number of LONG J1939 messages here
         test_msgs_long = [x for x in c.filterCanMsgs(advfilters=['len(data) > 8'])]
         self.assertEqual(len(test_msgs_long), 2)
@@ -49,9 +48,7 @@ class J1939_test(unittest.TestCase):
         self.assertEqual(data[-5:], unhexlify(b'0139040901'))
         self.assertEqual(len(data), 78)
 
-
         # now do destructive testing
         ts, arbtup, msg = c.J1939recv(pf=0xf0, ps=0x03, sa=0)[0]
-        self.assertEqual(arbtup, (0x3, 0x0, 0x0, 0xf0, 0x3, 0x0))
+        self.assertEqual(arbtup, (0xcf00300, 0x3, 0x0, 0x0, 0xf0, 0x3, 0x0))
         self.assertEqual(msg, b'\xda\xfe\x00\xff\xff\x0fc}')
-

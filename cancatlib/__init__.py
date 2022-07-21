@@ -2,10 +2,10 @@ from __future__ import print_function
 from past.builtins import xrange
 from builtins import input, bytes
 import six
+from operator import itemgetter
 
 import os
 import sys
-import cmd
 import time
 import serial
 import select
@@ -44,9 +44,9 @@ CMD_CHANGE_BAUD             = 0x42
 CMD_CAN_BAUD                = 0x43
 CMD_CAN_SEND                = 0x44
 CMD_CAN_MODE                = 0x45
-CMD_CAN_MODE_SNIFF_CAN0     = 0x00 # Start sniffing on can 0
-CMD_CAN_MODE_SNIFF_CAN1     = 0x01 # Start sniffing on can 1
-CMD_CAN_MODE_CITM           = 0x02 # Start CITM between can1 and can2
+CMD_CAN_MODE_SNIFF_CAN0     = 0x00  # Start sniffing on can 0
+CMD_CAN_MODE_SNIFF_CAN1     = 0x01  # Start sniffing on can 1
+CMD_CAN_MODE_CITM           = 0x02  # Start CITM between can1 and can2
 CMD_CAN_SEND_ISOTP          = 0x46
 CMD_CAN_RECV_ISOTP          = 0x47
 CMD_CAN_SENDRECV_ISOTP      = 0x48
@@ -62,7 +62,7 @@ CAN_RESP_GETTXBFTIMEOUT     = (6)
 CAN_RESP_SENDMSGTIMEOUT     = (7)
 CAN_RESP_FAIL               = (0xff)
 
-CAN_RESPS = { v: k for k,v in globals().items() if k.startswith('CAN_RESP_') }
+CAN_RESPS = {v: k for k, v in globals().items() if k.startswith('CAN_RESP_')}
 
 # constants for setting baudrate for the CAN bus
 CAN_AUTOBPS  = 0
@@ -145,13 +145,16 @@ Suzuki_messages = {
 Harley_messages = {
         }
 
+
 # helper functions for printing log messages from the CanCat Transceiver
 def handleLogToScreen(message, canbuf):
     print('LOG: %s' % repr(message))
 
+
 def handleLogHexToScreen(message, canbuf):
     num = struct.unpack("<L", message)
     print('LOG: %x' % num)
+
 
 def handleCanMsgsDuringSniff(message, canbuf, arbids=None, canidx=0):
     ts = time.time()
@@ -164,13 +167,29 @@ def handleCanMsgsDuringSniff(message, canbuf, arbids=None, canidx=0):
     else:
         print(reprCanMsg(canidx, idx, ts, arbid, data))
 
-default_cmdhandlers = {
-        CMD_LOG : handleLogToScreen,
-        CMD_LOG_HEX: handleLogHexToScreen,
-        }
 
-def loadCanBuffer(filename):
-    return pickle.load(open(filename))
+default_cmdhandlers = {
+    CMD_LOG: handleLogToScreen,
+    CMD_LOG_HEX: handleLogHexToScreen,
+}
+
+
+class CanCatUnPickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        '''
+        Gracefully handle the cancat->cancatlib module name change
+        '''
+        if module == 'cancat':
+            return super(CanCatUnPickler, self).find_class('cancatlib', name)
+        return super(CanCatUnPickler, self).find_class(module, name)
+
+
+def loadCanSession(filename):
+    with open(filename, 'rb') as f:
+        # gracefully handle python 2 to 3 conversion things
+        unpickler = CanCatUnPickler(f, fix_imports=True, encoding='latin1')
+        return unpickler.load()
+
 
 def keystop(delay=0):
     if os.name == 'posix':
@@ -179,12 +198,17 @@ def keystop(delay=0):
         import msvcrt
         return msvcrt.kbhit()
 
+
 class SPECIAL_CASE(object):
     pass
+
+
 DONT_PRINT_THIS_MESSAGE = SPECIAL_CASE
+
 
 class CanInterface(object):
     _msg_source_idx = CMD_CAN_RECV
+
     def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
         '''
         CAN Analysis Workspace
@@ -960,22 +984,22 @@ class CanInterface(object):
         canmsgs = self._messages.get(self._msg_source_idx, [])
         return len(canmsgs)
 
-    def printSessionStatsByBookmark(self, start=None, stop=None):
+    def printSessionStatsByBookmark(self, start=None, stop=None, reverse=True, sort=None):
         '''
         Prints session stats only for messages between two bookmarks
         '''
-        print(self.getSessionStatsByBookmark(start, stop))
+        print(self.getSessionStatsByBookmark(start=start, stop=stop, reverse=reverse, sort=sort))
 
-    def printSessionStats(self, start=0, stop=None):
+    def printSessionStats(self, start=0, stop=None, reverse=True, sort=None):
         '''
         Print session stats by Arbitration ID (aka WID/PID/CANID/etc...)
         between two message indexes (where they sit in the CMD_CAN_RECV
         mailbox)
         '''
         print(self._reprSessionStatsHeader())
-        print(self.getSessionStats(start, stop))
+        print(self.getSessionStats(start=start, stop=stop, reverse=reverse, sort=sort))
 
-    def getSessionStatsByBookmark(self, start=None, stop=None):
+    def getSessionStatsByBookmark(self, start=None, stop=None, reverse=True, sort=None):
         '''
         returns session stats by bookmarks
         '''
@@ -989,9 +1013,17 @@ class CanInterface(object):
         else:
             stop_msg = self.getCanMsgCount()
 
-        return(self.getSessionStats(start=start_msg, stop=stop_msg))
+        return(self.getSessionStats(start=start_msg, stop=stop_msg, reverse=reverse, sort=sort))
 
-    def getArbitrationIds(self, start=0, stop=None, reverse=False):
+    def _sortArbitrationIds(self, arbid_list, reverse=True, sort=None):
+        if sort is None:
+            # Sort on the msg count only
+            return sorted(arbid_list, key=itemgetter(0), reverse=reverse)
+        else:
+            # Sort on arbitration ID
+            return sorted(arbid_list, key=itemgetter(1), reverse=reverse)
+
+    def getArbitrationIds(self, start=0, stop=None, reverse=False, sort=None):
         '''
         return a list of Arbitration IDs
         '''
@@ -1005,8 +1037,8 @@ class CanInterface(object):
             arbmsgs.append((ts, data))
             msg_count += 1
 
-        arbid_list = [(len(msgs), arbid, msgs) for arbid,msgs in arbids.items()]
-        arbid_list.sort(reverse=reverse)
+        unsorted_list = [(len(msgs), arbid, msgs) for arbid,msgs in arbids.items()]
+        arbid_list = self._sortArbitrationIds(unsorted_list, reverse=reverse, sort=sort)
 
         return arbid_list
 
@@ -1016,9 +1048,9 @@ class CanInterface(object):
     def _reprArbid(self, arbid):
         return '  %8x' % arbid
 
-    def getSessionStats(self, start=0, stop=None):
+    def getSessionStats(self, start=0, stop=None, reverse=True, sort=None):
         out = []
-        arbid_list = self.getArbitrationIds(start=start, stop=stop, reverse=True)
+        arbid_list = self.getArbitrationIds(start=start, stop=stop, reverse=reverse, sort=sort)
 
         for datalen, arbid, msgs in arbid_list:
             last = 0
@@ -1060,15 +1092,16 @@ class CanInterface(object):
         Load a previous analysis session from a saved file
         see: saveSessionToFile()
         '''
-        loadedFile = open(filename, 'rb')
-        me = pickle.load(loadedFile, encoding='latin1')
+        me = loadCanSession(filename)
 
-        # Go through the msgs and turn them into bytes
+        # Go through the msgs and turn them into bytes to ensure any logs saved
+        # with python2 can be loaded in python3
         for cmd in me['messages']:
             for i in range(len(me['messages'][cmd])):
-                ts, msg = me['messages'][cmd][i]
-                if isinstance(msg, str):
-                    me['messages'][cmd][i] = (ts, msg.encode('latin-1'))
+                data = list(me['messages'][cmd][i])
+                if isinstance(data[-1], str):
+                    data[-1] = data[-1].encode('latin-1')
+                me['messages'][cmd][i] = tuple(data)
 
         self.restoreSession(me, force=force)
         self._filename = filename
@@ -2261,6 +2294,7 @@ class CanInTheMiddleInterface(CanInterface):
 ######### administrative, supporting code ##########
 cs = []
 
+
 def cleanupInteractiveAtExit():
     global cs
     for c in cs:
@@ -2269,12 +2303,14 @@ def cleanupInteractiveAtExit():
         except:
             pass
 
+
 def getDeviceFile():
     import serial.tools.list_ports
 
     for n, (port, desc, hwid) in enumerate(sorted(serial.tools.list_ports.comports()), 1):
         if os.path.exists(port):
             return port
+
 
 def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
     global c
@@ -2284,7 +2320,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
     atexit.register(cleanupInteractiveAtExit)
 
     if load_filename is None:
-        if can_baud != None:
+        if can_baud is not None:
             c.setCanBaud(can_baud)
         else:
             c.setCanBaud(CAN_500KBPS)
@@ -2296,8 +2332,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
         import IPython
         ipsh = IPython.embed(banner1=intro, colors="neutral")
 
-
-    except ImportError as e:
+    except ImportError:
         try:
             from IPython.terminal.interactiveshell import TerminalInteractiveShell
             from IPython.terminal.ipapp import load_default_config
@@ -2306,8 +2341,7 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
             ipsh.user_global_ns.update(lcls)
             ipsh.autocall = 2       # don't require parenthesis around *everything*.  be smart!
             ipsh.mainloop(intro)
-        except ImportError as e:
-
+        except ImportError:
             try:
                 from IPython.frontend.terminal.interactiveshell import TerminalInteractiveShell
                 ipsh = TerminalInteractiveShell()
@@ -2320,4 +2354,3 @@ def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=
                 import code
                 shell = code.InteractiveConsole(gbls)
                 shell.interact(intro)
-
