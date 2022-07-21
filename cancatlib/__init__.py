@@ -1446,7 +1446,7 @@ class CanInterface(object):
         return "\n".join(out)
 
     def _reprCanMsg(self, idx, ts, arbid, msg, comment=None):
-        return reprCanMsg(idx, ts, arbid, msg, comment=comment)
+        return reprCanMsg(0, idx, ts, arbid, msg, comment=comment)
 
     def printCanSessions(self, arbid_list=None, advfilters=[]):
         '''
@@ -1712,7 +1712,7 @@ def reprCanMsg(canidx, idx, ts, arbid, data, comment=None):
     #TODO: make some repr magic that spits out known ARBID's and other subdata
     if comment == None:
         comment = ''
-    return "%.8d %8.3f (can%d) ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, canidx, arbid, len(data), binascii.hexlify(data), comment)
+    return "%.8d %8.3f (can%d) ID: %.3x,  Len: %.2x, Data: %-18s\t%s" % (idx, ts, canidx, arbid, len(data), binascii.hexlify(data).decode(), comment)
 
 class FordInterface(CanInterface):
     def setCanBaudHSCAN(self):
@@ -2169,7 +2169,7 @@ class CanInTheMiddleInterface(CanInterface):
             else:
                 diff.append("TS_delta: %.3f" % delta_ts)
 
-            out.append(reprCanMsg(idx, ts, arbid, msg, comment='\t'.join(diff)))
+            out.append(reprCanMsg(0, idx, ts, arbid, msg, comment='\t'.join(diff)))
             last_ts = ts
             last_msg = msg
 

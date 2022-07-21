@@ -99,7 +99,7 @@ def pf_c9(idx, ts, arbtup, data, j1939):
 
 def pf_ea(idx, ts, arbtup, data, j1939):
     (prio, edp, dp, pf, ps, sa) = arbtup
-    return "Request: %s" % (hexlify(data[:3]))
+    return "Request: %s" % (hexlify(data[:3]).decode())
 
 # no pf_eb or pf_ec since those are handled at a lower-level in this stack
 
@@ -120,7 +120,7 @@ def pf_ef(idx, ts, arbtup, data, j1939):
 
 def pf_ff(idx, ts, arbtup, data, j1939):
     prio, edp, dp, pf, ps, sa = arbtup
-    pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, hexlify(data))
+    pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, hexlify(data).decode())
     return "Proprietary B %s" % pgn
 
 pgn_pfs = {
@@ -191,7 +191,7 @@ class J1939Interface(cancatlib.CanInterface):
     def J1939xmit(self, pf, ps, sa, data, prio=6, edp=0, dp=0):
         if len(data) <= 8:
             arbid = emitArbid(prio, edp, dp, pf, ps, sa)
-            # print("TX: %x : %r" % (arbid, hexlify(data)))
+            # print("TX: %x : %s" % (arbid, hexlify(data).decode()))
             self.CANxmit(arbid, data, extflag=1)
             return
 
@@ -213,13 +213,13 @@ class J1939Interface(cancatlib.CanInterface):
                 pgn2, pgn1, pgn0)
 
         arbid = emitArbid(prio, edp, dp, PF_TP_CM, ps, sa)
-        # print("TXe: %x : %r" % (arbid, hexlify(cm_msg)))
+        # print("TXe: %x : %s" % (arbid, hexlify(cm_msg).decode()))
         self.CANxmit(arbid, cm_msg, extflag=1)
         time.sleep(.01)  # hack: should watch for CM_CTS
         for msg in msgs:
             #self.J1939xmit(PF_TP_DT, ps, sa, msg, prio=prio)
             arbid = emitArbid(prio, edp, dp, PF_TP_DT, ps, sa)
-            print("TXe: %x : %r" % (arbid, hexlify(msg)))
+            print("TXe: %x : %s" % (arbid, hexlify(msg).decode()))
             self.CANxmit(arbid, msg, extflag=1)
 
         # hack: should watch for CM_EOM
@@ -283,7 +283,7 @@ class J1939Interface(cancatlib.CanInterface):
                     nextline = '\n' + '\n'.join(lines)
 
         return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Data: %-18s  %s\t\t%s%s" % \
-                (idx, ts, prio, edp, dp, pf, ps, sa, hexlify(data), pfmeaning, comment, nextline)
+                (idx, ts, prio, edp, dp, pf, ps, sa, hexlify(data).decode(), pfmeaning, comment, nextline)
 
     def _j1939_can_handler(self, tsmsg, none):
         '''
@@ -307,7 +307,7 @@ class J1939Interface(cancatlib.CanInterface):
         else:
             self.queueMessageHandlerEvent(self._submitJ1939Message, arbtup, data, ts)
 
-        #print("submitted message: %r" % (hexlify(message)))
+        #print("submitted message: %s" % (hexlify(message).decode()))
 
 
     def queueMessageHandlerEvent(self, pfhandler, arbtup, data, ts):

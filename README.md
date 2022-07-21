@@ -2,9 +2,9 @@
 CanCat is an open source multi-purpose tool for interacting and experimenting with Controller Area Networks (CAN), such as those that are often used in cars, building automation, etc.
 
 ## Description
-CanCat has two main parts:  
-1) Firmware for compatible CAN-transceivers,  
-2) Python client to talk to CanCat,  
+CanCat has two main parts:
+1) Firmware for compatible CAN-transceivers,
+2) Python client to talk to CanCat,
 
 The CAN-transceiver combinations that are currently supported by CanCat are:
 * Arduino with SeeedStudio's CANBUS Shield
@@ -25,11 +25,11 @@ The goals of CanCat are to provide:
 
 
 ### Recommended:
-* CANBUS_Shield from SeeedStudio (for Firmware compilation)  
+* CANBUS_Shield from SeeedStudio (for Firmware compilation)
     https://github.com/Seeed-Studio/CAN_BUS_Shield
 
-* vstructs From the Vivisect framework in the Python Path:  
-    (required for J1939 module)  
+* vstructs From the Vivisect framework in the Python Path:
+    (required for J1939 module)
     https://github.com/vivisect/vivisect
 
 * ipython
@@ -47,7 +47,7 @@ $ pip install --user pyserial
 $ pip install --user ipython
 ```
 
-3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software).  
+3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software).
 
 4) (OPTIONAL) If you are using a [Macchina M2](https://www.macchina.cc/) follow
 the [getting started
@@ -68,6 +68,8 @@ compile and flash the CanCat firmware with the following steps:
 $ git clone https://github.com/atlas0fd00m/CanCat
 $ arduino-cli config init
 $ arduino-cli config add board_manager.additional_urls https://macchina.cc/package_macchina_index.json
+$ arduino-cli lib update-index
+$ arduino-cli lib install due_can
 $ arduino-cli core update-index
 $ arduino-cli core install arduino:sam
 $ arduino-cli core install macchina:sam
@@ -120,11 +122,11 @@ you interact with the CanCat tool:
 >>> CANalysis.ping()
 ```
 
-`>>>` and `In [#]:` are used interchangeably in this instruction guide.  
+`>>>` and `In [#]:` are used interchangeably in this instruction guide.
 
 `>>>` is the default interactive python prompt, and commands using this prompt will use the `CANalysis` object.
 
-`In [#]:` is the ipython prompt, and commands using this prompt will begin with the `c` object.  
+`In [#]:` is the ipython prompt, and commands using this prompt will begin with the `c` object.
 
 Other than the different in prompt type, the commands for CanCat will look the same.
 
@@ -162,7 +164,7 @@ Once you save for the first time, the file name will be cached so you can simply
 ```
 
 ### CanCat help and tips
-To access the help function in CanCat:  
+To access the help function in CanCat:
 ```python
 >>> help(cancat)
 ```
@@ -253,7 +255,7 @@ arbitration ID from 0x700 to 0x7F7 and print out which servers respond, and whic
 time out.
 
 ```python
-for i in range(0x700, 0x7f8):  
+for i in range(0x700, 0x7f8):
     u = uds.UDS(c, i, i+8)
     print("Trying ", hex(i))
     try:
@@ -272,9 +274,9 @@ other identifying information for this UDS server.
 
 ```python
 for i in range(0xf180, 0xf1a0):
-    try:                  
+    try:
         print(u.ReadDID(i))
-    except:          
+    except:
         print(hex(i), " Returned error")
 ```
 
@@ -388,7 +390,7 @@ Placing a bookmark places a bookmark simultaneously on both the Isolation inform
 
 ##  canmap
 
-Canmap is a tool built on CanCat to scan a CAN bus for various UDS capabilities.  
+Canmap is a tool built on CanCat to scan a CAN bus for various UDS capabilities.
 Canmap is built on top of the `cancat.uds.UDS` class.  Canmap has many different
 options to control what type of scans are performed, and how the scans are
 performed, but the basic information required is the type of scan to run, the
@@ -462,11 +464,11 @@ $ ./canmap -p /dev/ttyACM0 -b 500K -sE -E 60-A0 -m std
 ECU scanning works by sending a read DID request (`cancat.uds.UDS.ReadDID`) or
 a session control request (`cancat.uds.UDS.DiagnosticSessionControl`) and
 waiting for a timeout, a negative response or a positive response.  The default
-method is to attempt to read the VIN from each UDS address   
+method is to attempt to read the VIN from each UDS address
 (`cancat.uds.UDS.ReadDID(0xF190)`). Different methods are available because
 different methods have different degrees of success on different vehicles.
 
-The other factor that can affect the success rate is how quickly ECUs respond.  
+The other factor that can affect the success rate is how quickly ECUs respond.
 The UDS standard timeout is 3 seconds, scanning both bus modes with 3 second
 timeouts could take up to 25 minutes. Instead the default timeout for ECU
 scanning is 0.2 seconds, if fewer ECUs than expected are identified it may be
