@@ -24,6 +24,8 @@ class Convert_test(unittest.TestCase):
         outf0 = tempfile.mkstemp()
         with open(outf0[1], 'wb') as outf:
             outf.write(testdata.filedata)
+            outf.close()
+
         outf1 = tempfile.mkstemp()
         outf2 = tempfile.mkstemp()
 
@@ -38,6 +40,7 @@ class Convert_test(unittest.TestCase):
         outf0 = tempfile.mkstemp()
         with open(outf0[1], 'wb') as outf:
             outf.write(testdata.filedata)
+            outf.close()
 
         outf1 = tempfile.mkstemp()
         outf2 = tempfile.mkstemp()
