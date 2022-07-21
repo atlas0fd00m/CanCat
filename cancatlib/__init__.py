@@ -1463,7 +1463,7 @@ class CanInterface(object):
                 if delta_ts >= .95:
                     yield ('')
 
-            msgrepr = self._reprCanMsg(0, idx, ts, arbid, msg, comment='\t'.join(diff))
+            msgrepr = self._reprCanMsg(idx, ts, arbid, msg, comment='\t'.join(diff))
             # allow _reprCanMsg to return None to skip printing the message
             if msgrepr != DONT_PRINT_THIS_MESSAGE:
                 yield msgrepr
