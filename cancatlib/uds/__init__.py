@@ -204,6 +204,8 @@ class UDS(object):
 
         if service is None:
             svc_resp = struct.pack('>B', svc + 0x40)
+        elif isinstance(service, int):
+            svc_resp = struct.pack('>B', service)
         else:
             svc_resp = service
 
