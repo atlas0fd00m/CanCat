@@ -276,7 +276,7 @@ class UDS(object):
 
         Returns: The response ISO-TP message as a string
         '''
-        resp = struct.pack('>BH',SVC_READ_DATA_BY_IDENTIFIER, did)
+        resp = struct.pack('>BH',SVC_READ_DATA_BY_IDENTIFIER+0x40, did)
         msg = self._do_Function(SVC_READ_DATA_BY_IDENTIFIER, struct.pack('>H', did), service=resp)
         return msg
 
@@ -286,7 +286,7 @@ class UDS(object):
 
         Returns: The response ISO-TP message as a string
         '''
-        resp = struct.pack('>BH',SVC_READ_DATA_BY_IDENTIFIER, did)
+        resp = struct.pack('>BH',SVC_READ_DATA_BY_IDENTIFIER+0x40, did)
         msg = self._do_Function(SVC_WRITE_DATA_BY_IDENTIFIER, struct.pack('>H', did) + data, service=resp)
         return msg
 
@@ -472,7 +472,7 @@ class UDS(object):
             @level = the SecurityAccess level to switch to
             @secret = a SecurityAccess algorithm specific secret used to generate the key
         """
-        resp = struct.pack('>BB',SVC_SECURITY_ACCESS, level)
+        resp = struct.pack('>BB',SVC_SECURITY_ACCESS+0x40, level)
         msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service=resp)
         if msg is None:
             return msg
@@ -487,7 +487,7 @@ class UDS(object):
             else:
                 key = bytes(self._key_from_seed(seed, secret))
 
-            resp = struct.pack('>BB',SVC_SECURITY_ACCESS, level)
+            resp = struct.pack('>BB',SVC_SECURITY_ACCESS+0x40, level)
             msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level + 1, data=key, service=resp)
             return msg
 
