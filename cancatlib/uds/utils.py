@@ -358,7 +358,8 @@ def did_read_scan(u, did_range, delay=None):
         if resp is not None:
             log.debug('DID {}: {}'.format(hex(i), resp))
             if 'resp' in resp:
-                printable_did = ''.join([x if x in string.printable else '' for x in resp['resp'][3:]])
+                data = resp['resp'][3:].decode('latin-1')
+                printable_did = ''.join([x if x in string.printable else '' for x in data])
                 log.msg('DID {}: {} ({})'.format(did_str(i), resp['resp'], printable_did))
             else:
                 log.msg('DID {}: ERR {}'.format(did_str(i), err_str(resp['err'])))
