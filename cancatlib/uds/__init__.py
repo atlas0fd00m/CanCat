@@ -212,7 +212,7 @@ class UDS(object):
         while True:
             if msg is None:
                 raise UDSTimeout()
-            if msg[:len(service)] == svc_resp:
+            if msg[:len(svc_resp)] == svc_resp:
                 if self.verbose:
                     print("Positive Response!")
                 break
