@@ -201,11 +201,16 @@ class UDS(object):
 
         # Process response
         svc = data[0]
+
+        if service is None:
+            svc_resp = struct.pack('>B', svc + 0x40)
+        else:
+            svc_resp = service
+
         while True:
             if msg is None:
                 raise UDSTimeout()
-            svc_resp = msg[0]
-            if svc_resp == svc + 0x40:
+            if msg[:len(service)] == svc_resp:
                 if self.verbose:
                     print("Positive Response!")
                 break
@@ -286,7 +291,7 @@ class UDS(object):
 
         Returns: The response ISO-TP message as a string
         '''
-        resp = struct.pack('>BH',SVC_READ_DATA_BY_IDENTIFIER+0x40, did)
+        resp = struct.pack('>BH',SVC_WRITE_DATA_BY_IDENTIFIER+0x40, did)
         msg = self._do_Function(SVC_WRITE_DATA_BY_IDENTIFIER, struct.pack('>H', did) + data, service=resp)
         return msg
 
