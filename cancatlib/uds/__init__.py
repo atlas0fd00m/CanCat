@@ -487,7 +487,7 @@ class UDS(object):
             else:
                 key = bytes(self._key_from_seed(seed, secret))
 
-            resp = struct.pack('>BB',SVC_SECURITY_ACCESS+0x40, level)
+            resp = struct.pack('>BB',SVC_SECURITY_ACCESS+0x40, level+1)
             msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level + 1, data=key, service=resp)
             return msg
 
