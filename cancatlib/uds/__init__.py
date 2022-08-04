@@ -276,7 +276,8 @@ class UDS(object):
 
         Returns: The response ISO-TP message as a string
         '''
-        msg = self._do_Function(SVC_READ_DATA_BY_IDENTIFIER, struct.pack('>H', did), service=0x62)
+        resp = struct.pack('>BH',SVC_READ_DATA_BY_IDENTIFIER, did)
+        msg = self._do_Function(SVC_READ_DATA_BY_IDENTIFIER, struct.pack('>H', did), service=resp)
         return msg
 
     def WriteDID(self, did, data):
@@ -285,7 +286,8 @@ class UDS(object):
 
         Returns: The response ISO-TP message as a string
         '''
-        msg = self._do_Function(SVC_WRITE_DATA_BY_IDENTIFIER, struct.pack('>H', did) + data, service=0x62)
+        resp = struct.pack('>BH',SVC_READ_DATA_BY_IDENTIFIER, did)
+        msg = self._do_Function(SVC_WRITE_DATA_BY_IDENTIFIER, struct.pack('>H', did) + data, service=resp)
         return msg
 
     def RequestDownload(self, addr, data, data_format=0x00, addr_format=0x44):
@@ -366,7 +368,7 @@ class UDS(object):
 
         data = struct.pack('<BI' + lfmt, lenlenbyte, address, lenlenbyte)
 
-        msg = self._do_Function(SVC_WRITE_MEMORY_BY_ADDRESS, data=data, service=0x63)
+        msg = self._do_Function(SVC_WRITE_MEMORY_BY_ADDRESS, data=data, service=0x7d)
 
         return msg
 
@@ -380,21 +382,21 @@ class UDS(object):
         addr_len_data = struct.pack('>Q', length)[8-(addr_format & 0xF):]
 
         req_data = b"\x35" + struct.pack('>BB', data_format, addr_format) + addr_data + addr_len_data
-        msg = self.xmit_recv(req_data, extflag=self.extflag, service=0x74)
+        msg = self.xmit_recv(req_data, extflag=self.extflag, service=0x75)
 
         sid, lfmtid, maxnumblocks = struct.unpack('>BBH', msg[:4])
 
         output = []
         for loop in maxnumblocks:
-            msg = self._do_Function(SVC_TRANSFER_DATA, subfunc=loop)
+            msg = self._do_Function(SVC_TRANSFER_DATA, subfunc=loop, service=0x76)
             output.append(msg)
 
-            if len(msg) and msg[0] != '\x76':
+            if len(msg) and msg[0] != 0x76:
                 print("FAILURE TO DOWNLOAD ALL.  Returning what we have so far (including error message)")
                 return output
 
-        msg = self._do_Function(SVC_REQUEST_TRANSFER_EXIT)
-        if len(msg) and msg[0] != '\x77':
+        msg = self._do_Function(SVC_REQUEST_TRANSFER_EXIT, service=0x77)
+        if len(msg) and msg[0] != 0x77:
             print("FAILURE TO EXIT CLEANLY.  Returning what we received.")
 
         return output
@@ -470,7 +472,8 @@ class UDS(object):
             @level = the SecurityAccess level to switch to
             @secret = a SecurityAccess algorithm specific secret used to generate the key
         """
-        msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service=0x67)
+        resp = struct.pack('>BB',SVC_SECURITY_ACCESS, level)
+        msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level, service=resp)
         if msg is None:
             return msg
         if msg[0] == 0x7f:
@@ -484,7 +487,8 @@ class UDS(object):
             else:
                 key = bytes(self._key_from_seed(seed, secret))
 
-            msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level + 1, data=key, service=0x67)
+            resp = struct.pack('>BB',SVC_SECURITY_ACCESS, level)
+            msg = self._do_Function(SVC_SECURITY_ACCESS, subfunc=level + 1, data=key, service=resp)
             return msg
 
     def _key_from_seed(self, seed, secret):
