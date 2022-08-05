@@ -33,14 +33,14 @@ class UDStest(unittest.TestCase):
             {
                 'ecu': ECU(c, ECUAddress(0x711, 0x719, 0), scancls=FakeUDS),
                 'dids': {
-                    0x0042: '\x62\x00\x42ANSWER',
+                    0x0042: b'\x62\x00\x42ANSWER',
                 },
             },
             {
                 'ecu': ECU(c, ECUAddress(0x7e0, 0x7e8, 0), scancls=FakeUDS),
                 'dids': {
-                    0xE010: '\x62\xE0\x10VERSION 1.2.3',
-                    0xF190: '\x62\xF1\x901AB123CD1EF123456',
+                    0xE010: b'\x62\xE0\x10VERSION 1.2.3',
+                    0xF190: b'\x62\xF1\x901AB123CD1EF123456',
                 },
             },
         ]
