@@ -680,7 +680,7 @@ class CanInterface(object):
         complete = False
         starttime = lasttime = time.time()
 
-        if service is not None and isinstance(service, int):
+        if isinstance(service, int):
             # Assume this is a 1 byte SID value
             service = struct.pack('>B', service)
 
