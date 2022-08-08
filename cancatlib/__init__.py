@@ -682,7 +682,7 @@ class CanInterface(object):
 
         if isinstance(service, int):
             # Assume this is a 1 byte SID value
-            service = struct.pack('>B', service)
+            service = struct.pack('>B', service & 0xff)
 
         while not complete and (not timeout or (lasttime-starttime < timeout)):
             time.sleep(0.01)
