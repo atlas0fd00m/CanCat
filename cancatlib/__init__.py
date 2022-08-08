@@ -680,6 +680,10 @@ class CanInterface(object):
         complete = False
         starttime = lasttime = time.time()
 
+        if isinstance(service, int):
+            # Assume this is a 1 byte SID value
+            service = struct.pack('>B', service & 0xff)
+
         while not complete and (not timeout or (lasttime-starttime < timeout)):
             time.sleep(0.01)
             msgs = [msg for msg in self.genCanMsgs(start=start_index, arbids=[rx_arbid])]
@@ -693,11 +697,11 @@ class CanInterface(object):
 
                     elif service is not None:
                         # Check if this is the right service, or there was an error
-                        if msg[0] == service or msg[0] == 0x7f:
+                        if msg[:len(service)] == service or msg[0] == 0x7f:
                             msg_found = True
                             return msg, msgs[count-1][0]
 
-                        print("Hey, we got here, wrong service code?")
+                        print("Hey, we got here, wrong service code? (%s != %s)" % (msg.hex(), service.hex()))
                         start_index = msgs[count-1][0] + 1
                     else:
                         msg_found = True
