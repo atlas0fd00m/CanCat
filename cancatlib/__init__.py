@@ -188,7 +188,18 @@ def loadCanSession(filename):
     with open(filename, 'rb') as f:
         # gracefully handle python 2 to 3 conversion things
         unpickler = CanCatUnPickler(f, fix_imports=True, encoding='latin1')
-        return unpickler.load()
+        data = unpickler.load()
+
+    # Go through the msgs and turn them into bytes to ensure any logs saved
+    # with python2 can be loaded in python3
+    for cmd in data['messages']:
+        for i in range(len(data['messages'][cmd])):
+            entry = list(data['messages'][cmd][i])
+            if isinstance(entry[-1], str):
+                entry[-1] = entry[-1].encode('latin-1')
+            data['messages'][cmd][i] = tuple(entry)
+
+    return data
 
 
 def keystop(delay=0):
@@ -1097,16 +1108,6 @@ class CanInterface(object):
         see: saveSessionToFile()
         '''
         me = loadCanSession(filename)
-
-        # Go through the msgs and turn them into bytes to ensure any logs saved
-        # with python2 can be loaded in python3
-        for cmd in me['messages']:
-            for i in range(len(me['messages'][cmd])):
-                data = list(me['messages'][cmd][i])
-                if isinstance(data[-1], str):
-                    data[-1] = data[-1].encode('latin-1')
-                me['messages'][cmd][i] = tuple(data)
-
         self.restoreSession(me, force=force)
         self._filename = filename
 
