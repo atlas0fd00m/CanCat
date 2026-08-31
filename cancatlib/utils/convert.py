@@ -7,6 +7,38 @@ import struct
 
 from binascii import unhexlify
 
+# --- PCAP (Linux SLL linktype) support without scapy ---------------------
+# The original scapy-based conversion used Linktype 113 (LINKTYPE_LINUX_SLL /
+# Cooked Linux).  We reproduce the exact same wire format manually so pcap
+# files remain interoperable with tools like tcpdump and wireshark.
+#
+# pcap global header (little-endian), 24 bytes:
+#   magic(4), version_major(2), version_minor(2),
+#   thiszone(4), sigfigs(4), snaplen(4), network(4)
+PCAP_GLOBAL_HDR = struct.pack(
+    '<IHHiIII',
+    0xA1B2C3D4,  # little-endian magic
+    2, 4,        # version 2.4
+    0, 0,        # thiszone, sigfigs
+    262144,      # snaplen
+    113,         # LINKTYPE_LINUX_SLL
+)
+
+# 16-byte Linux SLL header: pkttype(2), lladdrtype(2), lladdrlen(2),
+# src(8), proto(2)
+SLL_HDR = struct.pack('<HHH8sH', 1, 0x118, 0, b'', 0x0c)  # pkttype=1(host), proto=0x0c (ETH_P_CAN)
+
+
+def _pcap_record(arb, msg_data, msg_time):
+    """Build a single little-endian pcap record (packet header + frame)."""
+    msg_len = len(msg_data)
+    frame = SLL_HDR + struct.pack('<LL', arb | 0x80000000, msg_len) + msg_data + b'\x00' * (8 - msg_len)
+    # pcap record header: ts_sec(4), ts_usec(4), incl_len(4), orig_len(4)
+    ts_sec = int(msg_time)
+    ts_usec = int((msg_time - ts_sec) * 1_000_000)
+    rec_hdr = struct.pack('<IIII', ts_sec, ts_usec, len(frame), len(frame))
+    return rec_hdr + frame
+
 def cancat2candump(session, output):
     with open(session, 'rb') as f:
         sess = pickle.load(f, encoding='latin1')
@@ -25,37 +57,22 @@ def cancat2candump(session, output):
 
 
 def cancat2pcap(session, output):
-    import scapy.layers.l2
-    import scapy.packet
-    import scapy.utils
-
     with open(session, 'rb') as f:
         sess = pickle.load(f, encoding='latin1')
 
-    msgs = []
+    records = []
     for msg_time, msg in sess['messages'].get(cancatlib.CMD_CAN_RECV, None):
         if isinstance(msg, str):
             msg = bytes(msg, 'latin1')
 
-        arb = struct.unpack_from('>L', msg)[0] | 0x80000000
+        arb = struct.unpack_from('>L', msg)[0]
         msg_data = msg[4:]
-        msg_len = len(msg_data)
-        raw = struct.pack('<LL', arb, msg_len) + msg_data + b'\x00' * (8 - msg_len)
+        records.append(_pcap_record(arb, msg_data, msg_time))
 
-        pkt = scapy.layers.l2.CookedLinux(
-                pkttype=1,
-                lladdrtype=0x118,
-                lladdrlen=0,
-                src='',
-                proto=0xc
-              ) / scapy.packet.Raw(
-                load=raw
-              )
-        pkt.time = msg_time
-
-        msgs.append(pkt)
-
-    scapy.utils.wrpcap(output, msgs)
+    with open(output, 'wb') as f:
+        f.write(PCAP_GLOBAL_HDR)
+        for rec in records:
+            f.write(rec)
 
 
 def _import_candump(filename):
@@ -88,19 +105,48 @@ def _import_candump(filename):
 
 
 def _import_pcap(filename):
-    import scapy.layers.l2
-    import scapy.packet
-    import scapy.utils
-
     msgs = []
-    can_pkts = [p for p in scapy.utils.rdpcap(filename)
-                if scapy.layers.l2.CookedLinux in p and p.proto == 12]
-    for pkt in can_pkts:
-        [arb_id, data_len] = struct.unpack_from('<LL', pkt.load)
+    with open(filename, 'rb') as f:
+        # Read and validate the global header
+        gh = f.read(24)
+        if len(gh) != 24:
+            raise ValueError('Invalid pcap file: too short for global header')
+        magic = struct.unpack_from('<I', gh, 0)[0]
+        if magic == 0xA1B2C3D4:
+            # little-endian
+            endian = '<'
+        elif struct.unpack_from('>I', gh, 0)[0] == 0xA1B2C3D4:
+            # big-endian
+            endian = '>'
+        else:
+            raise ValueError('Invalid pcap file: bad magic 0x%08x' % magic)
+        # network/encapsulation type
+        network = struct.unpack_from(endian + 'I', gh, 20)[0]
+        if network != 113:
+            raise ValueError('Unsupported pcap network type %d (expected 113/LINKTYPE_LINUX_SLL)' % network)
 
-        # Clear any flags in the arbitration ID field that might be set
-        arb_id &= 0x1FFFFFFF
-        msgs.append((pkt.time, struct.pack('>L', arb_id) + pkt.load[8:8+data_len]))
+        while True:
+            rec_hdr = f.read(16)
+            if len(rec_hdr) != 16:
+                break  # clean EOF
+            (ts_sec, ts_usec, incl_len, orig_len) = struct.unpack(endian + 'IIII', rec_hdr)
+            frame = f.read(incl_len)
+            if len(frame) != incl_len:
+                raise ValueError('Truncated pcap packet record')
+
+            # SLL header: pkttype(2), lladdrtype(2), lladdrlen(2), src(8), proto(2)
+            if len(frame) < 16 + 8:
+                continue
+            proto = struct.unpack_from(endian + 'H', frame, 14)[0]
+            if proto != 0x0c:  # ETH_P_CAN
+                continue
+            payload = frame[16:]
+
+            # CAN frame: ARB id(4) | length(4) | data(len)
+            arb_id, data_len = struct.unpack_from(endian + 'LL', payload)
+            # Clear any flags in the arbitration ID field that might be set
+            arb_id &= 0x1FFFFFFF
+            msgs.append((ts_sec + ts_usec / 1_000_000, struct.pack('>L', arb_id) + payload[8:8+data_len]))
 
     sess = {
         'bookmark_info': {},

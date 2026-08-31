@@ -51,8 +51,8 @@ class Convert_test(unittest.TestCase):
         convert.candump2cancat(outf0[1], outf1[1])
 
         # now convert to pcap
-        #convert.cancat2pcap(outf1[1], outf2[1])
+        convert.cancat2pcap(outf1[1], outf2[1])
 
         # now convert back
-        #convert.pcap2cancat(outf2[1], outf3[1])
+        convert.pcap2cancat(outf2[1], outf3[1])
 
