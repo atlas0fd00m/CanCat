@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import sys
 
 
@@ -134,8 +132,6 @@ def stop():
 
 
 def log(level, *args):
-    global _log_level, _log_file, _use_color
-
     if len(args) == 0:
         msg = ''
     elif len(args) == 1:

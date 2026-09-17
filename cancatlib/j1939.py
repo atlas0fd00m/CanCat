@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import queue
 import cancatlib
 import struct
@@ -55,9 +53,9 @@ def parseName(name):
 def reprExtMsgs(msgs):
     out = ['Ext Msg: %.2x->%.2x (%.2x%.2x%.2x) (len: 0x%x)' % (msgs['sa'], msgs['da'], msgs['pgn2'], msgs['pgn1'], msgs['pgn0'], msgs['totsize'])]
     for arbtup, msg in msgs.get('msgs'):
-        out.append(msg[1:].encode('hex'))
+        out.append(msg[1:].hex())
 
-    data = ''.join(out[1:]).decode('hex')
+    data = bytes.fromhex(''.join(out[1:]))
     strings = getAscii(data)
 
     if len(strings):
@@ -89,7 +87,7 @@ def pf_c9(idx, ts, arbtup, data, j1939):
 
 def pf_ea(idx, ts, arbtup, data, j1939):
     (prio, edp, dp, pf, ps, sa) = arbtup
-    return "Request: %s" % (data[:3].encode('hex'))
+    return "Request: %s" % (data[:3].hex())
 
 def pf_eb(idx, ts, arbtup, data, j1939):
     (prio, edp, dp, pf, da, sa) = arbtup
@@ -269,7 +267,7 @@ def pf_ef(idx, ts, arbtup, data, j1939):
 
 def pf_ff(idx, ts, arbtup, data, j1939):
     (prio, edp, dp, pf, ps, sa) = arbtup
-    pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, data.encode('hex'))
+    pgn = "%.2x :: %.2x:%.2x - %s" % (sa, pf,ps, data.hex())
     return "Proprietary B %s" % pgn
 
 pgn_pfs = {
@@ -335,7 +333,7 @@ def ec_handler(j1939, idx, ts, arbtup, data):
         extmsgs['type'] = TP_DIRECT
         extmsgs['adminmsgs'].append((arbtup, data))
         if j1939.verbose: 
-            print("new TP_CM message: %r, %r\t\t%r" % (arbtup, data.encode('hex'), extmsgs))
+            print("new TP_CM message: %r, %r\t\t%r" % (arbtup, data.hex(), extmsgs))
             print('==1  %x %x->%x' % (pf, sa, da), extmsgs)
 
         # RESPOND!
@@ -565,7 +563,7 @@ class J1939(cancatlib.CanInterface):
                 nextline = "\n\t" + '\n\t'.join(spnlines)
 
         return "%.8d %8.3f pri/edp/dp: %d/%d/%d, PG: %.2x %.2x  Source: %.2x  Data: %-18s  %s\t\t%s%s" % \
-                (idx, ts, prio, edp, dp, pf, ps, sa, data.encode('hex'), pfmeaning, comment, nextline)
+                (idx, ts, prio, edp, dp, pf, ps, sa, data.hex(), pfmeaning, comment, nextline)
 
     def _getLocals(self, idx, ts, arbid, data):
         prio, edp, dp, pf, ps, sa = parseArbid(arbid)
@@ -604,7 +602,7 @@ class J1939(cancatlib.CanInterface):
             self.queueMessageHandlerEvent(pfhandler, idx, ts, arbtup, data)
             #pfhandler(self, idx, ts, arbtup, data)
 
-        #print("submitted message: %r" % (message.encode('hex')))
+        #print("submitted message: %r" % (message.hex()))
 
 
     def queueMessageHandlerEvent(self, pfhandler, idx, ts, arbtup, data):

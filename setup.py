@@ -26,13 +26,11 @@ setuptools.setup  (name  = 'cancat',
         package_data     = pkgdata,
         ext_modules      = mods,
         scripts          = scripts,
-        install_requires = [    
+        install_requires = [
                 "ipython",
                 "pyserial",
                 "pyusb",
                 "termcolor",
-                "future",
-                "six",
             ],
         classifiers      = [
                             'Development Status :: 5 - Production/Stable',

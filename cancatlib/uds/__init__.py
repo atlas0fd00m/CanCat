@@ -1,6 +1,3 @@
-from __future__ import print_function
-from builtins import input
-
 import sys
 import time
 import struct
@@ -311,7 +308,7 @@ class UDS(object):
 
         # Parse the response
         if msg[0] != 0x74:
-            print("Error received: {}".format(msg.encode('hex')))
+            print("Error received: {}".format(msg.hex()))
             return msg
         max_txfr_num_bytes = msg[1] >> 4  # number of bytes in the max tranfer length parameter
         max_txfr_len = 0
@@ -332,7 +329,7 @@ class UDS(object):
 
             # error checking
             if msg is not None and msg[0] == 0x7f and msg[2] != 0x78:
-                print("Error sending data: {}".format(msg.encode('hex')))
+                print("Error sending data: {}".format(msg.hex()))
                 return None
             if msg is None:
                 print("Didn't get a response?")
@@ -484,7 +481,7 @@ class UDS(object):
         if msg is None:
             return msg
         if msg[0] == 0x7f:
-            print("Error getting seed:", msg.encode('hex'))
+            print("Error getting seed:", msg.hex())
 
         else:
             seed = msg[2:]
@@ -523,7 +520,7 @@ def printUDSSession(c, tx_arbid, rx_arbid=None, paginate=45):
         svc = isotpmsg[0]
         mtype = (RESP_CODES, UDS_SVCS)[arbid == tx_arbid].get(svc, '')
 
-        print("Message: (%s:%s) \t %-30s %s" % (count, msgs_idx, isotpmsg.encode('hex'), mtype))
+        print("Message: (%s:%s) \t %-30s %s" % (count, msgs_idx, isotpmsg.hex(), mtype))
         msgs_idx += count
 
         if paginate:
