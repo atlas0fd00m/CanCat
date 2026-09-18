@@ -189,9 +189,9 @@ pgn_pfs = {
 
 class J1939Interface(cancatlib.CanInterface):
     _msg_source_idx = J1939MSGS
-    def __init__(self, port=None, baud=cancatlib.baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, process_can_msgs=True, promisc=True):
+    def __init__(self, port=None, baud=cancatlib.baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, process_can_msgs=True, promisc=True, transport='serial', socketcan_iface=None):
 
-        cancatlib.CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface)
+        cancatlib.CanInterface.__init__(self, port=port, baud=baud, verbose=verbose, cmdhandlers=cmdhandlers, comment=comment, load_filename=load_filename, orig_iface=orig_iface, transport=transport, socketcan_iface=socketcan_iface)
         self.register_handler(CMD_CAN_RECV, self._j1939_can_handler)
 
         self._last_recv_idx = -1

@@ -1,6 +1,4 @@
 # CAN bus device mapping tool
-from __future__ import print_function
-
 import sys
 import argparse
 import re
@@ -134,9 +132,12 @@ def udsmap_parse_args():
                         help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (S) diagnostic Sessions')
     parser.add_argument('-p', '--port', default='/dev/ttyACM0',
                         help='System device to use to communicate to the CanCat hardware (/dev/ttyACM0)')
+    parser.add_argument('--socketcan', metavar='IFACE',
+                        help='Use socketcan interface instead of serial device (e.g., can0, vcan0); '
+                             'note "-s" is already used for --scan')
     parser.add_argument('-b', '--baud',
                         choices=_get_baud_options(), default='AUTO',
-                        help='Set the CAN Bus Speed')
+                        help='Set the CAN Bus Speed (ignored for socketcan, configure the interface bitrate with "ip link" instead)')  # noqa: E501
     parser.add_argument('-t', '--discovery-type',
                         choices=['did', 'session'], default='did',
                         help='ECU discovery method: attempt to read a DID (F190), or enter diagnostic session 2')
@@ -286,7 +287,6 @@ def save_results(results, filename=None):
         # TODO: I should probably make the config a class of it's own also, with
         #       .add_ecu(), .add_note(), .export(), .import()
         output_data = {}
-        global _config
         output_data['config'] = results['config']
         output_data['notes'] = dict([(k, literal_unicode(v)) for k, v in results['notes'].items()])
         output_data['ECUs'] = sorted([e for e in results['ECUs'].values()], key=lambda x: x._addr.tx_arbid)
@@ -296,12 +296,10 @@ def save_results(results, filename=None):
 
 
 def save():
-    global _config, _output_filename, _can_session_filename
     if _output_filename:
         save_results(_config, _output_filename)
 
     if _can_session_filename:
-        global c
         c.saveSessionToFile(_can_session_filename)
 
 
@@ -311,7 +309,6 @@ def save_and_exit(retval):
 
 
 def sigint_handler(signum, frame):
-    global _config
     log_and_save(_config, 'scan aborted @ {}'.format(now()))
     save_and_exit(1)
 
@@ -424,7 +421,11 @@ def main():  # noqa: C901
         # instead of the real cancatlib.CanInterface class
         if hasattr(scanlib, 'CanInterface'):
             ifaceclass = getattr(scanlib, 'CanInterface')
-    c = ifaceclass(port=args.port)
+
+    if args.socketcan:
+        c = ifaceclass(transport='socketcan', socketcan_iface=args.socketcan)
+    else:
+        c = ifaceclass(port=args.port)
 
     global _config
     if args.input_file is not None:

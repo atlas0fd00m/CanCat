@@ -1,7 +1,3 @@
-from __future__ import print_function
-from past.builtins import xrange
-from builtins import input, bytes
-import six
 from operator import itemgetter
 
 import os
@@ -220,20 +216,25 @@ DONT_PRINT_THIS_MESSAGE = SPECIAL_CASE
 class CanInterface(object):
     _msg_source_idx = CMD_CAN_RECV
 
-    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
+    def __init__(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None, transport='serial', socketcan_iface=None):
         '''
         CAN Analysis Workspace
         This can be subclassed by vendor to allow more vendor-specific code
         based on the way each vendor uses the varios Buses
+
+        Args:
+            ... (existing args unchanged)
+            transport: 'serial' or 'socketcan'. Default 'serial' for backward compat.
+            socketcan_iface: Interface name for socketcan mode (e.g., 'vcan0', 'can0').
         '''
         if orig_iface != None:
             self._consumeInterface(orig_iface)
             return
 
 
-        self.init(port, baud, verbose, cmdhandlers, comment, load_filename, orig_iface, max_msgs)
+        self.init(port, baud, verbose, cmdhandlers, comment, load_filename, orig_iface, max_msgs, transport=transport, socketcan_iface=socketcan_iface)
 
-    def init(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None):
+    def init(self, port=None, baud=baud, verbose=False, cmdhandlers=None, comment='', load_filename=None, orig_iface=None, max_msgs=None, transport='serial', socketcan_iface=None):
         self._inbuf = b''
         self._trash = []
         self._messages = {}
@@ -248,6 +249,21 @@ class CanInterface(object):
         self.port = self._config['port'] = port
         self._baud = self._config['baud'] = baud
         self.name = self._config['name'] = 'CanCat'
+        self.transport_mode = self._config['transport'] = transport
+
+        # --- Transport layer setup (Step 3.2) -----------------------------------
+        self._transport = None
+        if transport == 'serial':
+            pass  # legacy path: _io is set by _reconnect() below
+        elif transport == 'socketcan':
+            from .transport import SocketcanTransport
+            iface = socketcan_iface or 'vcan0'
+            self._transport = SocketcanTransport(channel=iface)
+            self._transport.open()
+        else:
+            raise ValueError(f"Unsupported transport mode: {transport!r}")
+        # -----------------------------------------------------------------------
+
         self._io = None
         self._in_lock = None
         self._out_lock = None
@@ -268,19 +284,28 @@ class CanInterface(object):
         #### FIXME: make this a connection cycle, not just a "pick the first one" thing...
         #### Prove that it's a CanCat... and that it's not in use by something else...
         # If we specify a file and no port, assume we just want to read the file, only try to guess
-        # ports if there is no file specified
+         # ports if there is no file specified
         if self.port == None and load_filename == None:
-            self.port = getDeviceFile()
+            if transport == 'socketcan':
+                pass  # socketcan has its own initialization above; port is not needed
+            else:
+                self.port = getDeviceFile()
 
-        # No filename, can't guess the port, whatcha gonna do?
-        if self.port == None and load_filename == None:
+        # No filename, can't guess the port, whatcha gonna do? (serial only)
+        if self.port == None and load_filename == None and transport != 'socketcan':
             raise Exception("Cannot find device, and no filename specified.  Please try again.")
 
-        if self.port != None:
-            self._reconnect()
+        if self.port != None or transport == 'socketcan':
+            # Serial path only: reconnect and start rx thread
+            if transport == 'serial' and self.port != None:
+                self._reconnect()
 
-            # just start the receive thread, it's lightweight and you never know when you may want it.
-            self._startRxThread()
+                # just start the receive thread, it's lightweight and you never know when you may want it.
+                self._startRxThread()
+            elif transport == 'socketcan':
+                # Start a background thread to read CAN frames from socketcan and enqueue them
+                _thread = threading.Thread(target=self.__class__._socketcan_rx_loop, args=(self,), daemon=True)
+                _thread.start()
         self._config['go'] = True
 
     def _startRxThread(self):
@@ -347,9 +372,57 @@ class CanInterface(object):
         if self._io and isinstance(self._io, serial.Serial):
             print("shutting down serial connection")
             self._io.close()
+        # Close transport layer (Step 3.6)
+        if self._transport is not None:
+            self._transport.close()
         self._config['shutdown'] = True
         if self._commsthread != None:
             self._commsthread.wait()
+
+    def _socketcan_rx_loop(self):
+        '''
+        Background thread for socketcan transport. Reads CAN frames from the
+        transport layer and submits them to the CMD_CAN_RECV mailbox.
+
+        Uses its own subscription (see SocketcanTransport.subscribe()) so it
+        gets a private copy of every frame instead of competing with an
+        in-flight IsoTpStack transaction for frames off a single shared
+        queue -- otherwise whichever of the two happened to be waiting would
+        steal frames (e.g. an ISO-TP First Frame) away from the other.
+
+        Dispatches through self._cmdhandlers the same way the serial _rxtx()
+        loop does, rather than always calling _submitMessage() directly --
+        subclasses (e.g. J1939Interface) register a CMD_CAN_RECV handler to
+        get invoked live as each frame arrives (PGN/TP reassembly, myIDs
+        filtering, ...); without this, socketcan frames would only ever pile
+        up in the generic mailbox and those handlers would never run.
+        '''
+        sub = self._transport.subscribe() if hasattr(self._transport, 'subscribe') else self._transport
+        try:
+            while not self._config['shutdown']:
+                if not self._transport:
+                    time.sleep(0.1)
+                    continue
+                try:
+                    frame = sub.recv_raw_can(timeout=1.0)
+                    if frame is None:
+                        continue
+                    arbid, data_bytes, extflag = frame
+                    ts = time.time()
+                    msg = struct.pack('>I', arbid) + data_bytes
+                    tsmsg = (ts, msg)
+
+                    cmdhandler = self._cmdhandlers.get(CMD_CAN_RECV)
+                    if cmdhandler is not None:
+                        cmdhandler(tsmsg, self)
+                    else:
+                        self._submitMessage(CMD_CAN_RECV, tsmsg)
+                except Exception as e:
+                    if not self._config['shutdown']:
+                        print("SocketCAN rx error: %r" % e)
+        finally:
+            if sub is not self._transport and hasattr(sub, 'close'):
+                sub.close()
 
     def clearCanMsgs(self):
         '''
@@ -589,44 +662,74 @@ class CanInterface(object):
 
         for x in range(count):
             yield self.recv(CMD_CAN_RECV)
-
     def CANxmit(self, arbid, message, extflag=0, timeout=3, count=1):
         '''
-        Transmit a CAN message on the attached CAN bus
-        Currently returns the *last* result
+        Transmit a CAN message on the attached CAN bus.
+        Currently returns the *last* result.
+
+        For serial transport: uses CanCat protocol commands (CMD_CAN_SEND).
+        For socketcan transport: sends via python-can, returns 0 (success).
         '''
 
+        if self.transport_mode == 'socketcan':
+            # SocketCAN path -- direct send through transport layer
+            for i in range(count):
+                result = self._transport.send_raw_can(arbid, message, extflag=bool(extflag))
+            return 0  # success -- no handshake needed on socketcan
+
+        # Serial path: pack full protocol message and go through existing logic
         msg = struct.pack('>I', arbid) + struct.pack('B', extflag) + self._bytesHelper(message)
 
         for i in range(count):
             self._send(CMD_CAN_SEND, msg)
             ts, result = self.recv(CMD_CAN_SEND_RESULT, timeout)
 
-        if result == None:
+        if result is None:
             print("CANxmit:  Return is None!?")
             return None
 
         resval = ord(result)
-        if resval != 0:
-            print("CANxmit() failed: %s" % CAN_RESPS.get(resval))
+        if CAN_RESPS.get(resval):
+            print(f"CANxmit failed with code {resval}: {CAN_RESPS[resval]}")
 
         return resval
+
 
     def ISOTPxmit(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1):
         '''
         Transmit an ISOTP can message. tx_arbid is the arbid we're transmitting,
-        and rx_arbid is the arbid we're listening for
+        and rx_arbid is the arbid we're listening for.
+
+        For socketcan transport: uses IsoTpStack (Python-layer) for flow control.
+        For serial transport: delegates to CanCat firmware via CMD_CAN_SEND_ISOTP.
         '''
+
+        if self.transport_mode == 'socketcan':
+            from cancatlib.isotp_stack import IsoTpStack
+            # Use a private subscription so this transaction's FC/CF frames
+            # aren't stolen by (or steal from) the background logging
+            # thread reading off the same transport -- see
+            # SocketcanTransport.subscribe().
+            sub = self._transport.subscribe() if hasattr(self._transport, 'subscribe') else self._transport
+            try:
+                stack = IsoTpStack(sub, rx_id=rx_arbid, tx_id=tx_arbid)
+                for i in range(count):
+                    result = stack.send(tx_arbid, message, extflag=bool(extflag))
+            finally:
+                if sub is not self._transport and hasattr(sub, 'close'):
+                    sub.close()
+            return 0 if result else 1
+
         msg = struct.pack('>IIB', tx_arbid, rx_arbid, extflag) + message
         for i in range(count):
             self._send(CMD_CAN_SEND_ISOTP, msg)
             ts, result = self.recv(CMD_CAN_SEND_ISOTP_RESULT, timeout)
 
-        if result == None:
-            print("ISOTPxmit: Return is None!?")
+        if result is None:
+            print('ISOTPxmit: Return is None!?')
         resval = ord(result)
         if resval != 0:
-            print("ISOTPxmit() failed: %s" % CAN_RESPS.get(resval))
+            print('ISOTPxmit() failed: %s' % CAN_RESPS.get(resval))
 
         return resval
 
@@ -643,29 +746,61 @@ class CanInterface(object):
         # set the CANCat to respond to Flow Control messages
         resval = self._isotp_enable_flowcontrol(tx_arbid, rx_arbid, extflag)
 
-        msg = self._getIsoTpMsg(rx_arbid, start_index=start_msg_idx, timeout=timeout)
+        msg, idx = self._isotp_get_msg(rx_arbid, start_index=start_msg_idx, timeout=timeout)
 
-        return msg
+        return msg, idx
 
-    def _isotp_enable_flowcontrol(self, tx_arbid, rx_arbid, extflag, timeout=3):
+    def _isotp_enable_flowcontrol(self, tx_arbid, rx_arbid, extflag=0, timeout=3):
+        '''
+        Enable ISO-TP flow control. For socketcan mode this is a no-op
+        because IsoTpStack handles FC frames inline during receive.
+        For serial transport: tells CanCat firmware to send FC on rx_arbid.
+        '''
+
+        if self.transport_mode == 'socketcan':
+            # Handled by IsoTpStack during receive(); nothing to pre-enable
+            return 0
+
         msg = struct.pack('>IIB', tx_arbid, rx_arbid, extflag)
         self._send(CMD_CAN_RECV_ISOTP, msg)
         ts, result = self.recv(CMD_CAN_RECV_ISOTP_RESULT, timeout)
 
-        if result == None:
-            print("_isotp_enable_flowcontrol: Return is None!?")
+        if result is None:
+            print('_isotp_enable_flowcontrol: Return is None!?')
         resval = ord(result)
         if resval != 0:
-            print("_isotp_enable_flowcontrol() failed: %s" % CAN_RESPS.get(resval))
+            print('_isotp_enable_flowcontrol() failed: %s' % CAN_RESPS.get(resval))
 
         return resval
 
+
     def ISOTPxmit_recv(self, tx_arbid, rx_arbid, message, extflag=0, timeout=3, count=1, service=None):
         '''
-        Transmit an ISOTP can message, then wait for a response.
+        Transmit an ISO-TP can message, then wait for a response.
         tx_arbid is the arbid we're transmitting, and rx_arbid
-        is the arbid we're listening for
+        is the arbid we're listening for.
+
+        For socketcan: uses IsoTpStack to send + receive.
+        For serial: delegates to CanCat firmware via CMD_CAN_SENDRECV_ISOTP.
         '''
+
+        if self.transport_mode == 'socketcan':
+            from cancatlib.isotp_stack import IsoTpStack
+            # Use a private subscription so this transaction's FF/CF/FC
+            # frames aren't stolen by (or steal from) the background
+            # logging thread reading off the same transport -- see
+            # SocketcanTransport.subscribe().
+            sub = self._transport.subscribe() if hasattr(self._transport, 'subscribe') else self._transport
+            try:
+                stack = IsoTpStack(sub, rx_id=rx_arbid, tx_id=tx_arbid)
+                for i in range(count):
+                    result = stack.send(tx_arbid, message, extflag=bool(extflag))
+                # Now receive response
+                resp_data = stack.receive(timeout=min(timeout * 2, 15.0), extflag=bool(extflag))
+            finally:
+                if sub is not self._transport and hasattr(sub, 'close'):
+                    sub.close()
+            return resp_data, None
 
         currIdx = self.getCanMsgCount()
         msg = struct.pack('>II', tx_arbid, rx_arbid) + struct.pack('B', extflag) + self._bytesHelper(message)
@@ -673,19 +808,35 @@ class CanInterface(object):
             self._send(CMD_CAN_SENDRECV_ISOTP, msg)
             ts, result = self.recv(CMD_CAN_SENDRECV_ISOTP_RESULT, timeout)
 
-        if result == None:
-            print("ISOTPxmit: Return is None!?")
+        if result is None:
+            print('ISOTPxmit: Return is None!?')
         resval = ord(result)
         if resval != 0:
-            print("ISOTPxmit() failed: %s" % CAN_RESPS.get(resval))
+            print('ISOTPxmit() failed: %s' % CAN_RESPS.get(resval))
 
-        msg, idx = self._isotp_get_msg(rx_arbid, start_index = currIdx, service = service, timeout = timeout)
+        msg, idx = self._isotp_get_msg(rx_arbid, start_index=currIdx, service=service, timeout=timeout, tx_arbid=tx_arbid)
         return msg, idx
 
-    def _isotp_get_msg(self, rx_arbid, start_index=0, service=None, timeout=None):
+    def _isotp_get_msg(self, rx_arbid, start_index=0, service=None, timeout=None, tx_arbid=None):
         '''
         Internal Method to piece together a valid ISO-TP message from received CAN packets.
+
+        For socketcan: waits for the next ISO-TP message on rx_arbid via
+        IsoTpStack -- used e.g. by UDS.xmit_recv() to wait for the real
+        response after a ResponseCorrectlyReceivedResponsePending (NRC
+        0x78). start_index is a serial/firmware-mailbox concept (a position
+        to resume scanning from) that doesn't apply here, so it's ignored.
         '''
+        if self.transport_mode == 'socketcan':
+            from cancatlib.isotp_stack import IsoTpStack
+            sub = self._transport.subscribe() if hasattr(self._transport, 'subscribe') else self._transport
+            try:
+                stack = IsoTpStack(sub, rx_id=rx_arbid, tx_id=tx_arbid)
+                msg = stack.receive(timeout=timeout or 15.0)
+            finally:
+                if sub is not self._transport and hasattr(sub, 'close'):
+                    sub.close()
+            return msg, None
 
         found = False
         complete = False
@@ -843,7 +994,16 @@ class CanInterface(object):
         '''
         set the baud rate for the CAN bus.  this has nothing to do with the
         connection from the computer to the tool
+
+        This is only meaningful for the custom CanCat firmware, which has to
+        be told what speed to run the CAN bus at.  A socketcan interface is
+        configured externally (e.g. via `ip link set can0 up type can
+        bitrate ...`) before CanCat ever touches it, so there is no firmware
+        to talk to and this is a no-op in that mode.
         '''
+        if self.transport_mode == 'socketcan':
+            self._config['can_baud'] = baud_const
+            return
 
         baud = struct.pack("B", baud_const)
 
@@ -1684,11 +1844,8 @@ class CanInterface(object):
         self._send(CMD_PRINT_CAN_REGS, "")
 
     def _bytesHelper(self, msg):
-        if isinstance(msg, six.string_types):
-            if sys.version_info < (3, 0):
-                msg = bytes(msg)
-            else:
-                msg = bytes(msg, 'raw_unicode_escape')
+        if isinstance(msg, str):
+            msg = bytes(msg, 'raw_unicode_escape')
 
         return msg
 
@@ -1822,7 +1979,7 @@ class CanInTheMiddleInterface(CanInterface):
         else:
             stop = stop + 1
 
-        for idx in xrange(start, stop):
+        for idx in range(start, stop):
             ts, msg = messages[idx]
 
             arbid, data = self._splitCanMsg(msg)
@@ -2301,7 +2458,6 @@ cs = []
 
 
 def cleanupInteractiveAtExit():
-    global cs
     for c in cs:
         try:
             c.__del__()
@@ -2317,11 +2473,11 @@ def getDeviceFile():
             return port
 
 
-def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None):
+def interactive(port=None, InterfaceClass=CanInterface, intro='', load_filename=None, can_baud=None, transport='serial', socketcan_iface=None):
     global c
     import atexit
 
-    c = InterfaceClass(port=port, load_filename=load_filename)
+    c = InterfaceClass(port=port, load_filename=load_filename, transport=transport, socketcan_iface=socketcan_iface)
     atexit.register(cleanupInteractiveAtExit)
 
     if load_filename is None:
