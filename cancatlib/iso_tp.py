@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import sys
 import struct
 
@@ -76,7 +74,7 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
 
             # Single packet message, return only the relevant data
             data = msg[1:data_len+1]
-            if verbose: print("0: %r" % data.encode('hex'))
+            if verbose: print("0: %r" % data.hex())
 
             return narbid, data, count+1
 
@@ -88,7 +86,7 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
 
             msg = msg[2:]
             output.append(msg)
-            if verbose: print("1: %r" % msg.encode('hex'))
+            if verbose: print("1: %r" % msg.hex())
             length -= len(msg)
             nextidx += 1
 
@@ -103,14 +101,14 @@ def msg_decode(msglist, offset=0, verbose=False, cancat=True):
 
             msg = msg[1:length+1]
             output.append(msg)
-            if verbose: print("2: %r" % msg.encode('hex'))
+            if verbose: print("2: %r" % msg.hex())
             length -= len(msg)
             nextidx += 1
 
         elif ftype == 3:
-            if verbose: print("Flow Control packet found: %r" % (msg.encode('hex')))
+            if verbose: print("Flow Control packet found: %r" % (msg.hex()))
         else:
-            if verbose: print("Doesn't fit: %r" % (msg.encode('hex')))
+            if verbose: print("Doesn't fit: %r" % (msg.hex()))
 
         if nextidx >= 0x10:
             nextidx = 0
@@ -171,9 +169,9 @@ def msgs_decode(msglist, verbose=False):
                 messages[-1] = b''.join(output)
 
         elif ftype == 3:
-            if verbose: print("Flow Control packet found: %r" % (msg.encode('hex')))
+            if verbose: print("Flow Control packet found: %r" % (msg.hex()))
         else:
-            if verbose: print("Doesn't fit: %r" % (msg.encode('hex')))
+            if verbose: print("Doesn't fit: %r" % (msg.hex()))
 
         if nextidx >= 0x10:
             nextidx = 0

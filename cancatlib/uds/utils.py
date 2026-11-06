@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from cancatlib import uds, ARBID_29BIT
 from cancatlib.uds import UDS
 from cancatlib.utils import log
-from cancatlib.utils.types import ECUAddress, _range_func
+from cancatlib.utils.types import ECUAddress
 
 
 def get_uds_29bit_srcid(arbid):
@@ -31,14 +31,14 @@ def gen_uds_resp_range(arbid):
         dest_id = get_uds_29bit_srcid(arbid)
         base_id = uds.ARBID_CONSTS[ARBID_29BIT]['prefix'] & (dest_id << uds.ARBID_CONSTS[ARBID_29BIT]['destid_shift'])
 
-        return _range_func(base_id, base_id + 0x100)
+        return range(base_id, base_id + 0x100)
     else:
         # Assume this is an 11-bit request
         #
         # Normally if a request is sent to 0x710, the response should have an
         # arbitration ID of 0x718, but not all ECUs do things in a "normal" way,
         # so generate a range of possible response IDs.
-        return _range_func(0x700, 0x800)
+        return range(0x700, 0x800)
 
 
 def gen_arbids(idx, ext=0):
@@ -142,9 +142,9 @@ def did_str(did):
 
     # Handle some generic DID ranges
     if name_str is None:
-        if did in _range_func(0xf1a0, 0xf1ef+1):
+        if did in range(0xf1a0, 0xf1ef+1):
             name_str = 'identificationOptionVehicleManufacturerSpecific'
-        elif did in _range_func(0xf1f0, 0xf1ff+1):
+        elif did in range(0xf1f0, 0xf1ff+1):
             name_str = 'identificationOptionSystemSupplierSpecific'
 
     if name_str:

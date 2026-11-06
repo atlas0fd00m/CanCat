@@ -1,7 +1,3 @@
-from __future__ import print_function
-from past.builtins import xrange
-from builtins import input, bytes
-import six
 from operator import itemgetter
 
 import os
@@ -1684,11 +1680,8 @@ class CanInterface(object):
         self._send(CMD_PRINT_CAN_REGS, "")
 
     def _bytesHelper(self, msg):
-        if isinstance(msg, six.string_types):
-            if sys.version_info < (3, 0):
-                msg = bytes(msg)
-            else:
-                msg = bytes(msg, 'raw_unicode_escape')
+        if isinstance(msg, str):
+            msg = bytes(msg, 'raw_unicode_escape')
 
         return msg
 
@@ -1822,7 +1815,7 @@ class CanInTheMiddleInterface(CanInterface):
         else:
             stop = stop + 1
 
-        for idx in xrange(start, stop):
+        for idx in range(start, stop):
             ts, msg = messages[idx]
 
             arbid, data = self._splitCanMsg(msg)
@@ -2301,7 +2294,6 @@ cs = []
 
 
 def cleanupInteractiveAtExit():
-    global cs
     for c in cs:
         try:
             c.__del__()

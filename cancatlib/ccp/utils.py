@@ -1,6 +1,4 @@
 import struct
-import six
-import sys
 
 '''
 Table of Command Codes
@@ -119,13 +117,7 @@ def _gen_byte(value):
 
 
 def _parse_byte(value):
-    if isinstance(value, six.string_types):
-        if sys.version_info < (3, 0):
-            return struct.unpack('B', value)[0]
-        else:
-            return value
-    else:
-        return value
+    return value
 
 
 def _gen_2_byte_val(value):
@@ -154,18 +146,9 @@ def _parse_4_byte_value(value):
 
 
 def _parse_6_byte_value(value):
-    if isinstance(value, six.string_types):
-        if sys.version_info < (3, 0):
-            return '0x' + value.encode('hex')
-        else:
-            return '0x' + value.hex()
-    else:
-        return '0x' + value.hex()
+    return '0x' + value.hex()
 
 
 def _bytesHelper(msg):
-    if isinstance(msg, six.string_types):
-        if sys.version_info < (3, 0):
-            return bytes(msg)
-        else:
-            return bytes(msg, 'raw_unicode_escape')
+    if isinstance(msg, str):
+        return bytes(msg, 'raw_unicode_escape')
