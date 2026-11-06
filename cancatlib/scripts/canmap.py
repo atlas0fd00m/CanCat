@@ -1,6 +1,4 @@
 # CAN bus device mapping tool
-from __future__ import print_function
-
 import sys
 import argparse
 import re
@@ -286,7 +284,6 @@ def save_results(results, filename=None):
         # TODO: I should probably make the config a class of it's own also, with
         #       .add_ecu(), .add_note(), .export(), .import()
         output_data = {}
-        global _config
         output_data['config'] = results['config']
         output_data['notes'] = dict([(k, literal_unicode(v)) for k, v in results['notes'].items()])
         output_data['ECUs'] = sorted([e for e in results['ECUs'].values()], key=lambda x: x._addr.tx_arbid)
@@ -296,12 +293,10 @@ def save_results(results, filename=None):
 
 
 def save():
-    global _config, _output_filename, _can_session_filename
     if _output_filename:
         save_results(_config, _output_filename)
 
     if _can_session_filename:
-        global c
         c.saveSessionToFile(_can_session_filename)
 
 
@@ -311,7 +306,6 @@ def save_and_exit(retval):
 
 
 def sigint_handler(signum, frame):
-    global _config
     log_and_save(_config, 'scan aborted @ {}'.format(now()))
     save_and_exit(1)
 

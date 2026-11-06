@@ -1,14 +1,5 @@
 # Various types used by CanCat utility functions.
-from past.builtins import xrange
-
 import re
-
-# Test if this is python2 or python3
-try:
-    _ = xrange(1, 2)
-    _range_func = xrange
-except NameError:
-    _range_func = range
 
 
 def _dec_range(val, increment=1):
@@ -16,7 +7,7 @@ def _dec_range(val, increment=1):
     if len(parts) == 1:
         return int(parts[0])
     else:
-        return _range_func(int(parts[0]), int(parts[1]) + 1, increment)
+        return range(int(parts[0]), int(parts[1]) + 1, increment)
 
 
 def _hex_range(val, increment=1):
@@ -24,7 +15,7 @@ def _hex_range(val, increment=1):
     if len(parts) == 1:
         return int(parts[0], 16)
     else:
-        return _range_func(int(parts[0], 16), int(parts[1], 16) + 1, increment)
+        return range(int(parts[0], 16), int(parts[1], 16) + 1, increment)
 
 
 class SparseRange(tuple):
