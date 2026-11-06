@@ -132,9 +132,12 @@ def udsmap_parse_args():
                         help='Type of scan to run, select one or more of: (E) ECUs, (D) read DIDs, (S) diagnostic Sessions')
     parser.add_argument('-p', '--port', default='/dev/ttyACM0',
                         help='System device to use to communicate to the CanCat hardware (/dev/ttyACM0)')
+    parser.add_argument('--socketcan', metavar='IFACE',
+                        help='Use socketcan interface instead of serial device (e.g., can0, vcan0); '
+                             'note "-s" is already used for --scan')
     parser.add_argument('-b', '--baud',
                         choices=_get_baud_options(), default='AUTO',
-                        help='Set the CAN Bus Speed')
+                        help='Set the CAN Bus Speed (ignored for socketcan, configure the interface bitrate with "ip link" instead)')  # noqa: E501
     parser.add_argument('-t', '--discovery-type',
                         choices=['did', 'session'], default='did',
                         help='ECU discovery method: attempt to read a DID (F190), or enter diagnostic session 2')
@@ -418,7 +421,11 @@ def main():  # noqa: C901
         # instead of the real cancatlib.CanInterface class
         if hasattr(scanlib, 'CanInterface'):
             ifaceclass = getattr(scanlib, 'CanInterface')
-    c = ifaceclass(port=args.port)
+
+    if args.socketcan:
+        c = ifaceclass(transport='socketcan', socketcan_iface=args.socketcan)
+    else:
+        c = ifaceclass(port=args.port)
 
     global _config
     if args.input_file is not None:

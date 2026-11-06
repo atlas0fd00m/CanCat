@@ -223,8 +223,12 @@ class UDS(object):
                 # Don't throw an exception for
                 # ResponseCorrectlyReceivedResponsePending
                 if errcode == 0x78:
-                    # Try again but increment the start index
-                    msg, idx = self.c._isotp_get_msg(self.rx_arbid, start_index=idx+1, service=service, timeout=self.timeout)
+                    # Try again but increment the start index. idx is None
+                    # under socketcan (there's no mailbox position to resume
+                    # from -- _isotp_get_msg just waits for the next ISO-TP
+                    # message on rx_arbid instead), so guard against it.
+                    next_index = (idx + 1) if idx is not None else None
+                    msg, idx = self.c._isotp_get_msg(self.rx_arbid, start_index=next_index, service=service, timeout=self.timeout, tx_arbid=self.tx_arbid)
                 else:
                     raise NegativeResponseException(errcode, svc, msg)
 

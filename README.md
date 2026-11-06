@@ -4,13 +4,14 @@ CanCat is an open source multi-purpose tool for interacting and experimenting wi
 ## Description
 CanCat has two main parts:
 1) Firmware for compatible CAN-transceivers,
-2) Python client to talk to CanCat,
+2) Python client to talk to CanCat, (can also talk to socketcan devices).
 
 The CAN-transceiver combinations that are currently supported by CanCat are:
 * Arduino with SeeedStudio's CANBUS Shield
 * Arduino DUE with Togglebit.net's CAN shield
 * [Macchina M2 (Under-the-Hood)](https://www.macchina.cc/catalog)
 * [Macchina M2 (Under-the-Dash)](https://www.macchina.cc/catalog)
+* Any socketcan device
 
 The goals of CanCat are to provide:
 * a way to capture and transmit messages on an arbitrary CAN bus (whatever the speed, as supported by hardware)
@@ -37,15 +38,17 @@ The goals of CanCat are to provide:
 
 
 ## Installation
-1) Install pyserial:
+1) Install pyserial and python-can:
 ```
-$ pip install --user pyserial
+$ pip install --user pyserial python-can
 ```
 
 2) (OPTIONAL) Install ipython if you want to use CanCat interactively.
 ```
 $ pip install --user ipython
 ```
+
+Stop here if using a socketcan device.
 
 3) Install the [Arduino IDE](https://www.arduino.cc/en/main/software).
 
@@ -89,7 +92,7 @@ USB connector and then plugging it back in again.
 ## Connecting to your CAN-transceiver with CanCat
 Once you have the required software installed and your device is flashed, you can use CanCat with your CAN-transceiver.
 
-### Connect to the CAN-transceiver with CanCat [Linux]:
+### Connect to the CAN-transceiver with CanCat [Linux, CanCat Firmware]:
 ```bash
 $ ./CanCat.py -p /dev/ttyACM0  # if CanCat device is /dev/ttyACM0
 ```
@@ -130,6 +133,13 @@ you interact with the CanCat tool:
 
 Other than the different in prompt type, the commands for CanCat will look the same.
 
+
+### Connect to socketcan with CanCat [Linux and other systems]:
+```bash
+sudo ip link set dev can0 type can bitrate 500000
+sudo ip link set dev can0 up
+./CanCat -s can0
+```
 
 
 ## Getting Started
