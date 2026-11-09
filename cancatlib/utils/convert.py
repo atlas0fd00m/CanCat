@@ -69,9 +69,10 @@ def _import_candump(filename):
 
             time, arb_id, data, comment = match.groups()
 
-            # Ensure that the arbid is padded out to 4 bytes
+            # Ensure that the arbid is padded out to 4 bytes (candump writes
+            # 11-bit IDs as 3 hex digits, 29-bit IDs as 8)
             if len(arb_id) < 8:
-                arb_id = ('0' * (8 - len(arb_id))) + arb_id
+                arb_id = (b'0' * (8 - len(arb_id))) + arb_id
 
             msgs.append((float(time), unhexlify(arb_id) + unhexlify(data)))
 
