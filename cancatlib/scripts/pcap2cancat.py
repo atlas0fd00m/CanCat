@@ -1,5 +1,4 @@
 # Command line entry point for candump2cancat
-# This requires scapy to be installed
 
 import sys
 import argparse

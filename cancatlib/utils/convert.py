@@ -20,22 +20,34 @@ PCAP_GLOBAL_HDR = struct.pack(
     0xA1B2C3D4,  # little-endian magic
     2, 4,        # version 2.4
     0, 0,        # thiszone, sigfigs
-    262144,      # snaplen
+    65535,       # snaplen (scapy wrpcap default)
     113,         # LINKTYPE_LINUX_SLL
 )
 
 # 16-byte Linux SLL header: pkttype(2), lladdrtype(2), lladdrlen(2),
-# src(8), proto(2)
-SLL_HDR = struct.pack('<HHH8sH', 1, 0x118, 0, b'', 0x0c)  # pkttype=1(host), proto=0x0c (ETH_P_CAN)
+# src(8), proto(2).  SLL header fields are always big-endian (network byte
+# order), independent of the pcap file's byte order.  ETH_P_CAN = 0x000c,
+# ARPHRD_CAN = 0x118 (280).
+SLL_HDR = struct.pack('>HHH8sH', 1, 0x118, 0, b'', 0x0c)  # pkttype=1(host)
+ETH_P_CAN = 0x0c
+
+# The CAN frame following the SLL header (struct can_frame: can_id(4),
+# can_dlc(4 incl. padding), data(8)) is in capturing-host byte order.
+# CanCat has always written and read it little-endian.
+CAN_FRAME_HDR = '<LL'
 
 
 def _pcap_record(arb, msg_data, msg_time):
     """Build a single little-endian pcap record (packet header + frame)."""
     msg_len = len(msg_data)
-    frame = SLL_HDR + struct.pack('<LL', arb | 0x80000000, msg_len) + msg_data + b'\x00' * (8 - msg_len)
+    frame = SLL_HDR + struct.pack(CAN_FRAME_HDR, arb | 0x80000000, msg_len) + msg_data + b'\x00' * (8 - msg_len)
     # pcap record header: ts_sec(4), ts_usec(4), incl_len(4), orig_len(4)
+    # Round (not truncate) to the nearest microsecond, as scapy's wrpcap did.
     ts_sec = int(msg_time)
-    ts_usec = int((msg_time - ts_sec) * 1_000_000)
+    ts_usec = int(round((msg_time - ts_sec) * 1_000_000))
+    if ts_usec >= 1_000_000:
+        ts_sec += 1
+        ts_usec -= 1_000_000
     rec_hdr = struct.pack('<IIII', ts_sec, ts_usec, len(frame), len(frame))
     return rec_hdr + frame
 
@@ -137,13 +149,14 @@ def _import_pcap(filename):
             # SLL header: pkttype(2), lladdrtype(2), lladdrlen(2), src(8), proto(2)
             if len(frame) < 16 + 8:
                 continue
-            proto = struct.unpack_from(endian + 'H', frame, 14)[0]
-            if proto != 0x0c:  # ETH_P_CAN
+            # SLL fields are big-endian regardless of pcap byte order
+            proto = struct.unpack_from('>H', frame, 14)[0]
+            if proto != ETH_P_CAN:
                 continue
             payload = frame[16:]
 
             # CAN frame: ARB id(4) | length(4) | data(len)
-            arb_id, data_len = struct.unpack_from(endian + 'LL', payload)
+            arb_id, data_len = struct.unpack_from(CAN_FRAME_HDR, payload)
             # Clear any flags in the arbitration ID field that might be set
             arb_id &= 0x1FFFFFFF
             msgs.append((ts_sec + ts_usec / 1_000_000, struct.pack('>L', arb_id) + payload[8:8+data_len]))
